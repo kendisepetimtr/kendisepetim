@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "../../../lib/supabase";
+import { getCurrentRestaurantContext } from "../../../features/tenants";
 import { loginWithPassword } from "./actions";
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; registered?: string; message?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -13,11 +14,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) {
-    redirect("/dashboard");
-  }
-
   const params = await searchParams;
+
+  if (user) {
+    const restaurantContext = await getCurrentRestaurantContext();
+    if (restaurantContext) {
+      redirect("/dashboard");
+    }
+    redirect("/onboarding/restaurant");
+  }
 
   return (
     <main className="mx-auto flex min-h-[80vh] w-full max-w-md items-center px-6 py-12">
@@ -30,6 +35,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {params.error ? (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {params.error}
+          </p>
+        ) : null}
+
+        {params.registered ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {params.message
+              ? decodeURIComponent(params.message)
+              : "Kayit tamam. Simdi giris yapabilirsiniz."}
           </p>
         ) : null}
 
@@ -68,7 +81,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-gray-500">
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Hesabiniz yok mu?{" "}
+          <Link href="/register" className="font-medium text-gray-900 underline">
+            Kayit ol
+          </Link>
+        </p>
+
+        <p className="mt-3 text-center text-xs text-gray-500">
           Pazarlama sayfasina donmek icin{" "}
           <Link href="/" className="text-gray-800 underline">
             tiklayin

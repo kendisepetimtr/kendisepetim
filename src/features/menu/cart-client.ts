@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CartItem, Product } from "../../types";
+import { effectiveOnlinePrice, type CartItem, type Product } from "../../types";
 
 function getCartStorageKey(tenantSlug: string) {
   return `kendisepetim:cart:${tenantSlug}`;
@@ -13,6 +13,7 @@ function sanitizeCartItems(value: unknown): CartItem[] {
     .map((item) => item as Partial<CartItem>)
     .filter(
       (item) =>
+        typeof item.lineId === "string" &&
         typeof item.productId === "string" &&
         typeof item.name === "string" &&
         typeof item.price === "number" &&
@@ -22,11 +23,32 @@ function sanitizeCartItems(value: unknown): CartItem[] {
         item.quantity > 0,
     )
     .map((item) => ({
+      lineId: item.lineId as string,
       productId: item.productId as string,
       name: item.name as string,
       price: item.price as number,
       quantity: Math.floor(item.quantity as number),
+      removedIngredients: Array.isArray(item.removedIngredients)
+        ? item.removedIngredients.filter((v): v is string => typeof v === "string")
+        : [],
+      addedIngredients: Array.isArray(item.addedIngredients)
+        ? item.addedIngredients.filter((v): v is string => typeof v === "string")
+        : [],
+      itemNote: typeof item.itemNote === "string" ? item.itemNote : null,
     }));
+}
+
+function buildLineId(
+  productId: string,
+  removedIngredients: string[],
+  addedIngredients: string[],
+  itemNote: string,
+): string {
+  const normalize = (value: string) => value.trim().toLowerCase();
+  const removed = [...removedIngredients].map(normalize).filter(Boolean).sort().join("|");
+  const added = [...addedIngredients].map(normalize).filter(Boolean).sort().join("|");
+  const note = normalize(itemNote);
+  return [productId, removed, added, note].join("::");
 }
 
 export function useTenantCart(tenantSlug: string) {
@@ -59,38 +81,54 @@ export function useTenantCart(tenantSlug: string) {
     [cartItems],
   );
 
-  function addToCart(product: Product) {
+  function addToCart(
+    product: Product,
+    options?: {
+      removedIngredients?: string[];
+      addedIngredients?: string[];
+      itemNote?: string;
+    },
+  ) {
+    const removedIngredients = (options?.removedIngredients ?? []).filter(Boolean);
+    const addedIngredients = (options?.addedIngredients ?? []).filter(Boolean);
+    const itemNote = (options?.itemNote ?? "").trim();
+    const lineId = buildLineId(product.id, removedIngredients, addedIngredients, itemNote);
+
     setCartItems((prev) => {
-      const found = prev.find((item) => item.productId === product.id);
+      const found = prev.find((item) => item.lineId === lineId);
       if (!found) {
         return [
           ...prev,
           {
+            lineId,
             productId: product.id,
             name: product.name,
-            price: product.price,
+            price: effectiveOnlinePrice(product),
             quantity: 1,
+            removedIngredients,
+            addedIngredients,
+            itemNote: itemNote || null,
           },
         ];
       }
       return prev.map((item) =>
-        item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+        item.lineId === lineId ? { ...item, quantity: item.quantity + 1 } : item,
       );
     });
   }
 
-  function updateQuantity(productId: string, quantity: number) {
+  function updateQuantity(lineId: string, quantity: number) {
     if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((item) => item.productId !== productId));
+      setCartItems((prev) => prev.filter((item) => item.lineId !== lineId));
       return;
     }
     setCartItems((prev) =>
-      prev.map((item) => (item.productId === productId ? { ...item, quantity } : item)),
+      prev.map((item) => (item.lineId === lineId ? { ...item, quantity } : item)),
     );
   }
 
-  function removeFromCart(productId: string) {
-    setCartItems((prev) => prev.filter((item) => item.productId !== productId));
+  function removeFromCart(lineId: string) {
+    setCartItems((prev) => prev.filter((item) => item.lineId !== lineId));
   }
 
   function clearCart() {

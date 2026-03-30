@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { isValidTenantSlug, normalizeTenantSlug } from "../../../../lib/tenant";
-import { getCategoriesByRestaurantId, getActiveProductsByRestaurantId } from "../../../../features/menu";
+import {
+  getActiveProductsByRestaurantId,
+  getCategoriesByRestaurantId,
+} from "../../../../features/menu/server";
 import { getRestaurantBySlug } from "../../../../features/tenants";
-import { PageShell } from "../../../../components/ui/page-shell";
+import { menuThemeFromRestaurant } from "../../../../lib/tenant-menu-theme";
 import { TenantMenuClient } from "./menu-client";
 
 type TenantPageProps = {
@@ -17,26 +20,25 @@ export default async function TenantMenuPage({ params }: TenantPageProps) {
     notFound();
   }
 
-  const restaurant = await getRestaurantBySlug(normalizedTenant);
+  const restaurant = await getRestaurantBySlug(normalizedTenant, { storefront: true });
   if (!restaurant) {
     notFound();
   }
 
   const [categories, products] = await Promise.all([
-    getCategoriesByRestaurantId(restaurant.id),
-    getActiveProductsByRestaurantId(restaurant.id),
+    getCategoriesByRestaurantId(restaurant.id, { storefront: true }),
+    getActiveProductsByRestaurantId(restaurant.id, { storefront: true }),
   ]);
 
   return (
-    <PageShell
-      title={restaurant.name}
-      description={`${restaurant.slug}.kendisepetim.com menusu`}
-    >
+    <main className="w-full min-h-[100dvh]">
+      <h1 className="sr-only">{restaurant.name}</h1>
       <TenantMenuClient
         tenantSlug={restaurant.slug}
         categories={categories}
         products={products}
+        menuTheme={menuThemeFromRestaurant(restaurant)}
       />
-    </PageShell>
+    </main>
   );
 }

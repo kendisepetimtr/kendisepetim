@@ -17,7 +17,7 @@ export default async function TenantCartPage({ params }: TenantCartPageProps) {
     notFound();
   }
 
-  const restaurant = await getRestaurantBySlug(normalizedTenant);
+  const restaurant = await getRestaurantBySlug(normalizedTenant, { storefront: true });
   if (!restaurant) {
     notFound();
   }

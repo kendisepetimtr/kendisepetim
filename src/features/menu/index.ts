@@ -1,4 +1,2 @@
-export * from "./category-actions";
+/** Client-safe exports only. Server: import from `./server` or concrete modules. */
 export * from "./cart-client";
-export * from "./product-actions";
-export * from "./queries";

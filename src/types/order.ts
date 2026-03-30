@@ -7,6 +7,7 @@ export type OrderStatus =
   | "cancelled";
 
 export type OrderType = "table" | "delivery" | "pickup";
+export type OrderChannel = "online" | "table" | "package";
 export type PaymentMethod = "cash" | "card";
 
 export type Order = {
@@ -14,6 +15,7 @@ export type Order = {
   order_number: number | null;
   restaurant_id: string;
   order_type: OrderType;
+  order_channel: OrderChannel;
   payment_method: PaymentMethod;
   status: OrderStatus;
   customer_name: string | null;
@@ -28,6 +30,9 @@ export type OrderItem = {
   unit_price: number;
   quantity: number;
   line_total: number;
+  removed_ingredients?: string[] | null;
+  added_ingredients?: string[] | null;
+  item_note?: string | null;
 };
 
 export type OrderDetail = {
@@ -35,6 +40,7 @@ export type OrderDetail = {
   order_number: number | null;
   restaurant_id: string;
   order_type: OrderType;
+  order_channel: OrderChannel;
   payment_method: PaymentMethod;
   status: OrderStatus;
   customer_name: string | null;

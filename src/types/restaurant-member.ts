@@ -1,3 +1,5 @@
+import type { Restaurant } from "./restaurant";
+
 export type RestaurantMemberRole = "owner" | "manager" | "staff";
 
 export type RestaurantMember = {
@@ -16,13 +18,5 @@ export type UserRestaurantMembership = {
   role: RestaurantMemberRole;
   is_active: boolean;
   created_at: string;
-  restaurants: {
-    id: string;
-    name: string;
-    slug: string;
-    logo_url: string | null;
-    brand_color: string | null;
-    is_active: boolean;
-    created_at: string;
-  } | null;
+  restaurants: Restaurant | null;
 };

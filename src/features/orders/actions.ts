@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "../../lib/supabase";
-import type { CartItem, Order, OrderDetail, OrderItem, OrderStatus } from "../../types";
+import {
+  effectiveOnlinePrice,
+  type CartItem,
+  type OrderChannel,
+  type Order,
+  type OrderDetail,
+  type OrderItem,
+  type OrderStatus,
+} from "../../types";
 import { getCurrentRestaurantContext, getRestaurantBySlug } from "../tenants";
 import { DELIVERY_FEE_TRY } from "./constants";
 
@@ -17,9 +25,19 @@ const ORDER_STATUSES: OrderStatus[] = [
   "cancelled",
 ];
 
+function isUnknownColumnError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("schema cache") ||
+    (m.includes("could not find") && m.includes("column")) ||
+    (m.includes("column") && m.includes("does not exist"))
+  );
+}
+
 type CreateOrderInput = {
   tenantSlug: string;
   orderType: OrderType;
+  orderChannel?: OrderChannel;
   paymentMethod: PaymentMethod;
   customerName: string;
   customerPhone: string;
@@ -54,6 +72,9 @@ function validateOrderStatus(value: string): value is OrderStatus {
 
 export async function createOrderFromCheckout(input: CreateOrderInput): Promise<CreateOrderResult> {
   const orderType = String(input.orderType ?? "");
+  const orderChannel: OrderChannel =
+    input.orderChannel ??
+    (orderType === "table" ? "table" : "online");
   const paymentMethod = String(input.paymentMethod ?? "");
 
   if (!validateOrderType(orderType)) {
@@ -72,7 +93,7 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
   if (!customerName || !customerPhone) {
     throw new Error("Customer name and phone are required.");
   }
-  if (orderType === "delivery" && !deliveryAddress) {
+  if (orderType === "delivery" && orderChannel !== "package" && !deliveryAddress) {
     throw new Error("Delivery address is required for delivery orders.");
   }
   if (orderType === "table" && !tableNumber) {
@@ -88,6 +109,13 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
     .map((item) => ({
       productId: String(item.productId ?? "").trim(),
       quantity: Number(item.quantity),
+      removedIngredients: Array.isArray(item.removedIngredients)
+        ? item.removedIngredients.filter((v): v is string => typeof v === "string")
+        : [],
+      addedIngredients: Array.isArray(item.addedIngredients)
+        ? item.addedIngredients.filter((v): v is string => typeof v === "string")
+        : [],
+      itemNote: asText(item.itemNote),
     }))
     .filter((item) => item.productId && Number.isFinite(item.quantity) && item.quantity > 0)
     .map((item) => ({ ...item, quantity: Math.floor(item.quantity) }));
@@ -96,7 +124,7 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
     throw new Error("Cart contains invalid items.");
   }
 
-  const restaurant = await getRestaurantBySlug(input.tenantSlug);
+  const restaurant = await getRestaurantBySlug(input.tenantSlug, { storefront: true });
   if (!restaurant) {
     throw new Error("Restaurant not found for tenant.");
   }
@@ -106,7 +134,7 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
 
   const { data: products, error: productError } = await supabase
     .from("products")
-    .select("id, restaurant_id, name, price, is_active")
+    .select("*")
     .in("id", productIds)
     .eq("restaurant_id", restaurant.id);
 
@@ -129,7 +157,25 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
       throw new Error("Cart includes inactive products.");
     }
 
-    const unitPrice = Number(product.price);
+    const row = product as {
+      price: unknown;
+      delivery_price?: unknown;
+      use_delivery_price?: unknown;
+    };
+    const basePrice = Number(row.price);
+    const deliveryPrice =
+      row.delivery_price != null && row.delivery_price !== ""
+        ? Number(row.delivery_price)
+        : null;
+    const useDeliveryPrice = Boolean(row.use_delivery_price);
+    const unitPrice =
+      orderChannel === "package" && useDeliveryPrice && deliveryPrice != null
+        ? Number(deliveryPrice.toFixed(2))
+        : effectiveOnlinePrice({
+            price: basePrice,
+            delivery_price: deliveryPrice,
+            use_delivery_price: useDeliveryPrice,
+          });
     const lineTotal = Number((unitPrice * item.quantity).toFixed(2));
 
     return {
@@ -138,6 +184,9 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
       unit_price: Number(unitPrice.toFixed(2)),
       quantity: item.quantity,
       line_total: lineTotal,
+      removed_ingredients: item.removedIngredients,
+      added_ingredients: item.addedIngredients,
+      item_note: item.itemNote,
     };
   });
 
@@ -152,6 +201,7 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
     .insert({
       restaurant_id: restaurant.id,
       order_type: orderType,
+      order_channel: orderChannel,
       payment_method: paymentMethod,
       status: "pending",
       subtotal,
@@ -170,13 +220,28 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
     throw new Error(`Failed to create order: ${orderError?.message ?? "Unknown error"}`);
   }
 
-  const { error: itemError } = await supabase.from("order_items").insert(
+  let { error: itemError } = await supabase.from("order_items").insert(
     orderItems.map((item) => ({
       order_id: insertedOrder.id,
       restaurant_id: restaurant.id,
       ...item,
     })),
   );
+
+  if (itemError && isUnknownColumnError(itemError.message)) {
+    const legacyInsert = await supabase.from("order_items").insert(
+      orderItems.map((item) => ({
+        order_id: insertedOrder.id,
+        restaurant_id: restaurant.id,
+        product_id: item.product_id,
+        product_name_snapshot: item.product_name_snapshot,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        line_total: item.line_total,
+      })),
+    );
+    itemError = legacyInsert.error;
+  }
 
   if (itemError) {
     await supabase.from("orders").delete().eq("id", insertedOrder.id);
@@ -190,28 +255,87 @@ export async function createOrderFromCheckout(input: CreateOrderInput): Promise<
   };
 }
 
-export async function getDashboardOrdersForCurrentRestaurant(): Promise<Order[]> {
+export async function getDashboardOrdersForCurrentRestaurant(
+  channel?: OrderChannel | "all",
+): Promise<Order[]> {
   const context = await getCurrentRestaurantContext();
   if (!context) {
     throw new Error("Unauthorized: login and active restaurant membership required.");
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("orders")
     .select(
-      "id, order_number, restaurant_id, order_type, payment_method, status, customer_name, total, created_at",
+      "id, order_number, restaurant_id, order_type, order_channel, payment_method, status, customer_name, total, created_at",
     )
-    .eq("restaurant_id", context.restaurant.id)
+    .eq("restaurant_id", context.restaurant.id);
+
+  if (channel && channel !== "all") {
+    query = query.eq("order_channel", channel);
+  }
+
+  let { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(100)
     .returns<Order[]>();
+
+  if (error && isUnknownColumnError(error.message)) {
+    let legacyQuery = supabase
+      .from("orders")
+      .select("id, order_number, restaurant_id, order_type, payment_method, status, customer_name, total, created_at")
+      .eq("restaurant_id", context.restaurant.id);
+    if (channel && channel !== "all") {
+      if (channel === "table") legacyQuery = legacyQuery.eq("order_type", "table");
+      else if (channel === "online") legacyQuery = legacyQuery.in("order_type", ["delivery", "pickup"]);
+      else legacyQuery = legacyQuery.eq("id", "__no_package_before_patch__");
+    }
+    const legacy = await legacyQuery.order("created_at", { ascending: false }).limit(100);
+    error = legacy.error;
+    data = (legacy.data ?? []).map((r) => ({
+      ...r,
+      order_channel: r.order_type === "table" ? "table" : "online",
+    })) as Order[];
+  }
 
   if (error) {
     throw new Error(`Failed to fetch dashboard orders: ${error.message}`);
   }
 
   return data ?? [];
+}
+
+export async function getPendingOnlineOrdersCountForCurrentRestaurant(): Promise<number> {
+  const context = await getCurrentRestaurantContext();
+  if (!context) {
+    throw new Error("Unauthorized: login and active restaurant membership required.");
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .eq("restaurant_id", context.restaurant.id)
+    .eq("order_channel", "online")
+    .eq("status", "pending");
+
+  if (error && isUnknownColumnError(error.message)) {
+    const legacy = await supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("restaurant_id", context.restaurant.id)
+      .in("order_type", ["delivery", "pickup"])
+      .eq("status", "pending");
+    if (legacy.error) {
+      throw new Error(`Failed to fetch pending online orders: ${legacy.error.message}`);
+    }
+    return legacy.count ?? 0;
+  }
+
+  if (error) {
+    throw new Error(`Failed to fetch pending online orders: ${error.message}`);
+  }
+  return count ?? 0;
 }
 
 export async function updateOrderStatus(formData: FormData) {
@@ -249,14 +373,32 @@ export async function getDashboardOrderById(orderId: string): Promise<OrderDetai
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("orders")
     .select(
-      "id, order_number, restaurant_id, order_type, payment_method, status, customer_name, customer_phone, delivery_address, table_number, note, subtotal, delivery_fee, total, created_at",
+      "id, order_number, restaurant_id, order_type, order_channel, payment_method, status, customer_name, customer_phone, delivery_address, table_number, note, subtotal, delivery_fee, total, created_at",
     )
     .eq("restaurant_id", context.restaurant.id)
     .eq("id", orderId)
     .maybeSingle<OrderDetail>();
+
+  if (error && isUnknownColumnError(error.message)) {
+    const legacy = await supabase
+      .from("orders")
+      .select(
+        "id, order_number, restaurant_id, order_type, payment_method, status, customer_name, customer_phone, delivery_address, table_number, note, subtotal, delivery_fee, total, created_at",
+      )
+      .eq("restaurant_id", context.restaurant.id)
+      .eq("id", orderId)
+      .maybeSingle<Omit<OrderDetail, "order_channel">>();
+    error = legacy.error;
+    data = legacy.data
+      ? ({
+          ...legacy.data,
+          order_channel: legacy.data.order_type === "table" ? "table" : "online",
+        } as OrderDetail)
+      : null;
+  }
 
   if (error) {
     throw new Error(`Failed to fetch order detail: ${error.message}`);
@@ -272,13 +414,29 @@ export async function getDashboardOrderItems(orderId: string): Promise<OrderItem
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("order_items")
-    .select("id, order_id, product_name_snapshot, unit_price, quantity, line_total")
+    .select("id, order_id, product_name_snapshot, unit_price, quantity, line_total, removed_ingredients, added_ingredients, item_note")
     .eq("restaurant_id", context.restaurant.id)
     .eq("order_id", orderId)
     .order("created_at", { ascending: true })
     .returns<OrderItem[]>();
+
+  if (error && isUnknownColumnError(error.message)) {
+    const legacy = await supabase
+      .from("order_items")
+      .select("id, order_id, product_name_snapshot, unit_price, quantity, line_total")
+      .eq("restaurant_id", context.restaurant.id)
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: true });
+    error = legacy.error;
+    data = (legacy.data ?? []).map((item) => ({
+      ...item,
+      removed_ingredients: null,
+      added_ingredients: null,
+      item_note: null,
+    })) as OrderItem[];
+  }
 
   if (error) {
     throw new Error(`Failed to fetch order items: ${error.message}`);

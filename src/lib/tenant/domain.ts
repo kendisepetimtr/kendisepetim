@@ -1,7 +1,7 @@
 import { normalizeDevelopmentHostname } from "./hostname";
 import { isValidTenantSlug, normalizeTenantSlug } from "./slug";
 
-const RESERVED_SUBDOMAINS = new Set(["www", "app", "api"]);
+const RESERVED_SUBDOMAINS = new Set(["www", "app", "api", "admin", "superadmin"]);
 
 export function extractTenantSlugFromHostname(
   hostHeader: string,

@@ -27,15 +27,28 @@ export function TenantCartClient({ tenantSlug }: TenantCartClientProps) {
 
         <div className="mt-4 space-y-3">
           {cartItems.map((item) => (
-            <article key={item.productId} className="rounded-lg border border-gray-200 p-3">
+            <article key={item.lineId} className="rounded-lg border border-gray-200 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{item.name}</p>
                   <p className="text-xs text-gray-600">{formatTry(item.price)}</p>
+                  {item.removedIngredients && item.removedIngredients.length > 0 ? (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Çıkarılan: {item.removedIngredients.join(", ")}
+                    </p>
+                  ) : null}
+                  {item.addedIngredients && item.addedIngredients.length > 0 ? (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Eklenen: {item.addedIngredients.join(", ")}
+                    </p>
+                  ) : null}
+                  {item.itemNote ? (
+                    <p className="mt-1 text-xs text-gray-500">Not: {item.itemNote}</p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
-                  onClick={() => removeFromCart(item.productId)}
+                  onClick={() => removeFromCart(item.lineId)}
                   className="text-xs text-red-700"
                 >
                   Kaldir
@@ -44,7 +57,7 @@ export function TenantCartClient({ tenantSlug }: TenantCartClientProps) {
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                  onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                   className="rounded border border-gray-300 px-2 py-1 text-xs"
                 >
                   -
@@ -52,7 +65,7 @@ export function TenantCartClient({ tenantSlug }: TenantCartClientProps) {
                 <span className="min-w-6 text-center text-sm">{item.quantity}</span>
                 <button
                   type="button"
-                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                  onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
                   className="rounded border border-gray-300 px-2 py-1 text-xs"
                 >
                   +

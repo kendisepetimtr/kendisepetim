@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getCurrentRestaurantContext } from "../../../features/tenants";
 import { createServerSupabaseClient } from "../../../lib/supabase";
 
 function buildLoginErrorUrl(message: string) {
@@ -22,5 +23,16 @@ export async function loginWithPassword(formData: FormData) {
     redirect(buildLoginErrorUrl("Giris basarisiz. Bilgilerinizi kontrol edin."));
   }
 
+  const context = await getCurrentRestaurantContext();
+  if (!context) {
+    redirect("/onboarding/restaurant");
+  }
+
   redirect("/dashboard");
+}
+
+export async function signOutAndReturnToLogin() {
+  const supabase = await createServerSupabaseClient();
+  await supabase.auth.signOut();
+  redirect("/login");
 }

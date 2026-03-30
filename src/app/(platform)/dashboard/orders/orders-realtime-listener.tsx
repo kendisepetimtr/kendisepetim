@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserSupabaseClient } from "../../../../lib/supabase";
+import { createClient as createBrowserSupabaseClient } from "../../../../lib/supabase/client";
 
 type OrdersRealtimeListenerProps = {
   restaurantId: string;

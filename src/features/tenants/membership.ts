@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "../../lib/supabase";
 import type { Restaurant, UserRestaurantMembership } from "../../types";
+import { mapRestaurantFromDb, type RestaurantRow } from "./restaurant-map";
 
 export type CurrentRestaurantContext = {
   userId: string;
@@ -9,20 +10,25 @@ export type CurrentRestaurantContext = {
   restaurant: Restaurant;
 };
 
+export type MembershipWithRestaurantRow = Omit<UserRestaurantMembership, "restaurants"> & {
+  restaurants: RestaurantRow | null;
+};
+
 export async function getUserRestaurantMemberships(
   userId: string,
-): Promise<UserRestaurantMembership[]> {
+): Promise<MembershipWithRestaurantRow[]> {
   const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("restaurant_members")
     .select(
-      "id, restaurant_id, user_id, role, is_active, created_at, restaurants(id, name, slug, logo_url, brand_color, is_active, created_at)",
+      // restaurants(*) — patch öncesi DB'de olmayan kolonlar için; yalnızca mevcut sütunlar döner.
+      "id, restaurant_id, user_id, role, is_active, created_at, restaurants(*)",
     )
     .eq("user_id", userId)
     .eq("is_active", true)
     .order("created_at", { ascending: true })
-    .returns<UserRestaurantMembership[]>();
+    .returns<MembershipWithRestaurantRow[]>();
 
   if (error) {
     throw new Error(`Failed to fetch restaurant memberships: ${error.message}`);
@@ -54,7 +60,7 @@ export async function getCurrentRestaurantContext(): Promise<CurrentRestaurantCo
     userId: user.id,
     membershipId: firstValidMembership.id,
     role: firstValidMembership.role,
-    restaurant: firstValidMembership.restaurants,
+    restaurant: mapRestaurantFromDb(firstValidMembership.restaurants as RestaurantRow),
   };
 }
 

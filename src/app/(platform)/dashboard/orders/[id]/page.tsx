@@ -41,17 +41,17 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
 
   return (
     <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
-            Siparis #{order.order_number ?? "-"}
-          </h1>
+          <p className="text-lg font-semibold tracking-tight text-gray-900">
+            Sipariş #{order.order_number ?? "-"}
+          </p>
           <p className="mt-1 text-sm text-gray-600">{formatDate(order.created_at)}</p>
         </div>
         <Link href="/dashboard/orders" className="text-sm text-gray-600 underline">
-          Siparis listesine don
+          Sipariş listesine dön
         </Link>
-      </header>
+      </div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-base font-semibold text-gray-900">Siparis Ozeti</h2>
@@ -113,7 +113,16 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                 <p className="text-sm text-gray-800">
                   {item.quantity}x {item.product_name_snapshot}
                 </p>
-                <p className="text-sm font-medium text-gray-900">{formatTry(item.line_total)}</p>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">{formatTry(item.line_total)}</p>
+                  {item.removed_ingredients && item.removed_ingredients.length > 0 ? (
+                    <p className="text-xs text-gray-500">Çıkar: {item.removed_ingredients.join(", ")}</p>
+                  ) : null}
+                  {item.added_ingredients && item.added_ingredients.length > 0 ? (
+                    <p className="text-xs text-gray-500">Ekle: {item.added_ingredients.join(", ")}</p>
+                  ) : null}
+                  {item.item_note ? <p className="text-xs text-gray-500">Not: {item.item_note}</p> : null}
+                </div>
               </article>
             ))}
           </div>
@@ -127,6 +136,26 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         </p>
         <form action={updateOrderStatus} className="mt-4 flex flex-wrap items-center gap-2">
           <input type="hidden" name="order_id" value={order.id} />
+          {order.order_channel === "online" && order.status === "pending" ? (
+            <>
+              <button
+                type="submit"
+                name="status"
+                value="confirmed"
+                className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+              >
+                Kabul Et
+              </button>
+              <button
+                type="submit"
+                name="status"
+                value="cancelled"
+                className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-500"
+              >
+                Reddet
+              </button>
+            </>
+          ) : null}
           <select
             name="status"
             defaultValue={order.status}

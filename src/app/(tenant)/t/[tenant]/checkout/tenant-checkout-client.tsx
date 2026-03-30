@@ -1,30 +1,76 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { formatTry, useTenantCart } from "../../../../../features/menu";
 import { createOrderFromCheckout, DELIVERY_FEE_TRY } from "../../../../../features/orders";
+import type { OrderChannel } from "../../../../../types";
 
 type OrderType = "table" | "delivery" | "pickup";
 type PaymentMethod = "cash" | "card";
 
 type TenantCheckoutClientProps = {
   tenantSlug: string;
+  initialMode?: "online" | "table" | "package";
+  initialTableNumber?: string;
 };
 
-export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) {
+function defaultOrderType(mode: "online" | "table" | "package"): OrderType {
+  if (mode === "table") return "table";
+  if (mode === "package") return "pickup";
+  return "pickup";
+}
+
+function defaultOrderChannel(mode: "online" | "table" | "package"): OrderChannel {
+  if (mode === "table") return "table";
+  if (mode === "package") return "package";
+  return "online";
+}
+
+export function TenantCheckoutClient({
+  tenantSlug,
+  initialMode = "online",
+  initialTableNumber = "",
+}: TenantCheckoutClientProps) {
   const { cartItems, clearCart, subtotal, totalQuantity } = useTenantCart(tenantSlug);
-  const [orderType, setOrderType] = useState<OrderType>("pickup");
+  const [orderType, setOrderType] = useState<OrderType>(defaultOrderType(initialMode));
+  const [orderChannel, setOrderChannel] = useState<OrderChannel>(defaultOrderChannel(initialMode));
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [submitted, setSubmitted] = useState(false);
+  const [tableNumberValue, setTableNumberValue] = useState(initialTableNumber);
+  const [customerNameValue, setCustomerNameValue] = useState("");
+  const [customerPhoneValue, setCustomerPhoneValue] = useState("");
+  const [deliveryAddressValue, setDeliveryAddressValue] = useState("");
+  const [saveAddress, setSaveAddress] = useState(false);
+  const modeLocked = initialMode !== "online";
+  const profileStorageKey = `kendisepetim:checkout-profile:${tenantSlug}`;
+  const addressStorageKey = `kendisepetim:checkout-address:${tenantSlug}`;
 
   const deliveryFee = useMemo(
     () => (orderType === "delivery" ? DELIVERY_FEE_TRY : 0),
     [orderType],
   );
   const total = subtotal + deliveryFee;
+
+  useEffect(() => {
+    try {
+      const profileRaw = window.localStorage.getItem(profileStorageKey);
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw) as { customerName?: string; customerPhone?: string };
+        setCustomerNameValue(profile.customerName ?? "");
+        setCustomerPhoneValue(profile.customerPhone ?? "");
+      }
+      const savedAddress = window.localStorage.getItem(addressStorageKey);
+      if (savedAddress) {
+        setDeliveryAddressValue(savedAddress);
+        setSaveAddress(true);
+      }
+    } catch {
+      // ignore parse errors in client cache
+    }
+  }, [addressStorageKey, profileStorageKey]);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +89,7 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
         const result = await createOrderFromCheckout({
           tenantSlug,
           orderType,
+          orderChannel,
           paymentMethod,
           customerName,
           customerPhone,
@@ -53,6 +100,15 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
         });
 
         if (result.ok) {
+          window.localStorage.setItem(
+            profileStorageKey,
+            JSON.stringify({ customerName, customerPhone }),
+          );
+          if (saveAddress && deliveryAddress.trim()) {
+            window.localStorage.setItem(addressStorageKey, deliveryAddress.trim());
+          } else if (!saveAddress) {
+            window.localStorage.removeItem(addressStorageKey);
+          }
           setCreatedOrderId(result.orderId);
           setSubmitted(true);
           clearCart();
@@ -88,7 +144,7 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-base font-semibold text-gray-900">Siparis Bilgileri</h2>
         {errorMessage ? (
@@ -99,22 +155,40 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
 
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">Siparis tipi</p>
-          <div className="flex flex-wrap gap-2">
-            {(["table", "delivery", "pickup"] as OrderType[]).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setOrderType(type)}
-                className={`rounded-md border px-3 py-1.5 text-sm ${
-                  orderType === type
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-300 bg-white text-gray-700"
-                }`}
-              >
-                {type === "table" ? "Masa" : type === "delivery" ? "Paket" : "Gel-al"}
-              </button>
-            ))}
-          </div>
+          {modeLocked ? (
+            <p className="text-sm text-gray-700">
+              {initialMode === "table"
+                ? "Masa Siparişi"
+                : initialMode === "package"
+                  ? "Paket Siparişi"
+                  : "Online Sipariş"}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(["table", "delivery", "pickup"] as OrderType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => {
+                    setOrderType(type);
+                    setOrderChannel(type === "table" ? "table" : "online");
+                  }}
+                  className={`rounded-md border px-3 py-1.5 text-sm ${
+                    orderType === type
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-300 bg-white text-gray-700"
+                  }`}
+                >
+                  {type === "table" ? "Masa" : type === "delivery" ? "Paket" : "Gel-al"}
+                </button>
+              ))}
+            </div>
+          )}
+          {initialMode === "package" ? (
+            <p className="text-xs text-gray-500">
+              Paket siparişlerde ürünlerde tanımlıysa <code>delivery_price</code> kullanılır.
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -126,6 +200,8 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
               id="customer_name"
               name="customer_name"
               required
+              value={customerNameValue}
+              onChange={(e) => setCustomerNameValue(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -137,12 +213,14 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
               id="customer_phone"
               name="customer_phone"
               required
+              value={customerPhoneValue}
+              onChange={(e) => setCustomerPhoneValue(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-        {orderType === "delivery" ? (
+        {orderType === "delivery" && orderChannel !== "package" ? (
           <div>
             <label htmlFor="delivery_address" className="mb-1 block text-sm font-medium text-gray-700">
               Adres
@@ -152,8 +230,40 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
               name="delivery_address"
               required
               rows={3}
+              value={deliveryAddressValue}
+              onChange={(e) => setDeliveryAddressValue(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={saveAddress}
+                  onChange={(e) => setSaveAddress(e.target.checked)}
+                />
+                Sonraki sipariş için adresi kaydet
+              </label>
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-700"
+                onClick={() => {
+                  if (!navigator.geolocation) {
+                    setErrorMessage("Tarayıcı konum desteği sunmuyor.");
+                    return;
+                  }
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      const nextValue = `Konum: ${pos.coords.latitude}, ${pos.coords.longitude}`;
+                      setDeliveryAddressValue(nextValue);
+                    },
+                    () => setErrorMessage("Konum alınamadı. Lütfen izin verip tekrar deneyin."),
+                    { enableHighAccuracy: true, timeout: 10000 },
+                  );
+                }}
+              >
+                Tam konum al
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -166,6 +276,8 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
               id="table_number"
               name="table_number"
               required
+              value={tableNumberValue}
+              onChange={(e) => setTableNumberValue(e.target.value)}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -209,7 +321,7 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+          className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black sm:w-auto"
         >
           {isPending ? "Olusturuluyor..." : "Siparisi Tamamla"}
         </button>
@@ -221,13 +333,20 @@ export function TenantCheckoutClient({ tenantSlug }: TenantCheckoutClientProps) 
 
         <div className="mt-4 space-y-2">
           {cartItems.map((item) => (
-            <div key={item.productId} className="flex items-center justify-between text-sm">
-              <span className="text-gray-700">
-                {item.quantity}x {item.name}
-              </span>
-              <span className="font-medium text-gray-900">
-                {formatTry(item.price * item.quantity)}
-              </span>
+            <div key={item.lineId} className="rounded-md border border-gray-100 p-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700">
+                  {item.quantity}x {item.name}
+                </span>
+                <span className="font-medium text-gray-900">{formatTry(item.price * item.quantity)}</span>
+              </div>
+              {item.removedIngredients && item.removedIngredients.length > 0 ? (
+                <p className="mt-1 text-xs text-gray-500">Çıkarılan: {item.removedIngredients.join(", ")}</p>
+              ) : null}
+              {item.addedIngredients && item.addedIngredients.length > 0 ? (
+                <p className="mt-1 text-xs text-gray-500">Eklenen: {item.addedIngredients.join(", ")}</p>
+              ) : null}
+              {item.itemNote ? <p className="mt-1 text-xs text-gray-500">Not: {item.itemNote}</p> : null}
             </div>
           ))}
         </div>
