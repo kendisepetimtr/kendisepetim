@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PreviewVariant7 } from "./preview-variant7";
+import { PreviewPosCashier } from "./preview-pos-cashier";
 
 const SAMPLE_ORDERS = [
   { id: "#1042", time: "14:32", total: "186 TL", status: "Hazirlaniyor" },
@@ -26,7 +27,7 @@ export function DashboardPreviewVariants() {
           icin duruyor.
         </p>
         <nav className="mt-2 flex flex-wrap gap-2 text-xs">
-          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <a
               key={i}
               href={`#v${i}`}
@@ -420,6 +421,16 @@ export function DashboardPreviewVariants() {
           desc="Logo alani, emoji menuler, mobil drawer + masaustu daraltma, tarih oklari + modal, menuye gore baslik/dip not, alt cikis blogu."
         />
         <PreviewVariant7 />
+      </section>
+
+      {/* 8 — Kasa modu (tam ekran POS) */}
+      <section id="v8" className="scroll-mt-24 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <VariantLabel
+          n={8}
+          title="Kasa modu — tam ekran POS"
+          desc="Masa/Paket toggle, sol urun alani + sag sabit ozet paneli, dashboard shell gizli varsayim."
+        />
+        <PreviewPosCashier />
       </section>
     </div>
   );

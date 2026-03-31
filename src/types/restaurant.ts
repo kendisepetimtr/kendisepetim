@@ -1,5 +1,7 @@
 import type { MenuFabTheme } from "../lib/menu-layout";
 
+export type OrdersDateBasis = "calendar" | "business_day";
+
 export type Restaurant = {
   id: string;
   name: string;
@@ -32,4 +34,14 @@ export type Restaurant = {
   fab_location_lng: number | null;
   is_active: boolean;
   created_at: string;
+  /** İş günü modu için açılış saati (HH:MM:SS veya null). */
+  business_day_opens_at: string | null;
+  /** İş günü modu için kapanış (ertesi güne taşabilir). */
+  business_day_closes_at: string | null;
+  /** Sipariş listelerinde tarih: takvim günü veya iş günü. */
+  orders_date_basis: OrdersDateBasis;
+  /** Dashboard'ta masa siparişi menüsünü/akışını aç-kapat. */
+  enable_table_orders: boolean;
+  /** Dashboard'ta paket siparişi menüsünü/akışını aç-kapat. */
+  enable_package_orders: boolean;
 };

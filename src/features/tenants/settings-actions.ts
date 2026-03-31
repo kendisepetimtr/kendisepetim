@@ -137,6 +137,12 @@ export async function updateRestaurantSettings(formData: FormData) {
   const fabLocationLng = optionalNumber(formData.get("fab_location_lng"));
   const removeLogo = String(formData.get("remove_logo") ?? "") === "true";
   const logoFile = formData.get("logo");
+  const ordersDateBasisRaw = String(formData.get("orders_date_basis") ?? "calendar").trim();
+  const orders_date_basis = ordersDateBasisRaw === "business_day" ? "business_day" : "calendar";
+  const businessDayOpens = optionalText(formData.get("business_day_opens_at"));
+  const businessDayCloses = optionalText(formData.get("business_day_closes_at"));
+  const enableTableOrders = String(formData.get("enable_table_orders") ?? "false") === "true";
+  const enablePackageOrders = String(formData.get("enable_package_orders") ?? "false") === "true";
 
   if (!name) {
     throw new Error("Restaurant name is required.");
@@ -201,6 +207,11 @@ export async function updateRestaurantSettings(formData: FormData) {
     fab_location_enabled: fabLocationEnabled,
     fab_location_lat: fabLocationEnabled ? fabLocationLat : null,
     fab_location_lng: fabLocationEnabled ? fabLocationLng : null,
+    orders_date_basis,
+    business_day_opens_at: businessDayOpens,
+    business_day_closes_at: businessDayCloses,
+    enable_table_orders: enableTableOrders,
+    enable_package_orders: enablePackageOrders,
   };
   if (adminPassword) {
     patch.admin_password_hash = hashPassword(adminPassword);
@@ -226,7 +237,7 @@ export async function updateRestaurantSettings(formData: FormData) {
     .update(patch)
     .eq("id", context.restaurant.id);
 
-  if (error && isUnknownColumnError(error.message) && "logo_storage_path" in patch) {
+  if (error && isUnknownColumnError(error.message)) {
     const legacy: Record<string, unknown> = {
       name,
       description,
@@ -243,6 +254,21 @@ export async function updateRestaurantSettings(formData: FormData) {
       fab_location_lat: fabLocationEnabled ? fabLocationLat : null,
       fab_location_lng: fabLocationEnabled ? fabLocationLng : null,
     };
+    if ("orders_date_basis" in patch) {
+      legacy.orders_date_basis = patch.orders_date_basis;
+    }
+    if ("business_day_opens_at" in patch) {
+      legacy.business_day_opens_at = patch.business_day_opens_at;
+    }
+    if ("business_day_closes_at" in patch) {
+      legacy.business_day_closes_at = patch.business_day_closes_at;
+    }
+    if ("enable_table_orders" in patch) {
+      legacy.enable_table_orders = patch.enable_table_orders;
+    }
+    if ("enable_package_orders" in patch) {
+      legacy.enable_package_orders = patch.enable_package_orders;
+    }
     if ("admin_password_hash" in patch) {
       legacy.admin_password_hash = patch.admin_password_hash;
     }

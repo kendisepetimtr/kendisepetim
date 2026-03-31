@@ -8,8 +8,16 @@ type TenantCartClientProps = {
 };
 
 export function TenantCartClient({ tenantSlug }: TenantCartClientProps) {
-  const { cartItems, removeFromCart, subtotal, totalQuantity, updateQuantity } =
+  const { cartItems, cartHydrated, removeFromCart, subtotal, totalQuantity, updateQuantity } =
     useTenantCart(tenantSlug);
+
+  if (!cartHydrated) {
+    return (
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <p className="text-sm text-gray-600">Sepet yükleniyor…</p>
+      </section>
+    );
+  }
 
   if (cartItems.length === 0) {
     return (

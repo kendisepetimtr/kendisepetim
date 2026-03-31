@@ -19,8 +19,14 @@ export type Order = {
   payment_method: PaymentMethod;
   status: OrderStatus;
   customer_name: string | null;
+  table_number: string | null;
   total: number;
   created_at: string;
+  closed_at: string | null;
+  courier_id: string | null;
+  table_session_id: string | null;
+  /** Supabase join couriers(first_name,last_name) — liste sorgusunda doldurulabilir */
+  couriers?: { first_name: string; last_name: string } | null;
 };
 
 export type OrderItem = {
@@ -52,4 +58,9 @@ export type OrderDetail = {
   delivery_fee: number;
   total: number;
   created_at: string;
+  closed_at: string | null;
+  closed_by_user_id: string | null;
+  courier_id: string | null;
+  table_session_id: string | null;
+  couriers?: { first_name: string; last_name: string } | null;
 };

@@ -19,7 +19,7 @@ export function OrdersRealtimeListener({ restaurantId }: OrdersRealtimeListenerP
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "orders",
           filter: `restaurant_id=eq.${restaurantId}`,

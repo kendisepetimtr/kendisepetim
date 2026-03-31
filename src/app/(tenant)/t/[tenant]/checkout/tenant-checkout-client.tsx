@@ -31,7 +31,7 @@ export function TenantCheckoutClient({
   initialMode = "online",
   initialTableNumber = "",
 }: TenantCheckoutClientProps) {
-  const { cartItems, clearCart, subtotal, totalQuantity } = useTenantCart(tenantSlug);
+  const { cartItems, cartHydrated, clearCart, subtotal, totalQuantity } = useTenantCart(tenantSlug);
   const [orderType, setOrderType] = useState<OrderType>(defaultOrderType(initialMode));
   const [orderChannel, setOrderChannel] = useState<OrderChannel>(defaultOrderChannel(initialMode));
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
@@ -135,10 +135,18 @@ export function TenantCheckoutClient({
     );
   }
 
+  if (!cartHydrated) {
+    return (
+      <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <p className="text-sm text-gray-600">Sepet yükleniyor…</p>
+      </section>
+    );
+  }
+
   if (cartItems.length === 0) {
     return (
       <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <p className="text-sm text-gray-600">Checkout icin once sepete urun eklemelisiniz.</p>
+        <p className="text-sm text-gray-600">Checkout için önce sepete ürün eklemelisiniz.</p>
       </section>
     );
   }
@@ -165,13 +173,13 @@ export function TenantCheckoutClient({
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {(["table", "delivery", "pickup"] as OrderType[]).map((type) => (
+              {(["delivery", "pickup"] as OrderType[]).map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => {
                     setOrderType(type);
-                    setOrderChannel(type === "table" ? "table" : "online");
+                    setOrderChannel("online");
                   }}
                   className={`rounded-md border px-3 py-1.5 text-sm ${
                     orderType === type
@@ -179,7 +187,7 @@ export function TenantCheckoutClient({
                       : "border-gray-300 bg-white text-gray-700"
                   }`}
                 >
-                  {type === "table" ? "Masa" : type === "delivery" ? "Paket" : "Gel-al"}
+                  {type === "delivery" ? "Paket (adrese)" : "Gel-al"}
                 </button>
               ))}
             </div>

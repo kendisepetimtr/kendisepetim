@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentRestaurantContext } from "../../../features/tenants";
-import { getPendingOnlineOrdersCountForCurrentRestaurant } from "../../../features/orders";
+import {
+  getPendingOnlineOrdersCountForCurrentRestaurant,
+  getPendingPackageOrdersCountForCurrentRestaurant,
+  getPendingTableOrdersCountForCurrentRestaurant,
+} from "../../../features/orders";
 import { createServerSupabaseClient } from "../../../lib/supabase";
 import { buildPublicMenuUrls } from "../../../lib/tenant";
 import { DashboardShellV7 } from "./dashboard-shell-v7";
@@ -28,7 +32,15 @@ export default async function ProtectedDashboardLayout({
   const menuUrls = buildPublicMenuUrls(restaurantContext.restaurant.slug);
   const tenantAdminHref = `/t/${restaurantContext.restaurant.slug}/admin`;
   const tenantWaiterHref = `/t/${restaurantContext.restaurant.slug}/garson`;
-  const pendingOnlineOrdersCount = await getPendingOnlineOrdersCountForCurrentRestaurant();
+  const tenantCashierHref =
+    restaurantContext.restaurant.enable_table_orders || restaurantContext.restaurant.enable_package_orders
+      ? `/dashboard/orders?channel=${restaurantContext.restaurant.enable_table_orders ? "table" : "package"}&pos=1`
+      : null;
+  const [pendingOnlineOrdersCount, pendingTableOrdersCount, pendingPackageOrdersCount] = await Promise.all([
+    getPendingOnlineOrdersCountForCurrentRestaurant(),
+    getPendingTableOrdersCountForCurrentRestaurant(),
+    getPendingPackageOrdersCountForCurrentRestaurant(),
+  ]);
 
   return (
     <DashboardShellV7
@@ -40,7 +52,12 @@ export default async function ProtectedDashboardLayout({
       customerMenuFallbackHref={menuUrls.fallbackHref}
       tenantAdminHref={tenantAdminHref}
       tenantWaiterHref={tenantWaiterHref}
+      tenantCashierHref={tenantCashierHref}
       pendingOnlineOrdersCount={pendingOnlineOrdersCount}
+      pendingTableOrdersCount={pendingTableOrdersCount}
+      pendingPackageOrdersCount={pendingPackageOrdersCount}
+      enableTableOrders={restaurantContext.restaurant.enable_table_orders}
+      enablePackageOrders={restaurantContext.restaurant.enable_package_orders}
     >
       {children}
     </DashboardShellV7>

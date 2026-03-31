@@ -38,6 +38,7 @@ export function sampleVariantCategories(): MenuVariantCategory[] {
       name: it.name,
       description: it.description,
       priceLabel: `${it.price} TL`,
+      ingredients: [],
     })),
   }));
 }

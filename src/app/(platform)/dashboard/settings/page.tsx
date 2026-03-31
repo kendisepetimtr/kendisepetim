@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { getCurrentRestaurantContext, updateRestaurantSettings } from "../../../../features/tenants";
+import { CouriersSettingsSection } from "./couriers-settings-section";
 import { RestaurantContactControls } from "./restaurant-contact-controls";
 
 export default async function DashboardSettingsPage() {
@@ -76,6 +78,35 @@ export default async function DashboardSettingsPage() {
               defaultValue={restaurant.table_count ?? 10}
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
+          </div>
+
+          <div className="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-sm font-semibold text-gray-900">Sipariş kanalları</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Varsayılan olarak tüm kanallar açıktır. İstemediğiniz kanalı kapatabilirsiniz.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-6">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  name="enable_table_orders"
+                  value="true"
+                  defaultChecked={restaurant.enable_table_orders}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Masa Siparişleri aktif
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  name="enable_package_orders"
+                  value="true"
+                  defaultChecked={restaurant.enable_package_orders}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Paket Siparişleri aktif
+              </label>
+            </div>
           </div>
 
           <div>
@@ -173,6 +204,54 @@ export default async function DashboardSettingsPage() {
             </label>
           </div>
 
+          <div className="md:col-span-2 rounded-lg border border-gray-100 bg-gray-50/80 p-4">
+            <h3 className="text-sm font-semibold text-gray-900">Sipariş tarihi ve iş günü</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Varsayılan: takvim günü (gece yarısından sonra yeni gün). İş günü modunda açılış saati &quot;gün&quot;
+              başlangıcı sayılır (ör. 09:00–03:00 aynı iş günü).
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="orders_date_basis">
+                  Tarih hesabı
+                </label>
+                <select
+                  id="orders_date_basis"
+                  name="orders_date_basis"
+                  defaultValue={restaurant.orders_date_basis}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="calendar">Takvim günü (00:00–23:59)</option>
+                  <option value="business_day">İş günü (açılış saatine göre)</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="business_day_opens_at">
+                  İş günü açılış
+                </label>
+                <input
+                  id="business_day_opens_at"
+                  name="business_day_opens_at"
+                  type="time"
+                  defaultValue={restaurant.business_day_opens_at?.slice(0, 5) ?? ""}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="business_day_closes_at">
+                  İş günü kapanış
+                </label>
+                <input
+                  id="business_day_closes_at"
+                  name="business_day_closes_at"
+                  type="time"
+                  defaultValue={restaurant.business_day_closes_at?.slice(0, 5) ?? ""}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="md:col-span-2">
             <RestaurantContactControls
               defaultCallEnabled={restaurant.fab_call_enabled}
@@ -195,6 +274,10 @@ export default async function DashboardSettingsPage() {
           </div>
         </form>
       </section>
+
+      <Suspense fallback={<p className="text-sm text-gray-500">Kuryeler yükleniyor…</p>}>
+        <CouriersSettingsSection />
+      </Suspense>
     </section>
   );
 }

@@ -91,7 +91,7 @@ export default async function TenantWaiterPage({ params, searchParams }: WaiterP
           {tables.map((tableNo) => (
             <Link
               key={tableNo}
-              href={`/t/${restaurant.slug}/checkout?mode=table&table=${tableNo}`}
+              href={`/t/${restaurant.slug}/garson/siparis?table=${tableNo}`}
               className="rounded-lg border border-gray-300 bg-gray-50 px-4 py-4 text-center text-sm font-medium text-gray-800 hover:border-gray-500 hover:bg-white"
             >
               Masa {tableNo}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { signOutAndReturnToLogin } from "../login/actions";
 
@@ -17,7 +17,7 @@ const TITLES: Record<NavKey, string> = {
 
 const DIP_NOTES: Record<NavKey, string> = {
   overview: "Özet, müşteri menü linki ve hızlı erişim.",
-  orders: "Son siparişleri görüntüleyin ve durumları güncelleyin.",
+  orders: "Sipariş akışları kanal bazlı ayrı listelenir; aktif ve geçmiş görünüm her menüde bulunur.",
   menu_management: "Kategori ve ürünleri tek yerden yönetin.",
   settings: "Restoran ve menü görünümü — alt bölümler üst şeritte.",
   ui_preview: "Yerel geliştirme — diğer dashboard tasarım denemeleri.",
@@ -65,7 +65,7 @@ function parseYmd(s: string): Date | null {
 function navKeyFromPathname(pathname: string): NavKey {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard?")) return "overview";
   if (pathname.startsWith("/dashboard/ui-preview")) return "ui_preview";
-  if (pathname.startsWith("/dashboard/orders")) return "orders";
+  if (pathname.startsWith("/dashboard/orders") || pathname.startsWith("/dashboard/masalar")) return "orders";
   if (
     pathname.startsWith("/dashboard/menu-management") ||
     pathname.startsWith("/dashboard/categories") ||
@@ -94,7 +94,12 @@ type DashboardShellV7Props = {
   customerMenuFallbackHref?: string | null;
   tenantAdminHref?: string | null;
   tenantWaiterHref?: string | null;
+  tenantCashierHref?: string | null;
   pendingOnlineOrdersCount?: number;
+  pendingTableOrdersCount?: number;
+  pendingPackageOrdersCount?: number;
+  enableTableOrders?: boolean;
+  enablePackageOrders?: boolean;
 };
 
 export function DashboardShellV7({
@@ -107,9 +112,15 @@ export function DashboardShellV7({
   customerMenuFallbackHref = null,
   tenantAdminHref = null,
   tenantWaiterHref = null,
+  tenantCashierHref = null,
   pendingOnlineOrdersCount = 0,
+  pendingTableOrdersCount = 0,
+  pendingPackageOrdersCount = 0,
+  enableTableOrders = true,
+  enablePackageOrders = true,
 }: DashboardShellV7Props) {
   const pathname = usePathname() ?? "/dashboard";
+  const search = useSearchParams();
   const section = navKeyFromPathname(pathname);
   const isOrderDetail = /^\/dashboard\/orders\/[^/]+$/.test(pathname);
 
@@ -150,15 +161,20 @@ export function DashboardShellV7({
   const settingsThemeActive = pathname.startsWith("/dashboard/settings/theme");
 
   const showQuickToolbar = Boolean(
-    customerMenuHref || customerMenuFallbackHref || tenantAdminHref || tenantWaiterHref || isSettingsSection,
+    customerMenuHref ||
+      customerMenuFallbackHref ||
+      tenantAdminHref ||
+      tenantWaiterHref ||
+      tenantCashierHref ||
+      isSettingsSection,
   );
 
-  const showDateBar =
-    section === "overview" || section === "orders" || isOrderDetail;
+  const showDateBar = section === "overview" || section === "orders" || isOrderDetail;
 
   const uiPreviewItem = showUiPreviewLink
     ? { href: "/dashboard/ui-preview", label: "UI önizleme", emoji: "\u{1F3A8}" as const }
     : null;
+  const channel = (search?.get("channel") ?? "table").toLowerCase();
 
   return (
     <div className="relative isolate min-h-screen bg-white">
@@ -231,22 +247,66 @@ export function DashboardShellV7({
               href="/dashboard/orders?channel=online"
               onClick={() => setMobileOpen(false)}
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                linkActive(pathname, "/dashboard/orders")
+                pathname.startsWith("/dashboard/orders") && channel === "online"
                   ? "bg-gray-100 font-medium text-gray-900 md:border-l-2 md:border-gray-900 md:pl-2"
                   : "text-gray-600 hover:bg-gray-50"
               } ${desktopCollapsed ? "justify-center md:px-2" : ""}`}
-              title={desktopCollapsed ? "Siparişler" : undefined}
+              title={desktopCollapsed ? "Online Siparişler" : undefined}
             >
               <span className="text-lg leading-none" aria-hidden>
                 {"\u{1F9FE}"}
               </span>
-              {!desktopCollapsed && <span>Siparişler</span>}
+              {!desktopCollapsed && <span>Online Siparişler</span>}
               {pendingOnlineOrdersCount > 0 ? (
                 <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
                   {pendingOnlineOrdersCount}
                 </span>
               ) : null}
             </Link>
+            {enableTableOrders ? (
+              <Link
+                href="/dashboard/orders?channel=table"
+                onClick={() => setMobileOpen(false)}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                  pathname.startsWith("/dashboard/orders") && channel === "table"
+                    ? "bg-gray-100 font-medium text-gray-900 md:border-l-2 md:border-gray-900 md:pl-2"
+                    : "text-gray-600 hover:bg-gray-50"
+                } ${desktopCollapsed ? "justify-center md:px-2" : ""}`}
+                title={desktopCollapsed ? "Masa Siparişleri" : undefined}
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  {"\u{1F37D}\uFE0F"}
+                </span>
+                {!desktopCollapsed && <span>Masa Siparişleri</span>}
+                {pendingTableOrdersCount > 0 ? (
+                  <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                    {pendingTableOrdersCount}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
+            {enablePackageOrders ? (
+              <Link
+                href="/dashboard/orders?channel=package"
+                onClick={() => setMobileOpen(false)}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                  pathname.startsWith("/dashboard/orders") && channel === "package"
+                    ? "bg-gray-100 font-medium text-gray-900 md:border-l-2 md:border-gray-900 md:pl-2"
+                    : "text-gray-600 hover:bg-gray-50"
+                } ${desktopCollapsed ? "justify-center md:px-2" : ""}`}
+                title={desktopCollapsed ? "Paket Siparişleri" : undefined}
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  📦
+                </span>
+                {!desktopCollapsed && <span>Paket Siparişleri</span>}
+                {pendingPackageOrdersCount > 0 ? (
+                  <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                    {pendingPackageOrdersCount}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
 
             <Link
               href="/dashboard/menu-management"
@@ -400,6 +460,14 @@ export function DashboardShellV7({
                         className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-4 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-50"
                       >
                         Garson
+                      </a>
+                    ) : null}
+                    {tenantCashierHref ? (
+                      <a
+                        href={tenantCashierHref}
+                        className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                      >
+                        Kasa Modu
                       </a>
                     ) : null}
                     {customerMenuFallbackHref ? (

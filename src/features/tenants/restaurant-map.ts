@@ -30,6 +30,11 @@ export type RestaurantRow = {
   fab_location_lng?: number | null;
   is_active: boolean;
   created_at: string;
+  business_day_opens_at?: string | null;
+  business_day_closes_at?: string | null;
+  orders_date_basis?: string | null;
+  enable_table_orders?: boolean | null;
+  enable_package_orders?: boolean | null;
 };
 
 export function mapRestaurantFromDb(row: RestaurantRow): Restaurant {
@@ -66,5 +71,11 @@ export function mapRestaurantFromDb(row: RestaurantRow): Restaurant {
     fab_location_lng: row.fab_location_lng ?? null,
     is_active: row.is_active,
     created_at: row.created_at,
+    business_day_opens_at: row.business_day_opens_at ?? null,
+    business_day_closes_at: row.business_day_closes_at ?? null,
+    orders_date_basis:
+      row.orders_date_basis === "business_day" ? "business_day" : "calendar",
+    enable_table_orders: row.enable_table_orders ?? true,
+    enable_package_orders: row.enable_package_orders ?? true,
   };
 }

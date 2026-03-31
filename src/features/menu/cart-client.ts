@@ -7,37 +7,6 @@ function getCartStorageKey(tenantSlug: string) {
   return `kendisepetim:cart:${tenantSlug}`;
 }
 
-function sanitizeCartItems(value: unknown): CartItem[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => item as Partial<CartItem>)
-    .filter(
-      (item) =>
-        typeof item.lineId === "string" &&
-        typeof item.productId === "string" &&
-        typeof item.name === "string" &&
-        typeof item.price === "number" &&
-        Number.isFinite(item.price) &&
-        typeof item.quantity === "number" &&
-        Number.isFinite(item.quantity) &&
-        item.quantity > 0,
-    )
-    .map((item) => ({
-      lineId: item.lineId as string,
-      productId: item.productId as string,
-      name: item.name as string,
-      price: item.price as number,
-      quantity: Math.floor(item.quantity as number),
-      removedIngredients: Array.isArray(item.removedIngredients)
-        ? item.removedIngredients.filter((v): v is string => typeof v === "string")
-        : [],
-      addedIngredients: Array.isArray(item.addedIngredients)
-        ? item.addedIngredients.filter((v): v is string => typeof v === "string")
-        : [],
-      itemNote: typeof item.itemNote === "string" ? item.itemNote : null,
-    }));
-}
-
 function buildLineId(
   productId: string,
   removedIngredients: string[],
@@ -51,26 +20,72 @@ function buildLineId(
   return [productId, removed, added, note].join("::");
 }
 
+function sanitizeCartItems(value: unknown): CartItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => item as Partial<CartItem>)
+    .filter(
+      (item) =>
+        typeof item.productId === "string" &&
+        typeof item.name === "string" &&
+        typeof item.price === "number" &&
+        Number.isFinite(item.price) &&
+        typeof item.quantity === "number" &&
+        Number.isFinite(item.quantity) &&
+        item.quantity > 0,
+    )
+    .map((item) => {
+      const removedIngredients = Array.isArray(item.removedIngredients)
+        ? item.removedIngredients.filter((v): v is string => typeof v === "string")
+        : [];
+      const addedIngredients = Array.isArray(item.addedIngredients)
+        ? item.addedIngredients.filter((v): v is string => typeof v === "string")
+        : [];
+      const itemNote = typeof item.itemNote === "string" ? item.itemNote : "";
+      const lineId =
+        typeof item.lineId === "string" && item.lineId.length > 0
+          ? item.lineId
+          : buildLineId(item.productId as string, removedIngredients, addedIngredients, itemNote);
+      return {
+        lineId,
+        productId: item.productId as string,
+        name: item.name as string,
+        price: item.price as number,
+        quantity: Math.floor(item.quantity as number),
+        removedIngredients,
+        addedIngredients,
+        itemNote: itemNote || null,
+      };
+    });
+}
+
 export function useTenantCart(tenantSlug: string) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  /** localStorage okunmadan yazma yapılmasın; aksi halde boş [] ile sepet silinir */
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
     const key = getCartStorageKey(tenantSlug);
     const raw = window.localStorage.getItem(key);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw);
-      setCartItems(sanitizeCartItems(parsed));
-    } catch {
-      window.localStorage.removeItem(key);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        setCartItems(sanitizeCartItems(parsed));
+      } catch {
+        window.localStorage.removeItem(key);
+        setCartItems([]);
+      }
+    } else {
+      setCartItems([]);
     }
+    setHasHydrated(true);
   }, [tenantSlug]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     const key = getCartStorageKey(tenantSlug);
     window.localStorage.setItem(key, JSON.stringify(cartItems));
-  }, [tenantSlug, cartItems]);
+  }, [tenantSlug, cartItems, hasHydrated]);
 
   const totalQuantity = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -137,6 +152,7 @@ export function useTenantCart(tenantSlug: string) {
 
   return {
     cartItems,
+    cartHydrated: hasHydrated,
     totalQuantity,
     subtotal,
     addToCart,
