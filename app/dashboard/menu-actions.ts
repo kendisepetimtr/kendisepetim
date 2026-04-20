@@ -1,0 +1,266 @@
+﻿'use server';
+
+import { revalidatePath } from 'next/cache';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import type { MenuCategoryRow, MenuProductRow } from '@/lib/supabase/menu-types';
+import type { LocalMenuState } from '@/lib/local-menu';
+import type { CategoryEditFields } from '@/components/dashboard/category-edit-modal';
+import type { ProductFormFields } from '@/components/dashboard/product-form-modal';
+import { buildLocalMenuState } from '@/lib/menu-map';
+import { sanitizeCustomMenuWarnings, sanitizeMenuWarningPresetKeys } from '@/lib/menu-product-warnings';
+
+const MAX_PRODUCT_DESCRIPTION_LENGTH = 280;
+
+export type MenuLoadResult =
+  | { ok: true; state: LocalMenuState }
+  | { ok: false; error: string };
+
+async function getOwnerTenantId() {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { supabase, tenantId: null as string | null, error: 'Oturum bulunamadı.' };
+
+  const { data: tenant, error } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('owner_user_id', user.id)
+    .maybeSingle();
+
+  if (error || !tenant) {
+    return { supabase, tenantId: null as string | null, error: 'İşletme kaydı bulunamadı.' };
+  }
+
+  return { supabase, tenantId: tenant.id as string, error: null as string | null };
+}
+
+async function readMenuState(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, tenantId: string): Promise<LocalMenuState> {
+  const [{ data: categories }, { data: products }] = await Promise.all([
+    supabase
+      .from('menu_categories')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+    supabase
+      .from('menu_products')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true }),
+  ]);
+
+  return buildLocalMenuState({
+    categories: (categories ?? []) as MenuCategoryRow[],
+    products: (products ?? []) as MenuProductRow[],
+  });
+}
+
+export async function loadDashboardMenuAction(): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'Menü yüklenemedi.' };
+  const state = await readMenuState(supabase, tenantId);
+  return { ok: true, state };
+}
+
+export async function getDashboardMenuProductCountAction(): Promise<number> {
+  const { supabase, tenantId } = await getOwnerTenantId();
+  if (!tenantId) return 0;
+  const { count } = await supabase
+    .from('menu_products')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId);
+  return count ?? 0;
+}
+
+export async function createMenuCategoryAction(nameRaw: string): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const name = nameRaw.trim();
+  if (!name) return { ok: false, error: 'Kategori adı zorunludur.' };
+
+  const { data: current } = await supabase
+    .from('menu_categories')
+    .select('sort_order')
+    .eq('tenant_id', tenantId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+  const nextOrder = typeof current?.[0]?.sort_order === 'number' ? current[0].sort_order + 1 : 0;
+
+  const { error: insertError } = await supabase.from('menu_categories').insert({
+    tenant_id: tenantId,
+    name,
+    description: '',
+    hidden: false,
+    sort_order: nextOrder,
+  });
+  if (insertError) return { ok: false, error: insertError.message };
+  revalidatePath('/dashboard');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function updateMenuCategoryAction(id: string, fields: CategoryEditFields): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const name = fields.name.trim();
+  if (!name) return { ok: false, error: 'Kategori adı zorunludur.' };
+  const { error: updateError } = await supabase
+    .from('menu_categories')
+    .update({ name, description: fields.description.trim(), sort_order: fields.sortOrder })
+    .eq('id', id)
+    .eq('tenant_id', tenantId);
+  if (updateError) return { ok: false, error: updateError.message };
+  revalidatePath('/dashboard');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function deleteMenuCategoryAction(id: string): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const { error: deleteError } = await supabase.from('menu_categories').delete().eq('id', id).eq('tenant_id', tenantId);
+  if (deleteError) return { ok: false, error: deleteError.message };
+  revalidatePath('/dashboard');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function toggleMenuCategoryHiddenAction(id: string, hideProducts: boolean): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+
+  const { data: cat, error: findError } = await supabase
+    .from('menu_categories')
+    .select('hidden')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (findError || !cat) return { ok: false, error: findError?.message ?? 'Kategori bulunamadı.' };
+
+  const nextHidden = !cat.hidden;
+  const { error: updateError } = await supabase
+    .from('menu_categories')
+    .update({ hidden: nextHidden })
+    .eq('id', id)
+    .eq('tenant_id', tenantId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  if (nextHidden && hideProducts) {
+    const { error: productError } = await supabase
+      .from('menu_products')
+      .update({ hidden: true, signature_dish: false, checkout_upsell: false })
+      .eq('tenant_id', tenantId)
+      .eq('category_id', id);
+    if (productError) return { ok: false, error: productError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/m/[slug]', 'page');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+async function clearOtherSignatureDishes(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  tenantId: string,
+  exceptId?: string,
+) {
+  let q = supabase.from('menu_products').update({ signature_dish: false }).eq('tenant_id', tenantId).eq('signature_dish', true);
+  if (exceptId) q = q.neq('id', exceptId);
+  await q;
+}
+
+export async function upsertMenuProductAction(fields: ProductFormFields, productId?: string): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+
+  const name = fields.name.trim();
+  if (!name) return { ok: false, error: 'Ürün adı zorunludur.' };
+  const categoryId = fields.categoryId.trim() || null;
+  const payload = {
+    tenant_id: tenantId,
+    category_id: categoryId,
+    name,
+    description: fields.description.trim().slice(0, MAX_PRODUCT_DESCRIPTION_LENGTH),
+    ingredients: fields.ingredients.trim(),
+    price: fields.price,
+    use_package_price: fields.usePackagePrice,
+    package_price: fields.usePackagePrice ? fields.packagePrice : 0,
+    hidden: fields.hidden,
+    signature_dish: fields.signatureDish && !fields.hidden,
+    checkout_upsell: fields.checkoutUpsell && !fields.hidden,
+    image_url: fields.imageDataUrl.trim() || null,
+    warning_preset_keys: sanitizeMenuWarningPresetKeys(fields.warningPresetKeys),
+    custom_warning_tags: sanitizeCustomMenuWarnings(fields.customWarnings),
+  };
+
+  if (payload.signature_dish) {
+    await clearOtherSignatureDishes(supabase, tenantId, productId);
+  }
+
+  if (productId) {
+    const { error: updateError } = await supabase
+      .from('menu_products')
+      .update(payload)
+      .eq('id', productId)
+      .eq('tenant_id', tenantId);
+    if (updateError) return { ok: false, error: updateError.message };
+  } else {
+    const { data: current } = await supabase
+      .from('menu_products')
+      .select('sort_order')
+      .eq('tenant_id', tenantId)
+      .order('sort_order', { ascending: false })
+      .limit(1);
+    const nextSort = typeof current?.[0]?.sort_order === 'number' ? current[0].sort_order + 1 : 0;
+    const { error: insertError } = await supabase.from('menu_products').insert({ ...payload, sort_order: nextSort });
+    if (insertError) return { ok: false, error: insertError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/m/[slug]', 'page');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function toggleMenuProductHiddenAction(id: string): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const { data: row, error: findError } = await supabase
+    .from('menu_products')
+    .select('hidden')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (findError || !row) return { ok: false, error: findError?.message ?? 'Ürün bulunamadı.' };
+  const nextHidden = !row.hidden;
+  const { error: updateError } = await supabase
+    .from('menu_products')
+    .update({
+      hidden: nextHidden,
+      ...(nextHidden ? { signature_dish: false, checkout_upsell: false } : {}),
+    })
+    .eq('id', id)
+    .eq('tenant_id', tenantId);
+  if (updateError) return { ok: false, error: updateError.message };
+  revalidatePath('/dashboard');
+  revalidatePath('/m/[slug]', 'page');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function deleteMenuProductAction(id: string): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const { error: deleteError } = await supabase.from('menu_products').delete().eq('id', id).eq('tenant_id', tenantId);
+  if (deleteError) return { ok: false, error: deleteError.message };
+  revalidatePath('/dashboard');
+  revalidatePath('/m/[slug]', 'page');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}
+
+export async function clearAllMenuDataAction(): Promise<MenuLoadResult> {
+  const { supabase, tenantId, error } = await getOwnerTenantId();
+  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  const { error: productError } = await supabase.from('menu_products').delete().eq('tenant_id', tenantId);
+  if (productError) return { ok: false, error: productError.message };
+  const { error: categoryError } = await supabase.from('menu_categories').delete().eq('tenant_id', tenantId);
+  if (categoryError) return { ok: false, error: categoryError.message };
+  revalidatePath('/dashboard');
+  revalidatePath('/m/[slug]', 'page');
+  return { ok: true, state: await readMenuState(supabase, tenantId) };
+}

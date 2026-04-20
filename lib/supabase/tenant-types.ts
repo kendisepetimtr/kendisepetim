@@ -1,0 +1,48 @@
+/**
+ * public.tenants satırı — supabase/migrations ile uyumlu.
+ * Şema değişince burayı ve migration'ı birlikte güncelleyin.
+ */
+export type TenantPlan = "free" | "premium";
+
+export type TenantHoursDayMode = "calendar" | "shift";
+
+export type TenantRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  business_name: string;
+  subdomain: string;
+  owner_name: string;
+  email: string;
+  phone: string;
+  owner_user_id: string | null;
+  logo_url: string | null;
+  cover_image_url: string | null;
+  public_description: string;
+  google_maps_url: string | null;
+  seo_index_enabled: boolean;
+  hours_day_mode: TenantHoursDayMode;
+  open_time: string;
+  close_time: string;
+  payment_cash: boolean;
+  payment_door_card: boolean;
+  payment_meal_card: boolean;
+  plan: TenantPlan;
+  public_menu_enabled: boolean;
+  dashboard_enabled: boolean;
+  owner_admin_pin_hash: string | null;
+  owner_admin_pin_set_at: string | null;
+};
+
+export type TenantInsert = Omit<
+  TenantRow,
+  "id" | "created_at" | "updated_at"
+> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TenantUpdate = Partial<
+  Omit<TenantRow, "id" | "created_at" | "updated_at">
+>;

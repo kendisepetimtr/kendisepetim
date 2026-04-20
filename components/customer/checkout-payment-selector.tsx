@@ -1,0 +1,115 @@
+"use client";
+
+import {
+  countEnabledPaymentMethods,
+  MEAL_CARD_BRANDS,
+  type CheckoutPaymentMethod,
+  type MealCardBrandId,
+  type TenantPaymentFlags,
+} from "@/lib/tenant-payment";
+import type { PublicCheckoutMirror } from "@/lib/public-checkout-mirror";
+import { useId } from "react";
+
+type CheckoutPaymentSelectorProps = {
+  options: TenantPaymentFlags;
+  method: CheckoutPaymentMethod | "";
+  mealCardBrandId: MealCardBrandId | "";
+  onMethodChange: (m: CheckoutPaymentMethod | "") => void;
+  onMealCardBrandChange: (id: MealCardBrandId | "") => void;
+};
+
+export default function CheckoutPaymentSelector({
+  options,
+  method,
+  mealCardBrandId,
+  onMethodChange,
+  onMealCardBrandChange,
+}: CheckoutPaymentSelectorProps) {
+  const baseId = useId();
+  const n = countEnabledPaymentMethods(options);
+
+  if (n === 0) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-950">
+        Bu işletme henüz kapıda ödeme seçeneği tanımlamamış. Lütfen işletmeyle iletişime geçin veya daha sonra tekrar
+        deneyin.
+      </div>
+    );
+  }
+
+  const rowCls =
+    "flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-high bg-white px-3 py-3 has-[:checked]:border-primary has-[:checked]:bg-primary/[0.04]";
+
+  return (
+    <fieldset className="space-y-3">
+      <legend className="text-xs font-bold uppercase tracking-wider text-secondary">Ödeme yöntemi</legend>
+      <p className="text-[11px] leading-relaxed text-secondary">Çevrimiçi ödeme yok; kapıda ödeme seçenekleri.</p>
+      <div className="space-y-2">
+        {options.paymentCash ? (
+          <label className={rowCls}>
+            <input
+              type="radio"
+              name={`${baseId}-pay`}
+              checked={method === "cash"}
+              onChange={() => onMethodChange("cash")}
+              className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+            />
+            <span className="text-sm font-medium text-on-background">Kapıda nakit</span>
+          </label>
+        ) : null}
+        {options.paymentDoorCard ? (
+          <label className={rowCls}>
+            <input
+              type="radio"
+              name={`${baseId}-pay`}
+              checked={method === "door_card"}
+              onChange={() => onMethodChange("door_card")}
+              className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+            />
+            <span className="text-sm font-medium text-on-background">Kapıda kredi kartı</span>
+          </label>
+        ) : null}
+        {options.paymentMealCard ? (
+          <div className="rounded-xl border border-surface-container-high bg-surface-container-low/40 p-3">
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-1">
+              <input
+                type="radio"
+                name={`${baseId}-pay`}
+                checked={method === "meal_card"}
+                onChange={() => onMethodChange("meal_card")}
+                className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+              />
+              <span className="text-sm font-medium text-on-background">Yemek kartı</span>
+            </label>
+            {method === "meal_card" ? (
+              <div className="mt-3 space-y-2 border-t border-surface-container-high pt-3" role="group" aria-label="Kart türü">
+                <p className="text-[11px] font-medium text-secondary">Kart seçin</p>
+                {MEAL_CARD_BRANDS.map((b) => (
+                  <label key={b.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/80">
+                    <input
+                      type="radio"
+                      name={`${baseId}-meal`}
+                      checked={mealCardBrandId === b.id}
+                      onChange={() => onMealCardBrandChange(b.id)}
+                      className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+                    />
+                    <span className="text-sm text-on-background">{b.label}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Public menü: tenant ve mirror aynı alanları taşır */
+export function mirrorAsPaymentOptions(m: PublicCheckoutMirror): TenantPaymentFlags {
+  return {
+    paymentCash: m.paymentCash,
+    paymentDoorCard: m.paymentDoorCard,
+    paymentMealCard: m.paymentMealCard,
+  };
+}
