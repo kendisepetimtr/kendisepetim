@@ -1,10 +1,13 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { OWNER_ADMIN_COOKIE, verifyOwnerAdminToken } from "@/lib/owner-admin/session";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 
 export async function getCurrentOwnerTenant(): Promise<TenantRow | null> {
+  if (!getSupabaseEnv()) return null;
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

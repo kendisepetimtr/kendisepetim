@@ -5,6 +5,8 @@ import DashboardSessionBridge from "@/components/dashboard/dashboard-session-bri
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+export const dynamic = "force-dynamic";
+
 const DASHBOARD_TENANT_SELECT = `
   id,
   created_at,
