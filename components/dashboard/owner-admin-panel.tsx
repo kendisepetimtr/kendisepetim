@@ -376,7 +376,7 @@ function OverviewSection({
                   key={row.method}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-surface-container-high bg-surface-container-low/60 px-4 py-3"
                 >
-                  <span className="text-sm font-medium text-on-background">{paymentMethodLabel(row.method, row.mealCardBrandId)}</span>
+                  <span className="text-sm font-medium text-on-background">{paymentMethodLabel(row.method)}</span>
                   <span className="text-sm text-secondary">
                     {row.orderCount} sipariş · <span className="font-semibold text-on-background">{formatTry(row.revenue)}</span>
                   </span>

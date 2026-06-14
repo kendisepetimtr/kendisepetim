@@ -32,8 +32,12 @@ export async function GET(_: Request, { params }: RouteContext): Promise<Respons
   }
 
   const asset = await resolveTenantFaviconAsset(logoUrl);
+  const body = asset.bytes.buffer.slice(
+    asset.bytes.byteOffset,
+    asset.bytes.byteOffset + asset.bytes.byteLength,
+  ) as ArrayBuffer;
 
-  return new Response(asset.bytes, {
+  return new Response(body, {
     headers: {
       "Content-Type": asset.contentType,
       "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",

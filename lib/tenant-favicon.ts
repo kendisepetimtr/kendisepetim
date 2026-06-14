@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 
 export type TenantFaviconAsset = {
-  bytes: Uint8Array;
+  bytes: Buffer;
   contentType: string;
 };
 
@@ -27,7 +27,7 @@ function parseDataUrlAsset(value: string): TenantFaviconAsset | null {
         ? Buffer.from(body, "base64")
         : Buffer.from(decodeURIComponent(body), "utf8");
     return {
-      bytes: new Uint8Array(decoded),
+      bytes: decoded,
       contentType: normalizeImageContentType(mimeType ?? null),
     };
   } catch {
@@ -38,7 +38,7 @@ function parseDataUrlAsset(value: string): TenantFaviconAsset | null {
 export async function getDefaultFaviconAsset(): Promise<TenantFaviconAsset> {
   if (!defaultFaviconAssetPromise) {
     defaultFaviconAssetPromise = fs.readFile(DEFAULT_FAVICON_PATH).then((bytes) => ({
-      bytes: new Uint8Array(bytes),
+      bytes,
       contentType: DEFAULT_FAVICON_CONTENT_TYPE,
     }));
   }
@@ -64,7 +64,7 @@ export async function resolveTenantFaviconAsset(
     const response = await fetch(trimmed, { cache: "no-store" });
     if (!response.ok) throw new Error(`favicon fetch failed: ${response.status}`);
     return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
+      bytes: Buffer.from(await response.arrayBuffer()),
       contentType: normalizeImageContentType(response.headers.get("content-type")),
     };
   } catch {
