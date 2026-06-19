@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
+import OAuthErrorRecovery from "@/components/oauth-error-recovery";
 import "./globals.css";
 
 const inter = Inter({
@@ -47,6 +48,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-background font-body text-on-background antialiased selection:bg-primary/20 selection:text-primary">
+        <OAuthErrorRecovery />
         {children}
       </body>
     </html>

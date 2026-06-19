@@ -2,6 +2,7 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { describeSupabaseEnvGap, getSupabaseEnv } from "@/lib/supabase/env";
+import { getRequestSiteUrl } from "@/lib/site-url";
 
 export type ForgotPasswordActionState = { error: string } | { success: true } | null;
 
@@ -29,10 +30,10 @@ export async function forgotPasswordAction(
     return { error: "E-posta gerekli." };
   }
 
-  const siteBase = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  const siteBase = await getRequestSiteUrl();
   if (!siteBase) {
     return {
-      error: "NEXT_PUBLIC_SITE_URL tanımlı değil; sıfırlama bağlantısı oluşturulamıyor.",
+      error: "Site adresi belirlenemedi; NEXT_PUBLIC_SITE_URL tanımlayın.",
     };
   }
 

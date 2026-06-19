@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
-import { getPublicSiteUrl } from "@/lib/site-url";
+import { getBrowserSiteUrl } from "@/lib/site-url";
 
 type Props = {
   nextPath: string;
@@ -18,9 +18,9 @@ export default function GoogleAuthButton({ nextPath, label = "Google ile devam e
     setError(null);
 
     try {
-      const siteBase = getPublicSiteUrl();
+      const siteBase = getBrowserSiteUrl();
       if (!siteBase) {
-        setError("NEXT_PUBLIC_SITE_URL tanımlı değil.");
+        setError("Site adresi belirlenemedi.");
         setPending(false);
         return;
       }

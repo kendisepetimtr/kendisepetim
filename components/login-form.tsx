@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useId, useActionState } from "react";
 import { loginAction, type LoginActionState } from "@/app/giris/actions";
 import GoogleAuthButton from "@/components/google-auth-button";
+import { humanizeOAuthError } from "@/lib/oauth-errors";
 
 type Props = {
   nextPath: string;
@@ -63,7 +64,7 @@ export default function LoginForm({
 
       {oauthError ? (
         <p className="mb-6 rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error" role="alert">
-          Google ile giriş başarısız: {oauthError}
+          {humanizeOAuthError(oauthError)}
         </p>
       ) : null}
 

@@ -1,8 +1,27 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { updateSession } from "@/lib/supabase/middleware";
 
+function redirectOAuthQueryErrorToLogin(request: NextRequest): NextResponse | null {
+  const error = request.nextUrl.searchParams.get("error");
+  if (!error) return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/giris";
+  url.search = "";
+  url.searchParams.set("durum", "oauth-hata");
+  const desc =
+    request.nextUrl.searchParams.get("error_description") ??
+    request.nextUrl.searchParams.get("error_code") ??
+    error;
+  url.searchParams.set("mesaj", desc);
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(request: NextRequest) {
+  const oauthRedirect = redirectOAuthQueryErrorToLogin(request);
+  if (oauthRedirect) return oauthRedirect;
+
   const host = request.headers.get("host");
   const slug = parseMenuSubdomainFromHost(host);
   let rewrite: URL | undefined;

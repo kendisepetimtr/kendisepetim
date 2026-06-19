@@ -1,6 +1,6 @@
-const STATIC_CACHE = "ks-qr-static-v2";
-const PAGE_CACHE = "ks-qr-pages-v2";
-const DATA_CACHE = "ks-qr-data-v2";
+const STATIC_CACHE = "ks-qr-static-v3";
+const PAGE_CACHE = "ks-qr-pages-v3";
+const DATA_CACHE = "ks-qr-data-v3";
 const ACTIVE_CACHES = [STATIC_CACHE, PAGE_CACHE, DATA_CACHE];
 
 self.addEventListener("install", (event) => {
