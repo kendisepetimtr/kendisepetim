@@ -10,3 +10,20 @@ export function getSupabaseEnv(): { url: string; anonKey: string } | null {
   if (!url || !anonKey) return null;
   return { url, anonKey };
 }
+
+/** Eksik Supabase ortam değişkenlerini insan okunur metin olarak döner. */
+export function describeSupabaseEnvGap(): string | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  if (url && anonKey) return null;
+
+  const missing: string[] = [];
+  if (!url) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+  if (!anonKey) {
+    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY veya NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+  }
+  return missing.join(", ");
+}

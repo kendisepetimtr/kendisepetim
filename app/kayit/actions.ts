@@ -31,19 +31,17 @@ export async function registerTenantAction(
     .trim()
     .toLowerCase();
   const ownerName = String(formData.get("ownerName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const emailFromForm = String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const passwordAgain = String(formData.get("passwordAgain") ?? "");
   const acceptedTerms = formData.get("acceptedTerms") === "on";
 
-  if (!businessName || !ownerName || !email || !phone) {
+  if (!businessName || !ownerName || !phone) {
     return { error: "Zorunlu alanları doldurun." };
   }
   const subErr = validateSubdomain(subdomain);
   if (subErr) return { error: subErr };
-  if (password.length < 8) return { error: "Şifre en az 8 karakter olmalıdır." };
-  if (password !== passwordAgain) return { error: "Şifreler eşleşmiyor." };
   if (!acceptedTerms) return { error: "Devam etmek için kullanım şartlarını onaylayın." };
 
   let service;
@@ -61,11 +59,59 @@ export async function registerTenantAction(
     return { error: "Bu alt alan adı zaten kullanılıyor." };
   }
 
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user: existingUser },
+  } = await supabase.auth.getUser();
+
+  if (existingUser) {
+    const email = (existingUser.email ?? emailFromForm).trim().toLowerCase();
+    if (!email) {
+      return { error: "E-posta adresi bulunamadı. Google hesabınızda e-posta paylaşımına izin verin." };
+    }
+
+    const { data: existingTenant } = await service
+      .from("tenants")
+      .select("id")
+      .eq("owner_user_id", existingUser.id)
+      .maybeSingle();
+    if (existingTenant) {
+      redirect("/dashboard");
+    }
+
+    const { error: insertError } = await service.from("tenants").insert({
+      business_name: businessName,
+      subdomain,
+      owner_name: ownerName,
+      email,
+      phone,
+      owner_user_id: existingUser.id,
+      logo_url: null,
+      hours_day_mode: "calendar",
+      open_time: "09:00",
+      close_time: "22:00",
+      payment_cash: true,
+      payment_door_card: false,
+      payment_meal_card: false,
+    });
+
+    if (insertError) {
+      return { error: insertError.message || "İşletme kaydı oluşturulamadı." };
+    }
+
+    redirect("/dashboard");
+  }
+
+  if (!emailFromForm) {
+    return { error: "E-posta gerekli." };
+  }
+  if (password.length < 8) return { error: "Şifre en az 8 karakter olmalıdır." };
+  if (password !== passwordAgain) return { error: "Şifreler eşleşmiyor." };
+
   const siteBase = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ?? "";
 
-  const supabase = await createServerSupabaseClient();
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email,
+    email: emailFromForm,
     password,
     options: {
       data: {
@@ -93,7 +139,7 @@ export async function registerTenantAction(
     business_name: businessName,
     subdomain,
     owner_name: ownerName,
-    email,
+    email: emailFromForm,
     phone,
     owner_user_id: userId,
     logo_url: null,
@@ -113,5 +159,5 @@ export async function registerTenantAction(
     redirect("/dashboard");
   }
 
-  return { needsEmailConfirm: true, email };
+  return { needsEmailConfirm: true, email: emailFromForm };
 }

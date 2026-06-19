@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ForgotPasswordForm from "@/components/forgot-password-form";
 import SiteLogo from "@/components/site-logo";
+import { getSupabaseEnv } from "@/lib/supabase/env";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Şifremi unuttum",
@@ -9,6 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default function ForgotPasswordPage() {
+  const supabaseConfigured = !!getSupabaseEnv();
+
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-surface-container-low/50 via-background to-background">
       <p className="absolute right-6 top-5 text-right text-sm text-secondary sm:right-10 sm:top-8">
@@ -23,7 +28,7 @@ export default function ForgotPasswordPage() {
             <SiteLogo variant="auth" />
           </div>
 
-          <ForgotPasswordForm />
+          <ForgotPasswordForm supabaseConfigured={supabaseConfigured} />
         </div>
       </div>
 

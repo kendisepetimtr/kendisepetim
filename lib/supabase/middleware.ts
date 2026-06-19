@@ -80,6 +80,9 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
   }
 
   if ((pathname === "/kayit" || pathname.startsWith("/kayit/")) && user) {
+    if (request.nextUrl.searchParams.get("reason") === "tenant-missing") {
+      return supabaseResponse;
+    }
     const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
     copyCookies(supabaseResponse, redirectRes);
     return redirectRes;

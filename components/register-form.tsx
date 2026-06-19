@@ -2,6 +2,7 @@
 
 import { registerTenantAction } from "@/app/kayit/actions";
 import LegalSummaryModal, { type LegalModalKind } from "@/components/legal-summary-modal";
+import GoogleAuthButton from "@/components/google-auth-button";
 import Link from "next/link";
 import { getLocalTenant, saveLocalTenant } from "@/lib/local-tenant";
 import { useRouter } from "next/navigation";
@@ -20,9 +21,11 @@ function slugify(value: string) {
 type RegisterFormProps = {
   /** true ise Supabase hesabı + tenants satırı; false ise yalnızca localStorage (Supabase env yoksa) */
   supabaseConfigured: boolean;
+  /** Google vb. ile oturum açık; şifre alanları gizlenir */
+  oauthUser?: { email: string; ownerName: string } | null;
 };
 
-export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) {
+export default function RegisterForm({ supabaseConfigured, oauthUser = null }: RegisterFormProps) {
   const router = useRouter();
   const formId = useId();
   const [pending, startTransition] = useTransition();
@@ -45,6 +48,14 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
     }
   }, [router, supabaseConfigured]);
 
+  useEffect(() => {
+    if (!oauthUser) return;
+    if (oauthUser.email) setEmail(oauthUser.email);
+    if (oauthUser.ownerName && !ownerName) setOwnerName(oauthUser.ownerName);
+  }, [oauthUser, ownerName]);
+
+  const oauthMode = supabaseConfigured && !!oauthUser;
+
   const hostPreview = subdomain ? `${subdomain}.kendisepetim.com` : "isletmeniz.kendisepetim.com";
 
   function handleSubmit(e: FormEvent) {
@@ -60,17 +71,20 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
       setError("Alt alan adı yalnızca küçük harf, rakam ve tire içerebilir; tire ile başlayıp bitemez.");
       return;
     }
-    if (password.length < 8) {
-      setError("Şifre en az 8 karakter olmalıdır.");
-      return;
-    }
-    if (password !== passwordAgain) {
-      setError("Şifreler eşleşmiyor.");
-      return;
-    }
     if (!acceptedTerms) {
       setError("Devam etmek için kullanım şartlarını onaylayın.");
       return;
+    }
+
+    if (!oauthMode) {
+      if (password.length < 8) {
+        setError("Şifre en az 8 karakter olmalıdır.");
+        return;
+      }
+      if (password !== passwordAgain) {
+        setError("Şifreler eşleşmiyor.");
+        return;
+      }
     }
 
     if (supabaseConfigured) {
@@ -145,14 +159,35 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
         </p>
         {supabaseConfigured ? (
           <p className="mt-2 text-xs text-secondary">
-            Kayıt sonrası panele e-posta ve şifrenizle{" "}
-            <Link href="/giris?kayit=tamam" className="font-medium text-primary underline-offset-2 hover:underline">
-              giriş
-            </Link>{" "}
-            yaparsınız.
+            {oauthMode
+              ? "Google hesabınız bağlandı. İşletme bilgilerinizi tamamlayın; şifre gerekmez."
+              : (
+                <>
+                  Kayıt sonrası panele e-posta ve şifrenizle{" "}
+                  <Link href="/giris?kayit=tamam" className="font-medium text-primary underline-offset-2 hover:underline">
+                    giriş
+                  </Link>{" "}
+                  yaparsınız.
+                </>
+              )}
           </p>
         ) : null}
       </div>
+
+      {supabaseConfigured && !oauthMode ? (
+        <div className="mb-6">
+          <GoogleAuthButton nextPath="/dashboard" label="Google ile kayıt ol" />
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center" aria-hidden>
+              <div className="w-full border-t border-surface-container-highest" />
+            </div>
+            <p className="relative mx-auto w-fit bg-background px-3 text-xs font-medium uppercase tracking-wide text-secondary">
+              veya e-posta ile
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <form
         onSubmit={handleSubmit}
         className="space-y-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-8 shadow-sm"
@@ -243,9 +278,10 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
             type="email"
             autoComplete="email"
             required
+            readOnly={oauthMode}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-on-background shadow-sm outline-none transition-[box-shadow,border-color] focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className={`w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-on-background shadow-sm outline-none transition-[box-shadow,border-color] focus:border-primary focus:ring-2 focus:ring-primary/20${oauthMode ? " cursor-not-allowed bg-surface-container-low" : ""}`}
             placeholder="siz@isletme.com"
           />
         </div>
@@ -267,6 +303,7 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
         </div>
       </div>
 
+      {!oauthMode ? (
       <div className="grid gap-6 sm:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor={`${formId}-pass`} className="block text-sm font-semibold text-on-background">
@@ -301,6 +338,7 @@ export default function RegisterForm({ supabaseConfigured }: RegisterFormProps) 
           />
         </div>
       </div>
+      ) : null}
 
       <label className="flex cursor-pointer items-start gap-3 text-sm text-secondary">
         <input

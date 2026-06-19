@@ -11,9 +11,17 @@ export async function GET(request: NextRequest) {
   const env = getSupabaseEnv();
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
+  const oauthError = searchParams.get("error_description") ?? searchParams.get("error");
   const nextRaw = searchParams.get("next");
   const next =
     nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/giris?verified=1";
+
+  if (oauthError) {
+    const loginUrl = new URL("/giris", request.nextUrl.origin);
+    loginUrl.searchParams.set("durum", "oauth-hata");
+    loginUrl.searchParams.set("mesaj", oauthError);
+    return NextResponse.redirect(loginUrl);
+  }
 
   const redirectUrl = new URL(next, request.nextUrl.origin);
 

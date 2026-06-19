@@ -4,9 +4,29 @@ import Link from "next/link";
 import { useId, useActionState } from "react";
 import { forgotPasswordAction, type ForgotPasswordActionState } from "@/app/sifremi-unuttum/actions";
 
-export default function ForgotPasswordForm() {
+type Props = {
+  supabaseConfigured: boolean;
+};
+
+export default function ForgotPasswordForm({ supabaseConfigured }: Props) {
   const formId = useId();
   const [state, formAction, pending] = useActionState(forgotPasswordAction, null as ForgotPasswordActionState);
+
+  if (!supabaseConfigured) {
+    return (
+      <div
+        className="rounded-2xl border border-outline-variant/60 bg-surface-container-low px-6 py-8 text-center text-sm shadow-sm"
+        role="alert"
+      >
+        <p className="font-headline text-lg font-bold text-on-background">Supabase bağlantısı yapılandırılmamış</p>
+        <p className="mt-3 leading-relaxed text-secondary">
+          Şifre sıfırlama için sunucuda Supabase ortam değişkenleri tanımlı olmalıdır. Yerelde{" "}
+          <code className="rounded bg-white px-1 py-0.5 text-xs">.env.local</code> dosyasını kontrol edin; canlı
+          ortamda Vercel → Settings → Environment Variables bölümüne aynı değerleri ekleyip yeniden deploy edin.
+        </p>
+      </div>
+    );
+  }
 
   if (state && "success" in state) {
     return (

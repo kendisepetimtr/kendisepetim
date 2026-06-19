@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useId, useActionState } from "react";
 import { loginAction, type LoginActionState } from "@/app/giris/actions";
+import GoogleAuthButton from "@/components/google-auth-button";
 
 type Props = {
   nextPath: string;
+  supabaseConfigured?: boolean;
   notice?: "email-verified" | "signup-ok" | "password-updated" | null;
+  oauthError?: string | null;
   /** Sunucuda zaten Supabase oturumu var (ör. e-posta onayı sonrası) */
   signedIn?: boolean;
 };
@@ -26,7 +29,13 @@ const NOTICE_COPY: Record<NonNullable<Props["notice"]>, { title: string; body: s
   },
 };
 
-export default function LoginForm({ nextPath, notice = null, signedIn = false }: Props) {
+export default function LoginForm({
+  nextPath,
+  supabaseConfigured = false,
+  notice = null,
+  oauthError = null,
+  signedIn = false,
+}: Props) {
   const formId = useId();
   const [state, formAction, pending] = useActionState(loginAction, null as LoginActionState);
   const noticeText = notice ? NOTICE_COPY[notice] : null;
@@ -38,7 +47,7 @@ export default function LoginForm({ nextPath, notice = null, signedIn = false }:
           Giriş yap
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-secondary">
-          Yönetim panelinize e-posta ve şifrenizle erişin.
+          Google ile veya e-posta ve şifrenizle yönetim panelinize erişin.
         </p>
       </div>
 
@@ -52,6 +61,12 @@ export default function LoginForm({ nextPath, notice = null, signedIn = false }:
         </div>
       ) : null}
 
+      {oauthError ? (
+        <p className="mb-6 rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error" role="alert">
+          Google ile giriş başarısız: {oauthError}
+        </p>
+      ) : null}
+
       {signedIn ? (
         <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 px-4 py-4 text-center text-sm">
           <p className="font-medium text-on-background">Oturumunuz açık.</p>
@@ -63,11 +78,26 @@ export default function LoginForm({ nextPath, notice = null, signedIn = false }:
           </Link>
         </div>
       ) : (
-        <form
-          action={formAction}
-          className="space-y-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-8 shadow-sm"
-          noValidate
-        >
+        <>
+          {supabaseConfigured ? (
+            <div className="mb-6">
+              <GoogleAuthButton nextPath={nextPath} label="Google ile giriş yap" />
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center" aria-hidden>
+                  <div className="w-full border-t border-surface-container-highest" />
+                </div>
+                <p className="relative mx-auto w-fit bg-background px-3 text-xs font-medium uppercase tracking-wide text-secondary">
+                  veya e-posta ile
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <form
+            action={formAction}
+            className="space-y-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-8 shadow-sm"
+            noValidate
+          >
           <input type="hidden" name="next" value={nextPath} />
 
           <div className="space-y-2">
@@ -122,6 +152,7 @@ export default function LoginForm({ nextPath, notice = null, signedIn = false }:
             {pending ? "Giriş yapılıyor…" : "Giriş yap"}
           </button>
         </form>
+        </>
       )}
 
       {!signedIn ? (

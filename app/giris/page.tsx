@@ -17,6 +17,7 @@ type Props = {
     /** Kayıt tamam, giriş bekleniyor */
     kayit?: string;
     durum?: string;
+    mesaj?: string;
   }>;
 };
 
@@ -44,6 +45,8 @@ export default async function LoginPage({ searchParams }: Props) {
   const nextRaw = typeof q.next === "string" ? q.next : "/dashboard";
   const nextPath = nextRaw.startsWith("/") ? nextRaw : "/dashboard";
   const notice = loginNoticeFromSearchParams(q as Record<string, string | undefined>);
+  const oauthError =
+    q.durum === "oauth-hata" && typeof q.mesaj === "string" ? q.mesaj : null;
 
   let signedIn = false;
   if (getSupabaseEnv()) {
@@ -73,7 +76,13 @@ export default async function LoginPage({ searchParams }: Props) {
             <SiteLogo variant="auth" />
           </div>
 
-          <LoginForm nextPath={nextPath} notice={notice} signedIn={signedIn} />
+          <LoginForm
+            nextPath={nextPath}
+            notice={notice}
+            oauthError={oauthError}
+            signedIn={signedIn}
+            supabaseConfigured={!!getSupabaseEnv()}
+          />
         </div>
       </div>
 
