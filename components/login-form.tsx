@@ -63,7 +63,10 @@ export default function LoginForm({
       ) : null}
 
       {oauthError ? (
-        <p className="mb-6 rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error" role="alert">
+        <p
+          className="mb-6 whitespace-pre-line rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error"
+          role="alert"
+        >
           {humanizeOAuthError(oauthError)}
         </p>
       ) : null}

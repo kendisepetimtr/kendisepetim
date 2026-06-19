@@ -5,12 +5,17 @@ export function humanizeOAuthError(message: string): string {
 
   if (lower.includes("unable to exchange external code")) {
     return (
-      "Google ile oturum acilamadi: Supabase, Google'dan gelen kodu dogrulayamadi. " +
-      "Supabase → Authentication → Google bolumundeki Client ID ve Client Secret, " +
-      "Google Cloud → Credentials altindaki OAuth istemcisi ile birebir ayni olmali. " +
-      "Google tarafinda Authorized redirect URI olarak yalnizca su adres olmali: " +
-      "https://mjfrwzgvjkodkobcslxf.supabase.co/auth/v1/callback " +
-      "(localhost degil). OAuth uygulamasi «Testing» modundaysa Gmail adresinizi test kullanicisi olarak ekleyin."
+      "Google oturumu acilamadi (Supabase, Google kodunu dogrulayamadi). Asagidaki uc adimi sirayla kontrol edin:\n\n" +
+      "1) Google Cloud → Credentials → OAuth 2.0 Web client → Authorized redirect URIs:\n" +
+      "   https://mjfrwzgvjkodkobcslxf.supabase.co/auth/v1/callback\n" +
+      "   (localhost veya kendisepetim.com BURAYA yazilmaz)\n\n" +
+      "2) Supabase → Authentication → Providers → Google:\n" +
+      "   Client ID ve Client Secret, Google'daki Web client ile birebir ayni olmali.\n" +
+      "   Emin degilseniz Google'da yeni Client Secret olusturup Supabase'e yapistirin → Save.\n\n" +
+      "3) Supabase → Authentication → URL Configuration:\n" +
+      "   Site URL = https://kendisepetim.com (localhost birakmayin)\n" +
+      "   Redirect URLs = https://kendisepetim.com/auth/callback ve http://localhost:3000/auth/callback\n\n" +
+      "Testing modundaysa Google OAuth consent ekraninda Gmail adresinizi test kullanicisi olarak ekleyin."
     );
   }
 
