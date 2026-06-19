@@ -6,7 +6,7 @@ import { loginAction, type LoginActionState } from "@/app/giris/actions";
 
 type Props = {
   nextPath: string;
-  notice?: "email-verified" | "signup-ok" | null;
+  notice?: "email-verified" | "signup-ok" | "password-updated" | null;
   /** Sunucuda zaten Supabase oturumu var (ör. e-posta onayı sonrası) */
   signedIn?: boolean;
 };
@@ -19,6 +19,10 @@ const NOTICE_COPY: Record<NonNullable<Props["notice"]>, { title: string; body: s
   "signup-ok": {
     title: "Kayıt başarılı",
     body: "Hesabınız hazır. E-posta doğrulaması gerekiyorsa önce gelen kutunuzu (ör. Gmail) kontrol edin; ardından buradan giriş yapın.",
+  },
+  "password-updated": {
+    title: "Şifreniz güncellendi",
+    body: "Yeni şifreniz kaydedildi. Aşağıdan e-posta ve yeni şifrenizle giriş yapabilirsiniz.",
   },
 };
 
@@ -82,9 +86,17 @@ export default function LoginForm({ nextPath, notice = null, signedIn = false }:
           </div>
 
           <div className="space-y-2">
-            <label htmlFor={`${formId}-pass`} className="block text-sm font-semibold text-on-background">
-              Şifre
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor={`${formId}-pass`} className="block text-sm font-semibold text-on-background">
+                Şifre
+              </label>
+              <Link
+                href="/sifremi-unuttum"
+                className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Şifremi unuttum
+              </Link>
+            </div>
             <input
               id={`${formId}-pass`}
               name="password"

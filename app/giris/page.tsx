@@ -20,7 +20,12 @@ type Props = {
   }>;
 };
 
-function loginNoticeFromSearchParams(q: Record<string, string | undefined>): "email-verified" | "signup-ok" | null {
+function loginNoticeFromSearchParams(
+  q: Record<string, string | undefined>,
+): "email-verified" | "signup-ok" | "password-updated" | null {
+  const passwordUpdated = q.durum === "sifre-guncellendi";
+  if (passwordUpdated) return "password-updated";
+
   const verified =
     q.verified === "1" ||
     q.verified === "true" ||

@@ -8,6 +8,8 @@ export type UpdateSessionOptions = {
 };
 
 const LOGIN_PATH = "/giris";
+const FORGOT_PASSWORD_PATH = "/sifremi-unuttum";
+const RESET_PASSWORD_PATH = "/sifre-yenile";
 const PROTECTED_PREFIXES = ["/dashboard"];
 
 function copyCookies(from: NextResponse, to: NextResponse) {
@@ -81,6 +83,20 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
     copyCookies(supabaseResponse, redirectRes);
     return redirectRes;
+  }
+
+  if (
+    (pathname === FORGOT_PASSWORD_PATH || pathname.startsWith(`${FORGOT_PASSWORD_PATH}/`)) &&
+    user
+  ) {
+    const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
+    copyCookies(supabaseResponse, redirectRes);
+    return redirectRes;
+  }
+
+  /* Şifre sıfırlama bağlantısı oturum açar; kullanıcı bu sayfada kalmalı */
+  if (pathname === RESET_PASSWORD_PATH || pathname.startsWith(`${RESET_PASSWORD_PATH}/`)) {
+    return supabaseResponse;
   }
 
   return supabaseResponse;
