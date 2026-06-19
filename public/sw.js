@@ -1,6 +1,6 @@
-const STATIC_CACHE = "ks-qr-static-v1";
-const PAGE_CACHE = "ks-qr-pages-v1";
-const DATA_CACHE = "ks-qr-data-v1";
+const STATIC_CACHE = "ks-qr-static-v2";
+const PAGE_CACHE = "ks-qr-pages-v2";
+const DATA_CACHE = "ks-qr-data-v2";
 const ACTIVE_CACHES = [STATIC_CACHE, PAGE_CACHE, DATA_CACHE];
 
 self.addEventListener("install", (event) => {
@@ -23,12 +23,26 @@ function isSameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
+/** Yalnizca QR menu PWA rotalarinda devreye gir; giris/panel/auth rotalarina dokunma. */
+function isMenuSubdomainHost(hostname) {
+  const host = hostname.toLowerCase();
+  if (host === "kendisepetim.com" || host === "www.kendisepetim.com") return false;
+  if (host.endsWith(".localhost")) return true;
+  if (host.endsWith(".kendisepetim.com")) return true;
+  return false;
+}
+
+function isMenuPwaRequest(url) {
+  if (url.pathname.startsWith("/m/")) return true;
+  if (isMenuSubdomainHost(url.hostname) && url.pathname === "/") return true;
+  return false;
+}
+
 function isBypassedRequest(request, url) {
   if (request.method !== "GET") return true;
   if (!isSameOrigin(url)) return true;
+  if (!isMenuPwaRequest(url)) return true;
   if (url.pathname.startsWith("/api/")) return true;
-  if (url.pathname.startsWith("/dashboard")) return true;
-  if (url.pathname.startsWith("/superadmin")) return true;
   return false;
 }
 
@@ -48,7 +62,7 @@ async function networkFirst(request, cacheName) {
   } catch {
     const cached = await cache.match(request);
     if (cached) return cached;
-    return new Response("Cevrimdisi", {
+    return new Response("Menu su an cevrimdisi. Lutfen internet baglantinizi kontrol edin.", {
       status: 503,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
@@ -96,18 +110,12 @@ self.addEventListener("fetch", (event) => {
         const fallback = await cache.match(request);
         if (fallback) return fallback;
 
-        return new Response("Cevrimdisi", {
+        return new Response("Menu su an cevrimdisi. Lutfen internet baglantinizi kontrol edin.", {
           status: 503,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         });
       })(),
     );
-    return;
-  }
-
-  const isMenuDocument = url.pathname === "/" || url.pathname.startsWith("/m/");
-  if (isMenuDocument) {
-    event.respondWith(networkFirst(request, PAGE_CACHE));
     return;
   }
 
