@@ -4,6 +4,22 @@ export function getEnvSiteUrl(): string {
 }
 
 /**
+ * Canli site kok URL — Supabase Site URL yanlislikla localhost ise OAuth hatalarini buraya tasir.
+ * Vercel Production: https://kendisepetim.com
+ */
+export function getCanonicalSiteUrl(): string {
+  const canonical = process.env.NEXT_PUBLIC_CANONICAL_SITE_URL?.trim().replace(/\/$/, "");
+  if (canonical) return canonical;
+  const env = getEnvSiteUrl();
+  if (env && !env.includes("localhost") && !env.includes("127.0.0.1")) return env;
+  return "";
+}
+
+export function isLocalHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
+}
+
+/**
  * Tarayicida o an acik olan domain — OAuth redirect icin env yerine bunu kullanin.
  * Boylece canlida localhost env olsa bile dogru adrese donulur.
  */

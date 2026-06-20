@@ -13,7 +13,7 @@ export function humanizeOAuthError(message: string): string {
       "   Client ID ve Client Secret, Google'daki Web client ile birebir ayni olmali.\n" +
       "   Emin degilseniz Google'da yeni Client Secret olusturup Supabase'e yapistirin → Save.\n\n" +
       "3) Supabase → Authentication → URL Configuration:\n" +
-      "   Site URL = https://kendisepetim.com (localhost birakmayin)\n" +
+      "   Site URL = https://kendisepetim.com (localhost birakmayin — aksi halde hata sonrasi localhost'a atar)\n" +
       "   Redirect URLs = https://kendisepetim.com/auth/callback ve http://localhost:3000/auth/callback\n\n" +
       "Testing modundaysa Google OAuth consent ekraninda Gmail adresinizi test kullanicisi olarak ekleyin."
     );
