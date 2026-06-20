@@ -81,21 +81,31 @@ export default function LoginForm({
             Panele git
           </Link>
         </div>
+      ) : !supabaseConfigured ? (
+        <div
+          className="rounded-2xl border border-outline-variant/60 bg-surface-container-low px-6 py-8 text-center text-sm shadow-sm"
+          role="alert"
+        >
+          <p className="font-headline text-lg font-bold text-on-background">Giris servisi yapilandirilmamis</p>
+          <p className="mt-3 leading-relaxed text-secondary">
+            E-posta, sifre ve Google girisi icin Supabase ortam degiskenleri tanimli olmali. Yerelde{" "}
+            <code className="rounded bg-white px-1 py-0.5 text-xs">.env.local</code>, canlida Vercel
+            Environment Variables bolumunu kontrol edin.
+          </p>
+        </div>
       ) : (
         <>
-          {supabaseConfigured ? (
-            <div className="mb-6">
-              <GoogleAuthButton nextPath={nextPath} label="Google ile giriş yap" />
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center" aria-hidden>
-                  <div className="w-full border-t border-surface-container-highest" />
-                </div>
-                <p className="relative mx-auto w-fit bg-background px-3 text-xs font-medium uppercase tracking-wide text-secondary">
-                  veya e-posta ile
-                </p>
+          <div className="mb-6">
+            <GoogleAuthButton nextPath={nextPath} label="Google ile giriş yap" />
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center" aria-hidden>
+                <div className="w-full border-t border-surface-container-highest" />
               </div>
+              <p className="relative mx-auto w-fit bg-background px-3 text-xs font-medium uppercase tracking-wide text-secondary">
+                veya e-posta ile
+              </p>
             </div>
-          ) : null}
+          </div>
 
           <form
             action={formAction}

@@ -53,8 +53,8 @@ export default function RestaurantLanding() {
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             <Link
+              className="font-headline text-lg font-medium tracking-tight text-slate-600 transition-colors duration-200 hover:text-primary-container"
               href="/giris"
-              className="font-semibold text-slate-600 transition-colors hover:text-primary"
             >
               Giriş yap
             </Link>

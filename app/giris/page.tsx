@@ -4,6 +4,8 @@ import SiteLogo from "@/components/site-logo";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Giriş",
   description: "KendiSepetim işletme paneli girişi.",

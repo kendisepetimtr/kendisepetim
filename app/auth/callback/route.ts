@@ -1,10 +1,26 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
+
+function loginRedirect(request: NextRequest, params: Record<string, string>) {
+  const loginUrl = new URL("/giris", request.nextUrl.origin);
+  for (const [key, value] of Object.entries(params)) {
+    loginUrl.searchParams.set(key, value);
+  }
+  return NextResponse.redirect(loginUrl);
+}
+
+function resolveNextPath(nextRaw: string | null): string {
+  if (nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")) {
+    return nextRaw;
+  }
+  return EMAIL_VERIFIED_LOGIN_PATH;
+}
 
 /**
- * Supabase e-posta doğrulama / OAuth PKCE dönüşü.
- * Supabase Dashboard → Authentication → URL Configuration → Redirect URLs:
+ * Supabase e-posta dogrulama / OAuth PKCE donusu.
+ * Dashboard → Authentication → URL Configuration → Redirect URLs:
  *   https://siteniz.com/auth/callback
  */
 export async function GET(request: NextRequest) {
@@ -12,39 +28,42 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const oauthError = searchParams.get("error_description") ?? searchParams.get("error");
-  const nextRaw = searchParams.get("next");
-  const next =
-    nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/giris?verified=1";
+  const nextPath = resolveNextPath(searchParams.get("next"));
 
   if (oauthError) {
-    const loginUrl = new URL("/giris", request.nextUrl.origin);
-    loginUrl.searchParams.set("durum", "oauth-hata");
-    loginUrl.searchParams.set("mesaj", oauthError);
-    return NextResponse.redirect(loginUrl);
+    return loginRedirect(request, { durum: "oauth-hata", mesaj: oauthError });
   }
-
-  const redirectUrl = new URL(next, request.nextUrl.origin);
 
   if (!env) {
-    return NextResponse.redirect(new URL("/giris", request.nextUrl.origin));
+    return loginRedirect(request, { durum: "oauth-hata", mesaj: "Supabase yapilandirmasi eksik." });
   }
 
+  if (!code) {
+    return loginRedirect(request, {
+      durum: "oauth-hata",
+      mesaj: "Giris kodu bulunamadi. Lutfen tekrar deneyin.",
+    });
+  }
+
+  const redirectUrl = new URL(nextPath, request.nextUrl.origin);
   const response = NextResponse.redirect(redirectUrl);
 
-  if (code) {
-    const supabase = createServerClient(env.url, env.anonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
+  const supabase = createServerClient(env.url, env.anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-    });
-    await supabase.auth.exchangeCodeForSession(code);
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return loginRedirect(request, { durum: "oauth-hata", mesaj: error.message });
   }
 
   return response;

@@ -187,7 +187,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
         /* sunucu oturumu kapanmazsa yine ana sayfaya yönlendir */
       }
     }
-    router.push("/");
+    router.push("/giris");
     router.refresh();
   }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { buildAuthCallbackUrl, DEFAULT_POST_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { getBrowserSiteUrl } from "@/lib/site-url";
 
 type Props = {
@@ -25,8 +26,8 @@ export default function GoogleAuthButton({ nextPath, label = "Google ile devam e
         return;
       }
 
-      const next = nextPath.startsWith("/") ? nextPath : "/dashboard";
-      const redirectTo = `${siteBase}/auth/callback?next=${encodeURIComponent(next)}`;
+      const next = nextPath.startsWith("/") ? nextPath : DEFAULT_POST_LOGIN_PATH;
+      const redirectTo = buildAuthCallbackUrl(siteBase, next);
 
       const supabase = createBrowserSupabaseClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

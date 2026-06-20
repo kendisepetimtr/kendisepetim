@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { getRequestSiteUrl } from "@/lib/site-url";
+import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -120,7 +121,9 @@ export async function registerTenantAction(
         subdomain,
         owner_name: ownerName,
       },
-      ...(siteBase ? { emailRedirectTo: `${siteBase}/auth/callback` } : {}),
+      ...(siteBase
+        ? { emailRedirectTo: buildAuthCallbackUrl(siteBase, EMAIL_VERIFIED_LOGIN_PATH) }
+        : {}),
     },
   });
 

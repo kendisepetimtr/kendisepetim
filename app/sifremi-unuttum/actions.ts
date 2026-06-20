@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { describeSupabaseEnvGap, getSupabaseEnv } from "@/lib/supabase/env";
 import { getRequestSiteUrl } from "@/lib/site-url";
+import { buildAuthCallbackUrl, RESET_PASSWORD_PATH } from "@/lib/supabase/auth-urls";
 
 export type ForgotPasswordActionState = { error: string } | { success: true } | null;
 
@@ -39,7 +40,7 @@ export async function forgotPasswordAction(
 
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteBase}/auth/callback?next=/sifre-yenile`,
+    redirectTo: buildAuthCallbackUrl(siteBase, RESET_PASSWORD_PATH),
   });
 
   if (error) {
