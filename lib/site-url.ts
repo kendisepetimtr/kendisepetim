@@ -1,18 +1,20 @@
+/** Canli site — Supabase Site URL yanlis ayarli olsa bile OAuth donusleri buraya tasinir. */
+export const PRODUCTION_SITE_ORIGIN = "https://kendisepetim.com";
+
 /** Ortam degiskeninden site kok URL (sonunda / yok). */
 export function getEnvSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ?? "";
 }
 
 /**
- * Canli site kok URL — Supabase Site URL yanlislikla localhost ise OAuth hatalarini buraya tasir.
- * Vercel Production: https://kendisepetim.com
+ * Canli site kok URL — Supabase Site URL yanlislikla localhost ise OAuth donuslerini buraya tasir.
  */
 export function getCanonicalSiteUrl(): string {
   const canonical = process.env.NEXT_PUBLIC_CANONICAL_SITE_URL?.trim().replace(/\/$/, "");
   if (canonical) return canonical;
   const env = getEnvSiteUrl();
   if (env && !env.includes("localhost") && !env.includes("127.0.0.1")) return env;
-  return "";
+  return PRODUCTION_SITE_ORIGIN;
 }
 
 export function isLocalHost(hostname: string): boolean {

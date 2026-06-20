@@ -3,9 +3,10 @@ import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { updateSession } from "@/lib/supabase/middleware";
 import { buildAuthCallbackRedirectUrl } from "@/lib/oauth-redirect";
 import { AUTH_CALLBACK_PATH } from "@/lib/supabase/auth-urls";
+import { getCanonicalSiteUrl } from "@/lib/site-url";
 
-function getCanonicalSiteUrl(): string {
-  return process.env.NEXT_PUBLIC_CANONICAL_SITE_URL?.trim().replace(/\/$/, "") ?? "";
+function getCanonicalSiteUrlFromEnv(): string {
+  return getCanonicalSiteUrl();
 }
 
 /** Supabase Site URL localhost ise OAuth kodu/hatasi canli adrese tasinir. */
@@ -19,7 +20,7 @@ function redirectLocalhostAuthParamsToCanonical(request: NextRequest): NextRespo
   const error = request.nextUrl.searchParams.get("error");
   if (!code && !error) return null;
 
-  const canonical = getCanonicalSiteUrl();
+  const canonical = getCanonicalSiteUrlFromEnv();
   if (!canonical) return null;
 
   const url = new URL(request.nextUrl.pathname, canonical);
