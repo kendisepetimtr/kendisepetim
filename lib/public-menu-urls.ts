@@ -1,3 +1,5 @@
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
+
 /** Material SymbolsOutlined adı — panel Bağlantılar ikonları */
 export type PublicMenuConnectionLink = {
   key: string;
@@ -7,18 +9,34 @@ export type PublicMenuConnectionLink = {
   icon: string;
 };
 
+/** Canlı path menüsü — subdomain DNS hazır olana kadar yedek QR adresi. */
+export function getPublicMenuPathUrl(
+  subdomain: string,
+  origin: string = PRODUCTION_SITE_ORIGIN,
+): string {
+  return `${origin.replace(/\/$/, "")}/m/${encodeURIComponent(subdomain)}`;
+}
+
 /**
  * Panelden gösterilecek müşteri menüsü adresleri (geliştirme + üretim).
  */
 export function getPublicMenuConnectionLinks(subdomain: string): PublicMenuConnectionLink[] {
-  const prod = `https://${subdomain}.kendisepetim.com`;
+  const prodSubdomain = `https://${subdomain}.kendisepetim.com`;
+  const prodPath = getPublicMenuPathUrl(subdomain);
   const links: PublicMenuConnectionLink[] = [
     {
       key: "live-menu-prod",
-      href: prod,
+      href: prodSubdomain,
       label: `${subdomain}.kendisepetim.com`,
-      hint: "Canlı menü (üretim)",
+      hint: "Canlı menü (subdomain)",
       icon: "rocket_launch",
+    },
+    {
+      key: "live-menu-path-prod",
+      href: prodPath,
+      label: `kendisepetim.com/m/${subdomain}`,
+      hint: "Yedek menü (path)",
+      icon: "link",
     },
   ];
 

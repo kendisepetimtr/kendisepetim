@@ -2,7 +2,7 @@
 
 import QrCodeWithLogoPreview from "@/components/dashboard/qr-code-with-logo-preview";
 import { createQrPngWithCenterLogo, defaultKendiSepetimLogoUrl, qrCodeApiUrl } from "@/lib/qr-with-logo";
-import { getPublicMenuConnectionLinks, type PublicMenuConnectionLink } from "@/lib/public-menu-urls";
+import { getPublicMenuConnectionLinks, getPublicMenuPathUrl, type PublicMenuConnectionLink } from "@/lib/public-menu-urls";
 import type { LocalTenantProfile } from "@/lib/local-tenant";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
@@ -24,7 +24,9 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
   useEffect(() => {
     if (!links.length) return;
     if (!selectedKey || !links.some((l) => l.key === selectedKey)) {
-      setSelectedKey(links[0]!.key);
+      const preferred =
+        links.find((l) => l.key === "live-menu-path-prod")?.key ?? links[0]!.key;
+      setSelectedKey(preferred);
     }
   }, [links, selectedKey]);
 
@@ -35,6 +37,11 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
 
   const prodUrl = useMemo(
     () => `https://${tenant.subdomain}.kendisepetim.com`,
+    [tenant.subdomain],
+  );
+
+  const prodPathUrl = useMemo(
+    () => getPublicMenuPathUrl(tenant.subdomain),
     [tenant.subdomain],
   );
 
@@ -129,6 +136,17 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
               {prodUrl}
             </a>
           </p>
+          <p className="mt-2 break-all text-sm text-secondary">
+            Yedek menü:{" "}
+            <a
+              href={prodPathUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono font-medium text-primary hover:text-primary-container"
+            >
+              {prodPathUrl.replace(/^https:\/\//, "")}
+            </a>
+          </p>
         </section>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
@@ -207,7 +225,8 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
       <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
         <h2 className="font-headline text-lg font-bold text-on-background">Tüm menü bağlantıları</h2>
         <p className="mt-1 text-sm text-secondary">
-          Panodaki «Bağlantılar» ile aynı adresler. Müşteri telefonunda test için yerel adresleri kullanın.
+          Panodaki «Bağlantılar» ile aynı adresler. Subdomain DNS hazır değilse yedek path adresini kullanın;
+          yerel geliştirmede localhost adresleri yalnızca bu cihazda çalışır.
         </p>
         <ul className="mt-4 space-y-3">
           {links.map((l) => (
