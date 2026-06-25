@@ -2,7 +2,12 @@
   Marketplace vitrini, restoran konumu / teslimat yarıçapı ve sipariş tipi (gel-al / teslimat).
 */
 
-create type public.order_fulfillment_type as enum ('pickup', 'delivery');
+do $$
+begin
+  create type public.order_fulfillment_type as enum ('pickup', 'delivery');
+exception
+  when duplicate_object then null;
+end $$;
 
 alter table public.tenants
   add column if not exists marketplace_enabled boolean not null default false,

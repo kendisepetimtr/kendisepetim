@@ -53,6 +53,7 @@ export default function MarketplaceSettingsPanel({
     tenant.minOrderAmount != null ? String(tenant.minOrderAmount).replace(".", ",") : "",
   );
   const [savedFlash, setSavedFlash] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const neighborhoods = useMemo(
     () => getNeighborhoodsForDistrict(city, district),
@@ -101,6 +102,7 @@ export default function MarketplaceSettingsPanel({
 
   function handleSave(e: FormEvent) {
     e.preventDefault();
+    setSaveError(null);
     if (!fulfillmentPickupEnabled && !fulfillmentDeliveryEnabled) {
       window.alert("En az gel-al veya restoran teslimatı seçeneğini açmalısınız.");
       return;
@@ -141,26 +143,30 @@ export default function MarketplaceSettingsPanel({
     }
 
     startSaveTransition(async () => {
-      const result = await updateMarketplaceSettingsAction({
-        marketplaceEnabled,
-        city,
-        district,
-        neighborhood,
-        cuisineTags,
-        latitude,
-        longitude,
-        deliveryRadiusKm,
-        fulfillmentPickupEnabled,
-        fulfillmentDeliveryEnabled,
-        minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
-      });
-      if (!result.ok) {
-        window.alert(result.error);
-        return;
+      try {
+        const result = await updateMarketplaceSettingsAction({
+          marketplaceEnabled,
+          city,
+          district,
+          neighborhood,
+          cuisineTags,
+          latitude,
+          longitude,
+          deliveryRadiusKm,
+          fulfillmentPickupEnabled,
+          fulfillmentDeliveryEnabled,
+          minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
+        });
+        if (!result.ok) {
+          setSaveError(result.error);
+          return;
+        }
+        onTenantUpdate(result.profile);
+        setSavedFlash(true);
+        window.setTimeout(() => setSavedFlash(false), 2500);
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : "Kayıt güncellenemedi.");
       }
-      onTenantUpdate(result.profile);
-      setSavedFlash(true);
-      window.setTimeout(() => setSavedFlash(false), 2500);
     });
   }
 
@@ -364,6 +370,12 @@ export default function MarketplaceSettingsPanel({
           </span>
         </label>
       </section>
+
+      {saveError ? (
+        <div className="rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error whitespace-pre-wrap">
+          {saveError}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <button

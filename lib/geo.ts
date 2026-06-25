@@ -56,3 +56,12 @@ export function asGeoPoint(
 ): GeoPoint | null {
   return isValidCoordinate(lat, lng) ? { lat, lng: lng as number } : null;
 }
+
+/** Supabase numeric(10,7) ile uyumlu yuvarlama. */
+export function roundCoordinate(value: number): number {
+  return Math.round(value * 1e7) / 1e7;
+}
+
+export function normalizeGeoPoint(point: GeoPoint): GeoPoint {
+  return { lat: roundCoordinate(point.lat), lng: roundCoordinate(point.lng) };
+}
