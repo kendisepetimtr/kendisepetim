@@ -8,19 +8,35 @@ import { buildLocalMenuState } from "@/lib/menu-map";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
 import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import type { TenantRow } from "@/lib/supabase/tenant-types";
 
 type Props = { params: Promise<{ slug: string }> };
+
+function getServiceClientSafe() {
+  try {
+    return createServiceSupabaseClient();
+  } catch {
+    return null;
+  }
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug: raw } = await params;
   const slug = raw.toLowerCase();
   if (!isValidMenuSlug(slug)) return { title: "Menü" };
-  const svc = createServiceSupabaseClient();
+
+  const svc = getServiceClientSafe();
+  if (!svc) {
+    const title = slug.charAt(0).toUpperCase() + slug.slice(1);
+    return { title: `${title} - Menu` };
+  }
+
   const { data: tenant } = await svc
     .from("tenants")
     .select("business_name, public_description, public_menu_enabled, seo_index_enabled, logo_url")
     .eq("subdomain", slug)
     .maybeSingle();
+
   const title = tenant?.business_name?.trim() || slug.charAt(0).toUpperCase() + slug.slice(1);
   const description = tenant?.public_description?.trim() || `${title} dijital menu`;
   const indexEnabled = tenant?.public_menu_enabled === true && tenant?.seo_index_enabled === true;
@@ -57,19 +73,23 @@ export default async function PublicMenuPage({ params }: Props) {
   const slug = raw.toLowerCase();
   if (!isValidMenuSlug(slug)) notFound();
 
-  const svc = createServiceSupabaseClient();
-  const { data: tenant } = await svc
+  const svc = getServiceClientSafe();
+  if (!svc) notFound();
+
+  const { data: tenant, error: tenantError } = await svc
     .from("tenants")
-    .select("id, business_name, logo_url, cover_image_url, public_description, google_maps_url, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, public_menu_enabled, fulfillment_pickup_enabled, fulfillment_delivery_enabled, delivery_radius_km, latitude, longitude, min_order_amount")
+    .select("*")
     .eq("subdomain", slug)
     .maybeSingle();
 
-  if (!tenant || tenant.public_menu_enabled !== true) notFound();
+  if (tenantError || !tenant || tenant.public_menu_enabled !== true) notFound();
+
+  const row = tenant as TenantRow;
 
   const { data: categoryRows } = await svc
     .from("menu_categories")
     .select("*")
-    .eq("tenant_id", tenant.id)
+    .eq("tenant_id", row.id)
     .eq("hidden", false)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
@@ -82,7 +102,7 @@ export default async function PublicMenuPage({ params }: Props) {
       ? await svc
           .from("menu_products")
           .select("*")
-          .eq("tenant_id", tenant.id)
+          .eq("tenant_id", row.id)
           .eq("hidden", false)
           .in("category_id", categoryIds)
           .order("sort_order", { ascending: true })
@@ -90,33 +110,33 @@ export default async function PublicMenuPage({ params }: Props) {
       : { data: [] as MenuProductRow[] };
 
   const paymentFlags: TenantPaymentFlags = {
-    paymentCash: tenant.payment_cash === true,
-    paymentDoorCard: tenant.payment_door_card === true,
-    paymentMealCard: tenant.payment_meal_card === true,
+    paymentCash: row.payment_cash === true,
+    paymentDoorCard: row.payment_door_card === true,
+    paymentMealCard: row.payment_meal_card === true,
   };
   const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: tenant.fulfillment_pickup_enabled !== false,
-    fulfillmentDeliveryEnabled: tenant.fulfillment_delivery_enabled === true,
-    deliveryRadiusKm: clampDeliveryRadiusKm(Number(tenant.delivery_radius_km ?? 5)),
+    fulfillmentPickupEnabled: row.fulfillment_pickup_enabled !== false,
+    fulfillmentDeliveryEnabled: row.fulfillment_delivery_enabled === true,
+    deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
     minOrderAmount:
-      tenant.min_order_amount != null && Number.isFinite(Number(tenant.min_order_amount))
-        ? Number(tenant.min_order_amount)
+      row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
+        ? Number(row.min_order_amount)
         : null,
-    latitude: tenant.latitude != null ? Number(tenant.latitude) : null,
-    longitude: tenant.longitude != null ? Number(tenant.longitude) : null,
+    latitude: row.latitude != null ? Number(row.latitude) : null,
+    longitude: row.longitude != null ? Number(row.longitude) : null,
   };
-  const initialOpenStatus = isBusinessOpenNow(tenant.open_time, tenant.close_time);
-  const initialClosedMessage = getBusinessClosedMessage(tenant.open_time, tenant.close_time);
+  const initialOpenStatus = isBusinessOpenNow(row.open_time, row.close_time);
+  const initialClosedMessage = getBusinessClosedMessage(row.open_time, row.close_time);
 
   return (
     <PublicMenuClient
       slug={slug}
-      businessName={tenant.business_name}
-      businessLogoUrl={tenant.logo_url ?? ""}
-      businessCoverImageUrl={tenant.cover_image_url ?? ""}
-      publicDescription={tenant.public_description ?? ""}
-      googleMapsUrl={tenant.google_maps_url ?? ""}
-      hoursPair={{ open: tenant.open_time, close: tenant.close_time }}
+      businessName={row.business_name}
+      businessLogoUrl={row.logo_url ?? ""}
+      businessCoverImageUrl={row.cover_image_url ?? ""}
+      publicDescription={row.public_description ?? ""}
+      googleMapsUrl={row.google_maps_url ?? ""}
+      hoursPair={{ open: row.open_time, close: row.close_time }}
       initialOpenStatus={initialOpenStatus}
       initialClosedMessage={initialClosedMessage}
       paymentFlags={paymentFlags}
