@@ -30,6 +30,17 @@ export type TenantRow = {
   plan: TenantPlan;
   public_menu_enabled: boolean;
   dashboard_enabled: boolean;
+  marketplace_enabled: boolean;
+  city: string;
+  district: string;
+  neighborhood: string;
+  cuisine_tags: string[];
+  latitude: number | null;
+  longitude: number | null;
+  delivery_radius_km: number;
+  fulfillment_pickup_enabled: boolean;
+  fulfillment_delivery_enabled: boolean;
+  min_order_amount: number | null;
   owner_admin_pin_hash: string | null;
   owner_admin_pin_set_at: string | null;
 };

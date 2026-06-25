@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Ucretsiz Dene",
   description:
-    "Restoraninizi KendiSepetim'e kaydedin; yonetim paneli ve alt alan adinizla QR menuye hemen baslayin.",
+    "Restoraninizi KendiSepetim'e kaydedin; restoranadiniz.kendisepetim.com adresinde QR menu ve yonetim paneli.",
 };
 
 type Props = {

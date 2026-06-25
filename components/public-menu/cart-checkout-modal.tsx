@@ -5,11 +5,18 @@ import CustomerIdentityAddressForm from "@/components/customer/customer-identity
 import {
   emptyCustomerFormValues,
   type CustomerFormValues,
-  validateCustomerFormRequired,
+  validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
 import { formatCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
-import { getDisplayedProductPrice, type LocalMenuProduct } from "@/lib/local-menu";
+import type { LocalMenuProduct } from "@/lib/local-menu";
+import { getProductPriceForFulfillment } from "@/lib/product-pricing";
+import {
+  fulfillmentTypeLabel,
+  resolveDefaultFulfillmentType,
+  type FulfillmentType,
+  type TenantFulfillmentFlags,
+} from "@/lib/fulfillment";
 import { upsertLocalCustomerByPhone } from "@/lib/local-customers";
 import { loadQrCheckoutSession, saveQrCheckoutSession } from "@/lib/qr-checkout-session";
 import {
@@ -49,6 +56,8 @@ type CartCheckoutModalProps = {
   setCart: React.Dispatch<React.SetStateAction<CartState>>;
   visibleProducts: LocalMenuProduct[];
   paymentFlags: TenantPaymentFlags;
+  fulfillmentFlags: TenantFulfillmentFlags;
+  orderSource?: "qr_menu" | "marketplace";
   /** Menü subdomain (işletme kimliği) */
   subdomain: string;
   orderingEnabled: boolean;
@@ -62,12 +71,18 @@ export default function CartCheckoutModal({
   setCart,
   visibleProducts,
   paymentFlags,
+  fulfillmentFlags,
+  orderSource = "qr_menu",
   subdomain,
   orderingEnabled,
   closedMessage,
 }: CartCheckoutModalProps) {
   const baseId = useId();
+  const defaultFulfillment = resolveDefaultFulfillmentType(fulfillmentFlags);
   const [step, setStep] = useState<Step>("cart");
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(defaultFulfillment ?? "pickup");
+  const [customerLatitude, setCustomerLatitude] = useState<number | null>(null);
+  const [customerLongitude, setCustomerLongitude] = useState<number | null>(null);
   const [formValues, setFormValues] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">("");
   const [mealBrand, setMealBrand] = useState<MealCardBrandId | "">("");
@@ -148,7 +163,13 @@ export default function CartCheckoutModal({
     return lines;
   }, [cart, visibleProducts]);
 
-  const cartTotal = cartLines.reduce((s, l) => s + getDisplayedProductPrice(l.product) * l.qty, 0);
+  const cartTotal = cartLines.reduce(
+    (s, l) => s + getProductPriceForFulfillment(l.product, fulfillmentType) * l.qty,
+    0,
+  );
+
+  const showFulfillmentChoice =
+    fulfillmentFlags.fulfillmentPickupEnabled && fulfillmentFlags.fulfillmentDeliveryEnabled;
 
   const upsellProducts = useMemo(() => {
     const inCart = new Set(
@@ -200,12 +221,14 @@ export default function CartCheckoutModal({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        setCustomerLatitude(latitude);
+        setCustomerLongitude(longitude);
         const line = formatCourierLocationNoteLine(latitude, longitude);
         setFormValues((v) => ({
           ...v,
           orderNote: v.orderNote.trim() ? `${v.orderNote.trim()}\n\n${line}` : line,
         }));
-        setLocMsg("Konum notunuza harita bağlantısı olarak eklendi.");
+        setLocMsg("Konum alındı. Teslimat mesafesi siparişte doğrulanır.");
         setLocLoading(false);
       },
       () => {
@@ -221,9 +244,13 @@ export default function CartCheckoutModal({
       window.alert(closedMessage);
       return;
     }
-    const err = validateCustomerFormRequired(formValues);
+    const err = validateCustomerFormForFulfillment(formValues, fulfillmentType);
     if (err) {
       window.alert(err);
+      return;
+    }
+    if (fulfillmentType === "delivery" && (customerLatitude == null || customerLongitude == null)) {
+      window.alert("Teslimat için «Konum al» ile adresinizi paylaşın.");
       return;
     }
     if (!payMethod) {
@@ -253,7 +280,7 @@ export default function CartCheckoutModal({
       productId: p.id,
       name: p.name,
       qty,
-      unitPrice: getDisplayedProductPrice(p),
+      unitPrice: getProductPriceForFulfillment(p, fulfillmentType),
       removedIngredients: removedIngredients.length > 0 ? removedIngredients : undefined,
     }));
 
@@ -265,7 +292,8 @@ export default function CartCheckoutModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain,
-          orderSource: "qr_menu",
+          orderSource,
+          fulfillmentType,
           lines,
           total: cartTotal,
           firstName: formValues.firstName.trim(),
@@ -273,6 +301,8 @@ export default function CartCheckoutModal({
           phone: formValues.phone.trim(),
           email: formValues.email.trim(),
           address: addr,
+          customerLatitude: fulfillmentType === "delivery" ? customerLatitude : null,
+          customerLongitude: fulfillmentType === "delivery" ? customerLongitude : null,
           paymentMethod: payMethod,
           mealCardBrandId: payMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
           orderNote: formValues.orderNote.trim(),
@@ -416,7 +446,9 @@ export default function CartCheckoutModal({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="font-headline text-sm font-bold text-on-background line-clamp-2">{p.name}</p>
-                        <p className="mt-0.5 text-xs font-black text-primary">{formatTry(getDisplayedProductPrice(p))}</p>
+                        <p className="mt-0.5 text-xs font-black text-primary">
+                          {formatTry(getProductPriceForFulfillment(p, fulfillmentType))}
+                        </p>
                         {removedIngredients.length > 0 ? (
                           <p className="mt-1 text-[11px] leading-relaxed text-secondary">
                             Çıkarılacak: {removedIngredients.join(", ")}
@@ -476,7 +508,9 @@ export default function CartCheckoutModal({
                           )}
                         </div>
                         <p className="line-clamp-2 text-xs font-bold text-on-background">{p.name}</p>
-                        <p className="mt-1 text-[11px] font-black text-primary">{formatTry(getDisplayedProductPrice(p))}</p>
+                        <p className="mt-1 text-[11px] font-black text-primary">
+                          {formatTry(getProductPriceForFulfillment(p, fulfillmentType))}
+                        </p>
                         <button
                           type="button"
                           onClick={() => addUpsell(p.id)}
@@ -549,13 +583,48 @@ export default function CartCheckoutModal({
               </div>
 
               <div className="mt-6">
+                {(showFulfillmentChoice || fulfillmentFlags.fulfillmentPickupEnabled || fulfillmentFlags.fulfillmentDeliveryEnabled) ? (
+                  <div className="mb-6">
+                    <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sipariş tipi</p>
+                    {showFulfillmentChoice ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {(["pickup", "delivery"] as FulfillmentType[]).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setFulfillmentType(type)}
+                            className={[
+                              "rounded-xl border px-3 py-3 text-sm font-semibold transition",
+                              fulfillmentType === type
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-surface-container-highest bg-white text-secondary",
+                            ].join(" ")}
+                          >
+                            {fulfillmentTypeLabel(type)}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm font-medium text-on-background">
+                        {fulfillmentTypeLabel(fulfillmentType)}
+                      </p>
+                    )}
+                    {fulfillmentType === "delivery" && fulfillmentFlags.fulfillmentDeliveryEnabled ? (
+                      <p className="mt-2 text-[11px] text-secondary">
+                        Teslimat yarıçapı: {fulfillmentFlags.deliveryRadiusKm} km — «Konum al» zorunludur.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <CustomerIdentityAddressForm
                   idPrefix={`${baseId}-co`}
                   values={formValues}
                   onChange={setFormValues}
                   showPrefillNotice
                   showOrderNote
-                  showLocationButton
+                  hideAddress={fulfillmentType === "pickup"}
+                  showLocationButton={fulfillmentType === "delivery"}
                   locationLoading={locLoading}
                   locationMessage={locMsg}
                   onRequestLocation={handleRequestLocation}

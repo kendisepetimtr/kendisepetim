@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 import { useRouter } from "next/navigation";
 import { formatAddressOneLine } from "@/lib/customer-address";
 import type { AdminOrder } from "@/lib/orders";
-import { getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
+import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import {
   buildOrdersReportSummary,
   filterOrdersByPeriod,
@@ -434,7 +434,7 @@ export default function OwnerAdminPanel({
   const [openId, setOpenId] = useState<string | null>(initialOrders[0]?.id ?? null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const publicMenuHref = getPublicMenuConnectionLinks(subdomain)[0]?.href ?? `/m/${subdomain}`;
+  const publicMenuHref = getPrimaryPublicMenuUrl(subdomain);
   const ownerBadge = ownerInitials(ownerName);
   const reportDayConfig = useMemo(
     () => ({ hoursDayMode, openTime, closeTime }),

@@ -1,4 +1,5 @@
-import RestaurantLanding from "@/components/landing/restaurant-landing";
+import MarketplaceHome from "@/components/landing/marketplace-home";
+import { fetchMarketplaceListings } from "@/lib/marketplace-query";
 import { DEFAULT_POST_LOGIN_PATH, AUTH_CALLBACK_PATH } from "@/lib/supabase/auth-urls";
 import { getCanonicalSiteUrl, isLocalHost } from "@/lib/site-url";
 import { headers } from "next/headers";
@@ -44,5 +45,5 @@ export default async function Home({ searchParams }: Props) {
     redirect(`/giris?durum=oauth-hata&mesaj=${encodeURIComponent(mesaj)}`);
   }
 
-  return <RestaurantLanding />;
+  return <MarketplaceHome featuredListings={await fetchMarketplaceListings()} />;
 }

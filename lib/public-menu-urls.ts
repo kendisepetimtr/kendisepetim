@@ -9,7 +9,17 @@ export type PublicMenuConnectionLink = {
   icon: string;
 };
 
-/** Canlı path menüsü — subdomain DNS hazır olana kadar yedek QR adresi. */
+/** Resmi canlı menü adresi — restoranadiniz.kendisepetim.com */
+export function getPublicMenuSubdomainUrl(subdomain: string): string {
+  return `https://${subdomain}.kendisepetim.com`;
+}
+
+/** QR ve paylaşımda kullanılan birincil menü URL'si. */
+export function getPrimaryPublicMenuUrl(subdomain: string): string {
+  return getPublicMenuSubdomainUrl(subdomain);
+}
+
+/** Yedek path menüsü — resmi subdomain açılmazsa veya platform içi linkler için. */
 export function getPublicMenuPathUrl(
   subdomain: string,
   origin: string = PRODUCTION_SITE_ORIGIN,
@@ -19,16 +29,17 @@ export function getPublicMenuPathUrl(
 
 /**
  * Panelden gösterilecek müşteri menüsü adresleri (geliştirme + üretim).
+ * İlk kayıt her zaman resmi subdomain adresidir.
  */
 export function getPublicMenuConnectionLinks(subdomain: string): PublicMenuConnectionLink[] {
-  const prodSubdomain = `https://${subdomain}.kendisepetim.com`;
+  const prodSubdomain = getPublicMenuSubdomainUrl(subdomain);
   const prodPath = getPublicMenuPathUrl(subdomain);
   const links: PublicMenuConnectionLink[] = [
     {
       key: "live-menu-prod",
       href: prodSubdomain,
       label: `${subdomain}.kendisepetim.com`,
-      hint: "Canlı menü (subdomain)",
+      hint: "Resmi menü adresi",
       icon: "rocket_launch",
     },
     {

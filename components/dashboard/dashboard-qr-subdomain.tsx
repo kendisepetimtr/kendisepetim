@@ -2,7 +2,12 @@
 
 import QrCodeWithLogoPreview from "@/components/dashboard/qr-code-with-logo-preview";
 import { createQrPngWithCenterLogo, defaultKendiSepetimLogoUrl, qrCodeApiUrl } from "@/lib/qr-with-logo";
-import { getPublicMenuConnectionLinks, getPublicMenuPathUrl, type PublicMenuConnectionLink } from "@/lib/public-menu-urls";
+import {
+  getPrimaryPublicMenuUrl,
+  getPublicMenuConnectionLinks,
+  getPublicMenuPathUrl,
+  type PublicMenuConnectionLink,
+} from "@/lib/public-menu-urls";
 import type { LocalTenantProfile } from "@/lib/local-tenant";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
@@ -25,7 +30,7 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
     if (!links.length) return;
     if (!selectedKey || !links.some((l) => l.key === selectedKey)) {
       const preferred =
-        links.find((l) => l.key === "live-menu-path-prod")?.key ?? links[0]!.key;
+        links.find((l) => l.key === "live-menu-prod")?.key ?? links[0]!.key;
       setSelectedKey(preferred);
     }
   }, [links, selectedKey]);
@@ -35,10 +40,7 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
     [links, selectedKey],
   );
 
-  const prodUrl = useMemo(
-    () => `https://${tenant.subdomain}.kendisepetim.com`,
-    [tenant.subdomain],
-  );
+  const prodUrl = useMemo(() => getPrimaryPublicMenuUrl(tenant.subdomain), [tenant.subdomain]);
 
   const prodPathUrl = useMemo(
     () => getPublicMenuPathUrl(tenant.subdomain),
@@ -107,10 +109,11 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
-          <h2 className="font-headline text-lg font-bold text-on-background">Subdomain</h2>
+          <h2 className="font-headline text-lg font-bold text-on-background">Resmi menü adresiniz</h2>
           <p className="mt-1 text-sm text-secondary">
-            İşletmenize ayrılmış alt alan adı. Ayarlardan değiştirilemez; canlı yayında DNS ile bu ada yönlendirme
-            yapılır.
+            Müşterileriniz menünüze{" "}
+            <span className="font-medium text-on-background">restoranadiniz.kendisepetim.com</span> formatındaki bu
+            adresten ulaşır. QR kod ve paylaşımlarda varsayılan olarak bu adres kullanılır.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <code className="rounded-xl border border-surface-container-high bg-surface-container-low px-3 py-2 font-mono text-base font-bold text-on-background">
@@ -225,8 +228,8 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
       <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
         <h2 className="font-headline text-lg font-bold text-on-background">Tüm menü bağlantıları</h2>
         <p className="mt-1 text-sm text-secondary">
-          Panodaki «Bağlantılar» ile aynı adresler. Subdomain DNS hazır değilse yedek path adresini kullanın;
-          yerel geliştirmede localhost adresleri yalnızca bu cihazda çalışır.
+          Panodaki «Bağlantılar» ile aynı adresler. Birincil adres her zaman subdomain; path yalnızca yedek
+          bağlantıdır. Yerel geliştirmede localhost adresleri yalnızca bu cihazda çalışır.
         </p>
         <ul className="mt-4 space-y-3">
           {links.map((l) => (

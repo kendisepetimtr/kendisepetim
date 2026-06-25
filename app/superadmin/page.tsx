@@ -23,6 +23,7 @@ const SUPERADMIN_TENANT_SELECT = `
   plan,
   public_menu_enabled,
   dashboard_enabled,
+  marketplace_enabled,
   owner_admin_pin_set_at
 `;
 
@@ -43,6 +44,7 @@ export default async function SuperadminPage() {
       tenants = ((data ?? []) as Array<Omit<TenantRow, "owner_admin_pin_hash">>).map((row) => ({
         ...row,
         owner_admin_pin_hash: null,
+        marketplace_enabled: row.marketplace_enabled === true,
       })) as TenantRow[];
     }
   } catch (e) {

@@ -11,6 +11,7 @@ type CustomerIdentityAddressFormProps = {
   showPrefillNotice?: boolean;
   showOrderNote?: boolean;
   showLocationButton?: boolean;
+  hideAddress?: boolean;
   locationLoading?: boolean;
   locationMessage?: string | null;
   onRequestLocation?: () => void;
@@ -27,6 +28,7 @@ export default function CustomerIdentityAddressForm({
   showPrefillNotice = false,
   showOrderNote = false,
   showLocationButton = false,
+  hideAddress = false,
   locationLoading = false,
   locationMessage = null,
   onRequestLocation,
@@ -106,6 +108,7 @@ export default function CustomerIdentityAddressForm({
         <p className="mt-1 text-[11px] text-secondary">İsteğe bağlı.</p>
       </div>
 
+      {hideAddress ? null : (
       <div className="rounded-2xl border border-surface-container-high bg-surface-container-low/40 p-4">
         <p className="text-xs font-bold uppercase tracking-wider text-secondary">Adres</p>
         <div className="mt-4 space-y-4">
@@ -249,6 +252,7 @@ export default function CustomerIdentityAddressForm({
           ) : null}
         </div>
       </div>
+      )}
 
       {showOrderNote ? (
         <div>

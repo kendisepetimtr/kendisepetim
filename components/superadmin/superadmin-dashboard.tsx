@@ -2,6 +2,7 @@
 
 import {
   superadminLogoutAction,
+  superadminSetMarketplace,
   superadminSetDashboard,
   superadminSetOwnerAdminPin,
   superadminSetPlan,
@@ -89,7 +90,7 @@ export default function SuperadminDashboard({ initialTenants, loadError }: Props
       ) : null}
 
       <div className="overflow-x-auto rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm">
-        <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-surface-container-highest bg-surface-container-low text-xs font-bold uppercase tracking-wide text-secondary">
               <th className="px-4 py-3">İşletme</th>
@@ -98,6 +99,7 @@ export default function SuperadminDashboard({ initialTenants, loadError }: Props
               <th className="px-4 py-3">Patron PIN</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">QR menü</th>
+              <th className="px-4 py-3">Marketplace</th>
               <th className="px-4 py-3">Panel</th>
               <th className="px-4 py-3">Kayıt</th>
             </tr>
@@ -105,7 +107,7 @@ export default function SuperadminDashboard({ initialTenants, loadError }: Props
           <tbody>
             {initialTenants.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-secondary">
+                <td colSpan={9} className="px-4 py-12 text-center text-secondary">
                   Henüz kayıtlı işletme yok.
                 </td>
               </tr>
@@ -199,6 +201,21 @@ export default function SuperadminDashboard({ initialTenants, loadError }: Props
                       ].join(" ")}
                     >
                       {t.public_menu_enabled ? "Açık" : "Kapalı"}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => run(superadminSetMarketplace(t.id, !t.marketplace_enabled))}
+                      className={[
+                        "rounded-full px-3 py-1 text-xs font-bold transition-colors",
+                        t.marketplace_enabled
+                          ? "bg-emerald-600/15 text-emerald-900"
+                          : "bg-surface-container-high text-secondary",
+                      ].join(" ")}
+                    >
+                      {t.marketplace_enabled ? "Açık" : "Kapalı"}
                     </button>
                   </td>
                   <td className="px-4 py-3 align-top">

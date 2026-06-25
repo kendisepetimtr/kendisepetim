@@ -6,6 +6,7 @@ import { isValidMenuSlug } from "@/lib/menu-subdomain";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { buildLocalMenuState } from "@/lib/menu-map";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
+import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -59,7 +60,7 @@ export default async function PublicMenuPage({ params }: Props) {
   const svc = createServiceSupabaseClient();
   const { data: tenant } = await svc
     .from("tenants")
-    .select("id, business_name, logo_url, cover_image_url, public_description, google_maps_url, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, public_menu_enabled")
+    .select("id, business_name, logo_url, cover_image_url, public_description, google_maps_url, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, public_menu_enabled, fulfillment_pickup_enabled, fulfillment_delivery_enabled, delivery_radius_km, latitude, longitude, min_order_amount")
     .eq("subdomain", slug)
     .maybeSingle();
 
@@ -93,6 +94,17 @@ export default async function PublicMenuPage({ params }: Props) {
     paymentDoorCard: tenant.payment_door_card === true,
     paymentMealCard: tenant.payment_meal_card === true,
   };
+  const fulfillmentFlags: TenantFulfillmentFlags = {
+    fulfillmentPickupEnabled: tenant.fulfillment_pickup_enabled !== false,
+    fulfillmentDeliveryEnabled: tenant.fulfillment_delivery_enabled === true,
+    deliveryRadiusKm: clampDeliveryRadiusKm(Number(tenant.delivery_radius_km ?? 5)),
+    minOrderAmount:
+      tenant.min_order_amount != null && Number.isFinite(Number(tenant.min_order_amount))
+        ? Number(tenant.min_order_amount)
+        : null,
+    latitude: tenant.latitude != null ? Number(tenant.latitude) : null,
+    longitude: tenant.longitude != null ? Number(tenant.longitude) : null,
+  };
   const initialOpenStatus = isBusinessOpenNow(tenant.open_time, tenant.close_time);
   const initialClosedMessage = getBusinessClosedMessage(tenant.open_time, tenant.close_time);
 
@@ -108,6 +120,7 @@ export default async function PublicMenuPage({ params }: Props) {
       initialOpenStatus={initialOpenStatus}
       initialClosedMessage={initialClosedMessage}
       paymentFlags={paymentFlags}
+      fulfillmentFlags={fulfillmentFlags}
       initialMenu={buildLocalMenuState({
         categories,
         products: (productRows ?? []) as MenuProductRow[],

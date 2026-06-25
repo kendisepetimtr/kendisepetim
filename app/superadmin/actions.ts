@@ -105,6 +105,17 @@ export async function superadminSetPublicMenu(tenantId: string, enabled: boolean
   return {};
 }
 
+export async function superadminSetMarketplace(tenantId: string, enabled: boolean): Promise<{ error?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const svc = await guardAndService();
+  const { error } = await svc.from("tenants").update({ marketplace_enabled: enabled }).eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidatePath("/superadmin");
+  revalidatePath("/kesfet");
+  revalidatePath("/");
+  return {};
+}
+
 export async function superadminSetDashboard(tenantId: string, enabled: boolean): Promise<{ error?: string }> {
   if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
   const svc = await guardAndService();

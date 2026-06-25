@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
-  getDisplayedProductPrice,
   parseIngredientLines,
   sortCategoriesForMenu,
   type LocalMenuCategory,
   type LocalMenuProduct,
   type LocalMenuState,
 } from "@/lib/local-menu";
+import { getPrimaryMenuDisplayPrice } from "@/lib/product-pricing";
+import type { TenantFulfillmentFlags } from "@/lib/fulfillment";
 import {
   getBusinessClosedMessage,
   getBusinessHoursRangeLabel,
@@ -76,6 +77,8 @@ type PublicMenuClientProps = {
   initialOpenStatus: boolean | null;
   initialClosedMessage: string;
   paymentFlags: TenantPaymentFlags;
+  fulfillmentFlags: TenantFulfillmentFlags;
+  orderSource?: "qr_menu" | "marketplace";
   initialMenu: LocalMenuState;
 };
 
@@ -103,6 +106,8 @@ export default function PublicMenuClient({
   initialOpenStatus,
   initialClosedMessage,
   paymentFlags,
+  fulfillmentFlags,
+  orderSource = "qr_menu",
   initialMenu,
 }: PublicMenuClientProps) {
   const slug = rawSlug.toLowerCase();
@@ -191,7 +196,10 @@ export default function PublicMenuClient({
   }, [cart, visibleProducts]);
 
   const cartCount = cartLines.reduce((s, l) => s + l.qty, 0);
-  const cartTotal = cartLines.reduce((s, l) => s + getDisplayedProductPrice(l.product) * l.qty, 0);
+  const cartTotal = cartLines.reduce(
+    (s, l) => s + getPrimaryMenuDisplayPrice(l.product, fulfillmentFlags) * l.qty,
+    0,
+  );
 
   function addConfiguredProductToCart(productId: string, removedIngredients: string[] = []) {
     if (!orderingEnabled) return;
@@ -421,7 +429,7 @@ export default function PublicMenuClient({
                     {heroProduct.description ||
                       parseIngredientLines(heroProduct.ingredients).slice(0, 2).join(" · ")}
                   </p>
-                  <span className="text-xl font-black text-white">{formatTry(getDisplayedProductPrice(heroProduct))}</span>
+                  <span className="text-xl font-black text-white">{formatTry(getPrimaryMenuDisplayPrice(heroProduct, fulfillmentFlags))}</span>
                 </div>
               </div>
             </div>
@@ -506,7 +514,7 @@ export default function PublicMenuClient({
                         .join(" · ")}
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className="font-black text-primary">{formatTry(getDisplayedProductPrice(p))}</span>
+                    <span className="font-black text-primary">{formatTry(getPrimaryMenuDisplayPrice(p, fulfillmentFlags))}</span>
                     <button
                       type="button"
                       className={[
@@ -621,6 +629,8 @@ export default function PublicMenuClient({
         setCart={setCart}
         visibleProducts={visibleProducts}
         paymentFlags={paymentFlags}
+        fulfillmentFlags={fulfillmentFlags}
+        orderSource={orderSource}
         subdomain={slug}
         orderingEnabled={orderingEnabled}
         closedMessage={closedMessage}
@@ -646,6 +656,7 @@ export default function PublicMenuClient({
       {previewProduct ? (
         <ProductPreviewModal
           product={previewProduct}
+          fulfillmentFlags={fulfillmentFlags}
           onClose={() => setPreviewProduct(null)}
           onAddToCart={() => {
             setPreviewProduct(null);
@@ -660,11 +671,13 @@ export default function PublicMenuClient({
 
 function ProductPreviewModal({
   product,
+  fulfillmentFlags,
   onClose,
   onAddToCart,
   orderingEnabled,
 }: {
   product: LocalMenuProduct;
+  fulfillmentFlags: TenantFulfillmentFlags;
   onClose: () => void;
   onAddToCart: () => void;
   orderingEnabled: boolean;
@@ -702,7 +715,7 @@ function ProductPreviewModal({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="font-headline text-2xl font-extrabold text-on-background">{product.name}</h2>
-              <p className="mt-2 text-lg font-black text-primary">{formatTry(getDisplayedProductPrice(product))}</p>
+              <p className="mt-2 text-lg font-black text-primary">{formatTry(getPrimaryMenuDisplayPrice(product, fulfillmentFlags))}</p>
             </div>
           </div>
           {product.warningBadges.length > 0 ? (

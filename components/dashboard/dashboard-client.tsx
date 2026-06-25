@@ -5,6 +5,7 @@ import DashboardOrdersList from "@/components/dashboard/dashboard-orders-list";
 import DashboardReports from "@/components/dashboard/dashboard-reports";
 import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain";
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
+import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-settings-panel";
 import { getDashboardMenuProductCountAction } from "@/app/dashboard/menu-actions";
 import MenuManager from "@/components/dashboard/menu-manager";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
@@ -25,6 +26,7 @@ const NAV_MAIN = [
   { id: "menu", label: "Menü", icon: "restaurant_menu" },
   { id: "customers", label: "Müşteriler", icon: "group" },
   { id: "qr", label: "QR", icon: "qr_code_2" },
+  { id: "marketplace", label: "Marketplace", icon: "storefront" },
   { id: "reports", label: "Raporlar", icon: "bar_chart" },
 ] as const;
 
@@ -469,6 +471,13 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
               <DashboardQrSubdomain tenant={tenant} />
             ) : activeNav === "reports" ? (
               <DashboardReports subdomain={tenant.subdomain} />
+            ) : activeNav === "marketplace" ? (
+              <MarketplaceSettingsPanel
+                tenant={tenant}
+                productCount={menuProductCount}
+                onTenantUpdate={setTenant}
+                persistSettingsToSupabase={remoteAuthEnabled}
+              />
             ) : activeNav === "settings" ? (
               <DashboardSettings
                 tenant={tenant}
@@ -665,8 +674,9 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
               </div>
               <div className="flex flex-col justify-center rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/40 p-6 text-center">
                 <p className="text-sm text-secondary">
-                  Sonraki adımlar: QR kod indirme ve canlı subdomain — deploy ile bağlanacak. Menüyü soldan
-                  düzenleyebilirsiniz.
+                  Menünüz canlıda{" "}
+                  <span className="font-medium text-on-background">{tenant.subdomain}.kendisepetim.com</span>{" "}
+                  adresinde. QR kodu indirmek için soldaki QR sekmesine geçin; menüyü Menü bölümünden düzenleyin.
                 </p>
                 <button
                   type="button"

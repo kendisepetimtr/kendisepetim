@@ -153,9 +153,9 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
           Hesabınızı oluşturun
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-secondary">
-          İşletmenize özel{" "}
-          <span className="font-medium text-on-background">alt alan adı</span> ile yönetim paneli ve QR menüyü
-          tek hesaptan yönetin.
+          Menünüz{" "}
+          <span className="font-medium text-on-background">restoranadiniz.kendisepetim.com</span> adresinde yayınlanır;
+          yönetim paneli ve QR menü tek hesaptan yönetilir.
         </p>
         {supabaseConfigured ? (
           <p className="mt-2 text-xs text-secondary">
@@ -221,7 +221,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
           Alt alan adı
         </label>
         <p className="text-xs text-secondary">
-          QR menü ve yönetim paneliniz bu adreste açılacak (yalnızca küçük harf, rakam ve tire).
+          Resmi menü adresiniz: seçtiğiniz ad + .kendisepetim.com (yalnızca küçük harf, rakam ve tire).
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input

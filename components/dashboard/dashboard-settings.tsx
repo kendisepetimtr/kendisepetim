@@ -614,9 +614,9 @@ export default function DashboardSettings({
         </section>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
-          <h2 className="font-headline text-lg font-bold text-on-background">Subdomain</h2>
+          <h2 className="font-headline text-lg font-bold text-on-background">Resmi menü adresi</h2>
           <p className="mt-1 text-sm text-secondary">
-            QR menü ve canlı adresinizin parçası. Değiştirmek veri ve bağlantılarınızı etkiler; şimdilik salt
+            QR menü ve paylaşımlarda kullanılan subdomain. Değiştirmek veri ve bağlantılarınızı etkiler; şimdilik salt
             okunur.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2">

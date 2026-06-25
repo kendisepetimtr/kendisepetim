@@ -19,13 +19,19 @@ function ImagePlaceholder({
   );
 }
 
-export default function RestaurantLanding() {
+export default function RestaurantLanding({ skipHero = false }: { skipHero?: boolean }) {
   return (
     <>
       <header className="glass-nav fixed top-0 left-0 z-50 w-full">
         <nav className="mx-auto flex w-full max-w-7xl items-center justify-between px-8 py-4">
           <SiteLogo variant="landing" />
           <div className="hidden items-center space-x-8 md:flex">
+            <Link
+              className="font-headline text-lg font-medium tracking-tight text-slate-600 transition-colors duration-200 hover:text-primary-container"
+              href="/kesfet"
+            >
+              Keşfet
+            </Link>
             <a
               className="font-headline text-lg font-medium tracking-tight text-slate-600 transition-colors duration-200 hover:text-primary-container"
               href="#features"
@@ -70,6 +76,7 @@ export default function RestaurantLanding() {
       </header>
 
       <main className="pt-24">
+        {skipHero ? null : (
         <section className="relative mx-auto max-w-7xl overflow-hidden px-8 py-20 lg:py-32">
           <div className="grid items-center gap-16 lg:grid-cols-2">
             <div className="relative z-10 space-y-8">
@@ -83,8 +90,10 @@ export default function RestaurantLanding() {
                 Yönetin.
               </h1>
               <p className="max-w-xl text-lg leading-relaxed text-secondary lg:text-xl">
-                QR menüden masa yönetimine, kurye takibinden detaylı raporlamaya kadar ihtiyacınız olan tüm
-                araçlar tek bir platformda. Verimliliği artırın, ciroyu katlayın.
+                Menünüz{" "}
+                <span className="font-medium text-on-background">restoranadiniz.kendisepetim.com</span> adresinde
+                yayınlanır — kendi markanızla, tek link. QR menüden masa yönetimine, raporlamaya kadar tüm araçlar tek
+                platformda.
               </p>
               <div className="flex flex-col gap-4 pt-4 sm:flex-row">
                 <Link
@@ -123,6 +132,7 @@ export default function RestaurantLanding() {
             </div>
           </div>
         </section>
+        )}
 
         <section className="bg-surface-container-low px-8 py-24" id="features">
           <div className="mx-auto max-w-7xl">
@@ -140,8 +150,8 @@ export default function RestaurantLanding() {
                   </div>
                   <h3 className="font-headline text-2xl font-bold">Akıllı QR Menü</h3>
                   <p className="text-secondary">
-                    Garson bekletmeden sipariş, anlık fiyat güncelleme ve çoklu dil desteği. Müşterileriniz
-                    kendi telefonlarından sipariş versin.
+                    Her restoranın kendi adresi: <span className="font-medium text-on-background">sizinadiniz.kendisepetim.com</span>.
+                    Garson bekletmeden sipariş, anlık fiyat güncelleme. Müşteriler kendi telefonlarından sipariş versin.
                   </p>
                   <ul className="space-y-2">
                     <li className="flex items-center gap-2 text-sm font-semibold text-secondary">

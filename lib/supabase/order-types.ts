@@ -1,4 +1,5 @@
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
+import type { FulfillmentType } from "@/lib/fulfillment";
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "completed" | "cancelled";
 
@@ -19,6 +20,9 @@ export type OrderRow = {
   payment_method: CheckoutPaymentMethod;
   meal_card_brand_id: MealCardBrandId | null;
   order_note: string;
+  fulfillment_type: FulfillmentType;
+  customer_latitude: number | null;
+  customer_longitude: number | null;
 };
 
 export type OrderLineRow = {

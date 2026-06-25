@@ -106,3 +106,16 @@ export function validateCustomerFormRequired(v: CustomerFormValues): string | nu
   }
   return null;
 }
+
+/** Gel-al siparişte adres alanları zorunlu değil. */
+export function validateCustomerFormForFulfillment(
+  v: CustomerFormValues,
+  fulfillmentType: "pickup" | "delivery",
+): string | null {
+  const t = (s: string) => s.trim();
+  if (!t(v.firstName)) return "Ad zorunludur.";
+  if (!t(v.lastName)) return "Soyad zorunludur.";
+  if (!t(v.phone)) return "Telefon zorunludur.";
+  if (fulfillmentType === "pickup") return null;
+  return validateCustomerFormRequired(v);
+}

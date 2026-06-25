@@ -30,7 +30,18 @@ const DASHBOARD_TENANT_SELECT = `
   payment_meal_card,
   plan,
   public_menu_enabled,
-  dashboard_enabled
+  dashboard_enabled,
+  marketplace_enabled,
+  city,
+  district,
+  neighborhood,
+  cuisine_tags,
+  latitude,
+  longitude,
+  delivery_radius_km,
+  fulfillment_pickup_enabled,
+  fulfillment_delivery_enabled,
+  min_order_amount
 `;
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
