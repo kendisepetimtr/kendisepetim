@@ -174,7 +174,6 @@ export async function updateMarketplaceSettingsAction(
       return { ok: false, error: formatSaveError(upErr?.message ?? "Kayıt güncellenemedi.") };
     }
 
-    revalidatePath("/dashboard");
     revalidatePath("/kesfet");
     revalidatePath("/");
     revalidatePath(`/m/${updated.subdomain}`);

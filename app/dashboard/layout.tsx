@@ -1,8 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
-import type { TenantRow } from "@/lib/supabase/tenant-types";
-import { stripTenantRowForClientSync } from "@/lib/tenant-client-sync";
-import DashboardSessionBridge from "@/components/dashboard/dashboard-session-bridge";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -14,6 +11,7 @@ function isNextNavigationError(error: unknown): boolean {
   return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_NOT_FOUND"));
 }
 
+/** Yalnızca oturum + tenant varlığı — profil verisi client server action ile senkron edilir. */
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   if (!getSupabaseEnv()) {
     return <>{children}</>;
@@ -29,19 +27,16 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       redirect("/giris?next=/dashboard");
     }
 
-    const { data: row, error } = await supabase
+    const { count, error } = await supabase
       .from("tenants")
-      .select("*")
-      .eq("owner_user_id", user.id)
-      .maybeSingle();
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", user.id);
 
-    if (error || !row) {
+    if (error || !count) {
       redirect("/kayit?reason=tenant-missing");
     }
 
-    const safeTenant = stripTenantRowForClientSync(row as TenantRow);
-
-    return <DashboardSessionBridge serverTenant={safeTenant}>{children}</DashboardSessionBridge>;
+    return <>{children}</>;
   } catch (error) {
     if (isNextNavigationError(error)) throw error;
     console.error("[dashboard/layout]", error);

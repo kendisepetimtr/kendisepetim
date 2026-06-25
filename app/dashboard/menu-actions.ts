@@ -38,8 +38,7 @@ async function getOwnerTenantId() {
   };
 }
 
-function revalidateDashboardAndPublicMenu(subdomain: string | null) {
-  revalidatePath("/dashboard");
+function revalidateOwnerPublicMenu(subdomain: string | null) {
   if (subdomain) {
     revalidatePath(`/m/${subdomain}`);
   }
@@ -106,7 +105,7 @@ export async function createMenuCategoryAction(nameRaw: string): Promise<MenuLoa
     sort_order: nextOrder,
   });
   if (insertError) return { ok: false, error: insertError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -121,7 +120,7 @@ export async function updateMenuCategoryAction(id: string, fields: CategoryEditF
     .eq('id', id)
     .eq('tenant_id', tenantId);
   if (updateError) return { ok: false, error: updateError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -130,7 +129,7 @@ export async function deleteMenuCategoryAction(id: string): Promise<MenuLoadResu
   if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { error: deleteError } = await supabase.from('menu_categories').delete().eq('id', id).eq('tenant_id', tenantId);
   if (deleteError) return { ok: false, error: deleteError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -163,7 +162,7 @@ export async function toggleMenuCategoryHiddenAction(id: string, hideProducts: b
     if (productError) return { ok: false, error: productError.message };
   }
 
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -224,7 +223,7 @@ export async function upsertMenuProductAction(fields: ProductFormFields, product
     if (insertError) return { ok: false, error: insertError.message };
   }
 
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -248,7 +247,7 @@ export async function toggleMenuProductHiddenAction(id: string): Promise<MenuLoa
     .eq('id', id)
     .eq('tenant_id', tenantId);
   if (updateError) return { ok: false, error: updateError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -257,7 +256,7 @@ export async function deleteMenuProductAction(id: string): Promise<MenuLoadResul
   if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { error: deleteError } = await supabase.from('menu_products').delete().eq('id', id).eq('tenant_id', tenantId);
   if (deleteError) return { ok: false, error: deleteError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }
 
@@ -268,6 +267,6 @@ export async function clearAllMenuDataAction(): Promise<MenuLoadResult> {
   if (productError) return { ok: false, error: productError.message };
   const { error: categoryError } = await supabase.from('menu_categories').delete().eq('tenant_id', tenantId);
   if (categoryError) return { ok: false, error: categoryError.message };
-  revalidateDashboardAndPublicMenu(subdomain);
+  revalidateOwnerPublicMenu(subdomain);
   return { ok: true, state: await readMenuState(supabase, tenantId) };
 }

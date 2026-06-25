@@ -117,7 +117,6 @@ export async function updateTenantBusinessSettingsAction(
     return { ok: false, error: upErr?.message ?? "Kayıt güncellenemedi." };
   }
 
-  revalidatePath("/dashboard");
   revalidatePath(`/m/${updated.subdomain}`);
   return { ok: true, profile: tenantRowToLocalProfile(updated as TenantRow) };
 }

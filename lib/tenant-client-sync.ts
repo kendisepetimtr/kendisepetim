@@ -1,22 +1,36 @@
-import type { TenantRow } from "@/lib/supabase/tenant-types";
+import type { LocalTenantProfile } from "@/lib/local-tenant";
 
-/** RSC → client aktarımında devasa data URL'ler payload limitini aşmasın diye üst sınır. */
-const MAX_CLIENT_SYNC_URL_LENGTH = 4096;
+/** RSC / server action yanıtında taşınabilecek maksimum URL uzunluğu. */
+const MAX_CLIENT_SYNC_URL_LENGTH = 2048;
 
-function stripHeavyUrl(url: string | null | undefined): string | null {
-  if (!url?.trim()) return null;
+function stripHeavyMediaUrl(url: string): string {
   const trimmed = url.trim();
-  if (trimmed.length > MAX_CLIENT_SYNC_URL_LENGTH) return null;
+  if (!trimmed) return "";
+  if (trimmed.length > MAX_CLIENT_SYNC_URL_LENGTH) return "";
+  if (trimmed.startsWith("data:") && trimmed.length > 512) return "";
   return trimmed;
 }
 
-/** Panel layout'unun client bileşenine gönderdiği tenant — logo/kapak blob'ları kırpılır. */
-export function stripTenantRowForClientSync(row: TenantRow): TenantRow {
+/** Server → client profil yanıtında logo/kapak blob'larını kırpar. */
+export function slimTenantProfileForClient(profile: LocalTenantProfile): LocalTenantProfile {
   return {
-    ...row,
-    logo_url: stripHeavyUrl(row.logo_url),
-    cover_image_url: stripHeavyUrl(row.cover_image_url),
-    owner_admin_pin_hash: null,
-    owner_admin_pin_set_at: null,
+    ...profile,
+    logoDataUrl: stripHeavyMediaUrl(profile.logoDataUrl),
+    coverImageUrl: stripHeavyMediaUrl(profile.coverImageUrl),
+  };
+}
+
+/** Sunucu profili + localStorage (logo/kapak) birleşimi. */
+export function mergeDashboardTenantProfiles(
+  local: LocalTenantProfile | null,
+  server: LocalTenantProfile,
+): LocalTenantProfile {
+  if (!local || local.subdomain !== server.subdomain) {
+    return server;
+  }
+  return {
+    ...server,
+    logoDataUrl: server.logoDataUrl || local.logoDataUrl,
+    coverImageUrl: server.coverImageUrl || local.coverImageUrl,
   };
 }

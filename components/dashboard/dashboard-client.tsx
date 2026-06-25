@@ -7,12 +7,14 @@ import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain"
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
 import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-settings-panel";
 import { getDashboardMenuProductCountAction } from "@/app/dashboard/menu-actions";
+import { syncDashboardTenantAction } from "@/app/dashboard/tenant-sync-actions";
 import MenuManager from "@/components/dashboard/menu-manager";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
 import { clearLocalCustomers, countLocalCustomers } from "@/lib/local-customers";
 import { clearLocalOrders } from "@/lib/local-orders";
 import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
-import { clearLocalTenant, getLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
+import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
+import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
 import { signOutFromDashboard } from "@/app/dashboard/actions";
 import { useRouter } from "next/navigation";
@@ -145,15 +147,47 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   }, []);
 
   useEffect(() => {
-    const t = getLocalTenant();
-    if (!t) {
-      router.replace("/kayit");
-      setTenant(null);
-      return;
+    let cancelled = false;
+
+    async function hydrateTenant() {
+      const local = getLocalTenant();
+
+      if (remoteAuthEnabled) {
+        const result = await syncDashboardTenantAction();
+        if (cancelled) return;
+
+        if (!result.ok) {
+          if (!local) {
+            router.replace("/kayit");
+            setTenant(null);
+            return;
+          }
+          setTenant(local);
+          writePublicCheckoutMirror(local);
+          return;
+        }
+
+        const merged = mergeDashboardTenantProfiles(local, result.profile);
+        saveLocalTenant(merged);
+        setTenant(merged);
+        writePublicCheckoutMirror(merged);
+        return;
+      }
+
+      if (!local) {
+        router.replace("/kayit");
+        setTenant(null);
+        return;
+      }
+      setTenant(local);
+      writePublicCheckoutMirror(local);
     }
-    setTenant(t);
-    writePublicCheckoutMirror(t);
-  }, [router]);
+
+    void hydrateTenant();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, remoteAuthEnabled]);
 
   useEffect(() => {
     if (!tenant) return;
