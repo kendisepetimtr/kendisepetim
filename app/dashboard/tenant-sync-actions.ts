@@ -2,7 +2,7 @@
 
 import type { LocalTenantProfile } from "@/lib/local-tenant";
 import { slimTenantProfileForClient } from "@/lib/tenant-client-sync";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { tenantRowToLocalProfile } from "@/lib/tenant-map";
 
@@ -13,7 +13,9 @@ export type SyncDashboardTenantResult =
 /** Panel oturumu — tenant profilini sunucudan okur (layout RSC payload taşımaz). */
 export async function syncDashboardTenantAction(): Promise<SyncDashboardTenantResult> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await tryCreateServerSupabaseClient();
+    if (!supabase) return { ok: false, error: "Supabase bağlantısı kurulamadı." };
+
     const {
       data: { user },
     } = await supabase.auth.getUser();

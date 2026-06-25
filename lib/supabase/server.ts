@@ -33,3 +33,13 @@ export async function createServerSupabaseClient() {
     },
   });
 }
+
+/** Server action'larda throw yerine null döner. */
+export async function tryCreateServerSupabaseClient() {
+  try {
+    if (!getSupabaseEnv()) return null;
+    return await createServerSupabaseClient();
+  } catch {
+    return null;
+  }
+}

@@ -1,7 +1,7 @@
 ﻿'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, tryCreateServerSupabaseClient } from '@/lib/supabase/server';
 import type { MenuCategoryRow, MenuProductRow } from '@/lib/supabase/menu-types';
 import type { LocalMenuState } from '@/lib/local-menu';
 import type { CategoryEditFields } from '@/components/dashboard/category-edit-modal';
@@ -16,26 +16,56 @@ export type MenuLoadResult =
   | { ok: false; error: string };
 
 async function getOwnerTenantId() {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { supabase, tenantId: null as string | null, subdomain: null as string | null, error: 'Oturum bulunamadı.' };
+  try {
+    const supabase = await tryCreateServerSupabaseClient();
+    if (!supabase) {
+      return {
+        supabase: null,
+        tenantId: null as string | null,
+        subdomain: null as string | null,
+        error: 'Supabase bağlantısı kurulamadı.',
+      };
+    }
 
-  const { data: tenant, error } = await supabase
-    .from('tenants')
-    .select('id, subdomain')
-    .eq('owner_user_id', user.id)
-    .maybeSingle();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        supabase,
+        tenantId: null as string | null,
+        subdomain: null as string | null,
+        error: 'Oturum bulunamadı.',
+      };
+    }
 
-  if (error || !tenant) {
-    return { supabase, tenantId: null as string | null, subdomain: null as string | null, error: 'İşletme kaydı bulunamadı.' };
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('id, subdomain')
+      .eq('owner_user_id', user.id)
+      .maybeSingle();
+
+    if (error || !tenant) {
+      return {
+        supabase,
+        tenantId: null as string | null,
+        subdomain: null as string | null,
+        error: 'İşletme kaydı bulunamadı.',
+      };
+    }
+
+    return {
+      supabase,
+      tenantId: tenant.id as string,
+      subdomain: typeof tenant.subdomain === 'string' ? tenant.subdomain : null,
+      error: null as string | null,
+    };
+  } catch {
+    return {
+      supabase: null,
+      tenantId: null as string | null,
+      subdomain: null as string | null,
+      error: 'Sunucu hatası.',
+    };
   }
-
-  return {
-    supabase,
-    tenantId: tenant.id as string,
-    subdomain: typeof tenant.subdomain === 'string' ? tenant.subdomain : null,
-    error: null as string | null,
-  };
 }
 
 function revalidateOwnerPublicMenu(subdomain: string | null) {
@@ -67,25 +97,33 @@ async function readMenuState(supabase: Awaited<ReturnType<typeof createServerSup
 }
 
 export async function loadDashboardMenuAction(): Promise<MenuLoadResult> {
-  const { supabase, tenantId, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'Menü yüklenemedi.' };
-  const state = await readMenuState(supabase, tenantId);
-  return { ok: true, state };
+  try {
+    const { supabase, tenantId, error } = await getOwnerTenantId();
+    if (!supabase || !tenantId) return { ok: false, error: error ?? 'Menü yüklenemedi.' };
+    const state = await readMenuState(supabase, tenantId);
+    return { ok: true, state };
+  } catch {
+    return { ok: false, error: 'Menü yüklenemedi.' };
+  }
 }
 
 export async function getDashboardMenuProductCountAction(): Promise<number> {
-  const { supabase, tenantId } = await getOwnerTenantId();
-  if (!tenantId) return 0;
-  const { count } = await supabase
-    .from('menu_products')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenantId);
-  return count ?? 0;
+  try {
+    const { supabase, tenantId } = await getOwnerTenantId();
+    if (!supabase || !tenantId) return 0;
+    const { count } = await supabase
+      .from('menu_products')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId);
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function createMenuCategoryAction(nameRaw: string): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const name = nameRaw.trim();
   if (!name) return { ok: false, error: 'Kategori adı zorunludur.' };
 
@@ -111,7 +149,7 @@ export async function createMenuCategoryAction(nameRaw: string): Promise<MenuLoa
 
 export async function updateMenuCategoryAction(id: string, fields: CategoryEditFields): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const name = fields.name.trim();
   if (!name) return { ok: false, error: 'Kategori adı zorunludur.' };
   const { error: updateError } = await supabase
@@ -126,7 +164,7 @@ export async function updateMenuCategoryAction(id: string, fields: CategoryEditF
 
 export async function deleteMenuCategoryAction(id: string): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { error: deleteError } = await supabase.from('menu_categories').delete().eq('id', id).eq('tenant_id', tenantId);
   if (deleteError) return { ok: false, error: deleteError.message };
   revalidateOwnerPublicMenu(subdomain);
@@ -135,7 +173,7 @@ export async function deleteMenuCategoryAction(id: string): Promise<MenuLoadResu
 
 export async function toggleMenuCategoryHiddenAction(id: string, hideProducts: boolean): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
 
   const { data: cat, error: findError } = await supabase
     .from('menu_categories')
@@ -178,7 +216,7 @@ async function clearOtherSignatureDishes(
 
 export async function upsertMenuProductAction(fields: ProductFormFields, productId?: string): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
 
   const name = fields.name.trim();
   if (!name) return { ok: false, error: 'Ürün adı zorunludur.' };
@@ -229,7 +267,7 @@ export async function upsertMenuProductAction(fields: ProductFormFields, product
 
 export async function toggleMenuProductHiddenAction(id: string): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { data: row, error: findError } = await supabase
     .from('menu_products')
     .select('hidden')
@@ -253,7 +291,7 @@ export async function toggleMenuProductHiddenAction(id: string): Promise<MenuLoa
 
 export async function deleteMenuProductAction(id: string): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { error: deleteError } = await supabase.from('menu_products').delete().eq('id', id).eq('tenant_id', tenantId);
   if (deleteError) return { ok: false, error: deleteError.message };
   revalidateOwnerPublicMenu(subdomain);
@@ -262,7 +300,7 @@ export async function deleteMenuProductAction(id: string): Promise<MenuLoadResul
 
 export async function clearAllMenuDataAction(): Promise<MenuLoadResult> {
   const { supabase, tenantId, subdomain, error } = await getOwnerTenantId();
-  if (!tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
+  if (!supabase || !tenantId) return { ok: false, error: error ?? 'İşlem yapılamadı.' };
   const { error: productError } = await supabase.from('menu_products').delete().eq('tenant_id', tenantId);
   if (productError) return { ok: false, error: productError.message };
   const { error: categoryError } = await supabase.from('menu_categories').delete().eq('tenant_id', tenantId);

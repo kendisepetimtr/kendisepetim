@@ -193,7 +193,9 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
     if (!tenant) return;
     setCustomerCount(countLocalCustomers(tenant.subdomain));
     if (remoteAuthEnabled) {
-      void getDashboardMenuProductCountAction().then((count) => setMenuProductCount(count));
+      void getDashboardMenuProductCountAction()
+        .then((count) => setMenuProductCount(count))
+        .catch(() => setMenuProductCount(0));
     } else {
       setMenuProductCount(0);
     }

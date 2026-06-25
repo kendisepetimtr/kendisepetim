@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
-import DashboardClient from "@/components/dashboard/dashboard-client";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Panel",
-  description: "Restoran yonetim paneli — KendiSepetim.",
-};
+import DashboardClient from "@/components/dashboard/dashboard-client";
 
 export default function DashboardPage() {
-  return <DashboardClient remoteAuthEnabled={!!getSupabaseEnv()} />;
+  const remoteAuthEnabled = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()),
+  );
+
+  return <DashboardClient remoteAuthEnabled={remoteAuthEnabled} />;
 }
