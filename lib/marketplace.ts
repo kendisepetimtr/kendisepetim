@@ -56,7 +56,7 @@ export function getMarketplaceQualityIssues(input: MarketplaceProfileInput): Mar
   if (!input.fulfillmentPickupEnabled && !input.fulfillmentDeliveryEnabled) {
     issues.push({ key: "fulfillment", label: "Gel-al veya teslimat seçeneği" });
   }
-  if (input.publicMenuEnabled !== true) {
+  if (input.publicMenuEnabled === false) {
     issues.push({ key: "public_menu", label: "QR menü açık olmalı" });
   }
   if (input.city !== LAUNCH_CITY || input.district !== LAUNCH_DISTRICT) {

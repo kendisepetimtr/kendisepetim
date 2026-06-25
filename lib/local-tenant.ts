@@ -29,6 +29,8 @@ export type LocalTenantProfile = {
   googleMapsUrl: string;
   /** Arama motorlarında görünürlük */
   seoIndexEnabled: boolean;
+  /** QR / herkese açık menü */
+  publicMenuEnabled: boolean;
   /**
    * Sipariş / rapor günü: takvim günü mü, yoksa mesai aralığı (gece sarkan vardiya) mı.
    * QR “açık” hesabı bu alandan bağımsızdır; yalnızca openTime/closeTime kullanılır.
@@ -76,6 +78,7 @@ export function saveLocalTenant(
     publicDescription: data.publicDescription ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
     seoIndexEnabled: data.seoIndexEnabled === true,
+    publicMenuEnabled: data.publicMenuEnabled !== false,
     hoursDayMode: data.hoursDayMode === "shift" ? "shift" : "calendar",
     openTime: normalizeTimeString(data.openTime ?? DEFAULT_OPEN_TIME, DEFAULT_OPEN_TIME),
     closeTime: normalizeTimeString(data.closeTime ?? DEFAULT_CLOSE_TIME, DEFAULT_CLOSE_TIME),
@@ -126,6 +129,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const publicDescription = typeof p.publicDescription === "string" ? p.publicDescription : "";
     const googleMapsUrl = typeof p.googleMapsUrl === "string" ? p.googleMapsUrl : "";
     const seoIndexEnabled = p.seoIndexEnabled === true;
+    const publicMenuEnabled = p.publicMenuEnabled !== false;
 
     const hoursDayMode: BusinessHoursDayMode = p.hoursDayMode === "shift" ? "shift" : "calendar";
     const openTime = normalizeTimeString(
@@ -169,6 +173,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
       publicDescription,
       googleMapsUrl,
       seoIndexEnabled,
+      publicMenuEnabled,
       hoursDayMode,
       openTime,
       closeTime,

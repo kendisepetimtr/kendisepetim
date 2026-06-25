@@ -17,6 +17,7 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
     publicDescription: row.public_description,
     googleMapsUrl: row.google_maps_url?.trim() ?? "",
     seoIndexEnabled: row.seo_index_enabled === true,
+    publicMenuEnabled: row.public_menu_enabled !== false,
     hoursDayMode: row.hours_day_mode,
     openTime: row.open_time,
     closeTime: row.close_time,

@@ -14,7 +14,7 @@ import {
 } from "@/lib/fulfillment";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, getLaunchCities, getNeighborhoodsForDistrict } from "@/lib/turkey-geography";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
-import { type FormEvent, useMemo, useState, useTransition } from "react";
+import { type FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 
 const LocationMapPicker = dynamic(() => import("@/components/dashboard/location-map-picker"), {
   ssr: false,
@@ -62,7 +62,7 @@ export default function MarketplaceSettingsPanel({
 
   const profilePreview: MarketplaceProfileInput = useMemo(
     () => ({
-      marketplaceEnabled: true,
+      marketplaceEnabled,
       city,
       district,
       neighborhood,
@@ -72,12 +72,13 @@ export default function MarketplaceSettingsPanel({
       coverImageUrl: tenant.coverImageUrl,
       logoUrl: tenant.logoDataUrl,
       publicDescription: tenant.publicDescription,
-      publicMenuEnabled: true,
+      publicMenuEnabled: tenant.publicMenuEnabled,
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       productCount,
     }),
     [
+      marketplaceEnabled,
       city,
       district,
       neighborhood,
@@ -87,6 +88,7 @@ export default function MarketplaceSettingsPanel({
       tenant.coverImageUrl,
       tenant.logoDataUrl,
       tenant.publicDescription,
+      tenant.publicMenuEnabled,
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       productCount,
@@ -95,6 +97,22 @@ export default function MarketplaceSettingsPanel({
 
   const qualityIssues = useMemo(() => getMarketplaceQualityIssues(profilePreview), [profilePreview]);
   const canPublish = qualityIssues.length === 0;
+
+  useEffect(() => {
+    setMarketplaceEnabled(tenant.marketplaceEnabled);
+    setCity(tenant.city || LAUNCH_CITY);
+    setDistrict(tenant.district || LAUNCH_DISTRICT);
+    setNeighborhood(tenant.neighborhood);
+    setCuisineTags(tenant.cuisineTags);
+    setLatitude(tenant.latitude);
+    setLongitude(tenant.longitude);
+    setDeliveryRadiusKm(tenant.deliveryRadiusKm || DEFAULT_DELIVERY_RADIUS_KM);
+    setFulfillmentPickupEnabled(tenant.fulfillmentPickupEnabled);
+    setFulfillmentDeliveryEnabled(tenant.fulfillmentDeliveryEnabled);
+    setMinOrderAmount(
+      tenant.minOrderAmount != null ? String(tenant.minOrderAmount).replace(".", ",") : "",
+    );
+  }, [tenant]);
 
   function toggleCuisineTag(tag: string) {
     setCuisineTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
@@ -162,6 +180,7 @@ export default function MarketplaceSettingsPanel({
           return;
         }
         onTenantUpdate(result.profile);
+        setMarketplaceEnabled(result.profile.marketplaceEnabled);
         setSavedFlash(true);
         window.setTimeout(() => setSavedFlash(false), 2500);
       } catch (error) {
@@ -358,15 +377,24 @@ export default function MarketplaceSettingsPanel({
           <input
             type="checkbox"
             checked={marketplaceEnabled}
-            disabled={!canPublish && !marketplaceEnabled}
             onChange={(e) => setMarketplaceEnabled(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30 disabled:opacity-40"
+            className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
           />
           <span>
             <span className="block text-sm font-semibold text-on-background">Marketplace&apos;te yayınla</span>
             <span className="mt-0.5 block text-xs text-secondary">
               Açıkken restoranınız Keşfet ve ana sayfada listelenir. Kapatmak için işareti kaldırın.
             </span>
+            {marketplaceEnabled && !canPublish ? (
+              <span className="mt-2 block text-xs font-medium text-amber-800">
+                Kaydetmeden önce yukarıdaki eksikleri tamamlayın.
+              </span>
+            ) : null}
+            {!marketplaceEnabled && !canPublish ? (
+              <span className="mt-2 block text-xs text-secondary">
+                İşaretleyip kaydetmeden önce eksikleri tamamlamanız gerekir.
+              </span>
+            ) : null}
           </span>
         </label>
       </section>

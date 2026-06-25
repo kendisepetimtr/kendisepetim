@@ -24,7 +24,7 @@ function tenantToProfileInput(
     coverImageUrl: tenant.cover_image_url ?? "",
     logoUrl: tenant.logo_url ?? "",
     publicDescription: tenant.public_description ?? "",
-    publicMenuEnabled: tenant.public_menu_enabled === true,
+    publicMenuEnabled: tenant.public_menu_enabled !== false,
     fulfillmentPickupEnabled: tenant.fulfillment_pickup_enabled !== false,
     fulfillmentDeliveryEnabled: tenant.fulfillment_delivery_enabled === true,
     productCount,
@@ -73,7 +73,13 @@ export type MarketplaceListFilters = {
 export async function fetchMarketplaceListings(
   filters: MarketplaceListFilters = {},
 ): Promise<MarketplaceListing[]> {
-  const svc = createServiceSupabaseClient();
+  let svc;
+  try {
+    svc = createServiceSupabaseClient();
+  } catch {
+    return [];
+  }
+
   const { data: tenants, error } = await svc
     .from("tenants")
     .select("*")

@@ -7,43 +7,6 @@ import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
-const DASHBOARD_TENANT_SELECT = `
-  id,
-  created_at,
-  updated_at,
-  business_name,
-  subdomain,
-  owner_name,
-  email,
-  phone,
-  owner_user_id,
-  logo_url,
-  cover_image_url,
-  public_description,
-  google_maps_url,
-  seo_index_enabled,
-  hours_day_mode,
-  open_time,
-  close_time,
-  payment_cash,
-  payment_door_card,
-  payment_meal_card,
-  plan,
-  public_menu_enabled,
-  dashboard_enabled,
-  marketplace_enabled,
-  city,
-  district,
-  neighborhood,
-  cuisine_tags,
-  latitude,
-  longitude,
-  delivery_radius_km,
-  fulfillment_pickup_enabled,
-  fulfillment_delivery_enabled,
-  min_order_amount
-`;
-
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   if (!getSupabaseEnv()) {
     return <>{children}</>;
@@ -60,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const { data: row, error } = await supabase
     .from("tenants")
-    .select(DASHBOARD_TENANT_SELECT)
+    .select("*")
     .eq("owner_user_id", user.id)
     .maybeSingle();
 
