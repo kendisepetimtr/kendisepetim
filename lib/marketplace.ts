@@ -45,6 +45,9 @@ export function getMarketplaceQualityIssues(input: MarketplaceProfileInput): Mar
   const issues: MarketplaceQualityIssue[] = [];
   if (!input.coverImageUrl.trim()) issues.push({ key: "cover", label: "Kapak görseli" });
   if (!input.logoUrl.trim()) issues.push({ key: "logo", label: "Logo" });
+  if (input.cuisineTags.length === 0) {
+    issues.push({ key: "cuisine", label: "Mutfak türü seçimi" });
+  }
   if (input.productCount < MARKETPLACE_MIN_PRODUCT_COUNT) {
     issues.push({ key: "products", label: `En az ${MARKETPLACE_MIN_PRODUCT_COUNT} ürün` });
   }

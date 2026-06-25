@@ -477,6 +477,10 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 productCount={menuProductCount}
                 onTenantUpdate={setTenant}
                 persistSettingsToSupabase={remoteAuthEnabled}
+                onNavigateToTab={(tab) => {
+                  setActiveNav(tab);
+                  setSidebarOpen(false);
+                }}
               />
             ) : activeNav === "settings" ? (
               <DashboardSettings

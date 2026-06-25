@@ -28,6 +28,8 @@ export type MarketplaceSettingsPatch = {
   fulfillmentPickupEnabled: boolean;
   fulfillmentDeliveryEnabled: boolean;
   minOrderAmount: number | null;
+  coverImageUrl: string;
+  publicDescription: string;
 };
 
 export type UpdateMarketplaceSettingsResult =
@@ -119,6 +121,9 @@ export async function updateMarketplaceSettingsAction(
     }
 
     const productCount = await countProductsForTenant(supabase, current.id);
+    const coverImageUrl = patch.coverImageUrl.trim();
+    const publicDescription = patch.publicDescription.trim().slice(0, 280);
+
     const profileInput: MarketplaceProfileInput = {
       marketplaceEnabled: patch.marketplaceEnabled === true,
       city,
@@ -127,9 +132,9 @@ export async function updateMarketplaceSettingsAction(
       cuisineTags,
       latitude,
       longitude,
-      coverImageUrl: current.cover_image_url ?? "",
+      coverImageUrl,
       logoUrl: current.logo_url ?? "",
-      publicDescription: current.public_description ?? "",
+      publicDescription,
       publicMenuEnabled: current.public_menu_enabled !== false,
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
@@ -158,6 +163,8 @@ export async function updateMarketplaceSettingsAction(
         fulfillment_pickup_enabled: fulfillmentPickupEnabled,
         fulfillment_delivery_enabled: fulfillmentDeliveryEnabled,
         min_order_amount: minOrderAmount,
+        cover_image_url: coverImageUrl || null,
+        public_description: publicDescription,
       })
       .eq("id", current.id)
       .select("*")

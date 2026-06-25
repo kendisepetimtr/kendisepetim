@@ -2,6 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { updateMarketplaceSettingsAction } from "@/app/dashboard/marketplace-settings-actions";
+import MarketplaceProfileRing from "@/components/dashboard/marketplace-profile-ring";
+import {
+  resolveAutoCoverImageUrl,
+  isPresetMarketplaceCoverUrl,
+} from "@/lib/marketplace-cuisine-covers";
+import {
+  getMarketplaceChecklistStatus,
+  type MarketplaceChecklistItem,
+} from "@/lib/marketplace-profile-checklist";
 import {
   CUISINE_TAG_OPTIONS,
   getMarketplaceQualityIssues,
@@ -15,6 +24,8 @@ import {
 import { LAUNCH_CITY, LAUNCH_DISTRICT, getLaunchCities, getNeighborhoodsForDistrict } from "@/lib/turkey-geography";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { type FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+
+const MAX_PUBLIC_DESCRIPTION_LENGTH = 280;
 
 const LocationMapPicker = dynamic(() => import("@/components/dashboard/location-map-picker"), {
   ssr: false,
@@ -30,6 +41,7 @@ type MarketplaceSettingsPanelProps = {
   productCount: number;
   onTenantUpdate: (tenant: LocalTenantProfile) => void;
   persistSettingsToSupabase?: boolean;
+  onNavigateToTab?: (tab: string) => void;
 };
 
 export default function MarketplaceSettingsPanel({
@@ -37,6 +49,7 @@ export default function MarketplaceSettingsPanel({
   productCount,
   onTenantUpdate,
   persistSettingsToSupabase = false,
+  onNavigateToTab,
 }: MarketplaceSettingsPanelProps) {
   const [savePending, startSaveTransition] = useTransition();
   const [marketplaceEnabled, setMarketplaceEnabled] = useState(tenant.marketplaceEnabled);
@@ -44,6 +57,10 @@ export default function MarketplaceSettingsPanel({
   const [district, setDistrict] = useState(tenant.district || LAUNCH_DISTRICT);
   const [neighborhood, setNeighborhood] = useState(tenant.neighborhood);
   const [cuisineTags, setCuisineTags] = useState<string[]>(tenant.cuisineTags);
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    () => resolveAutoCoverImageUrl(tenant.coverImageUrl, tenant.cuisineTags),
+  );
+  const [publicDescription, setPublicDescription] = useState(tenant.publicDescription);
   const [latitude, setLatitude] = useState<number | null>(tenant.latitude);
   const [longitude, setLongitude] = useState<number | null>(tenant.longitude);
   const [deliveryRadiusKm, setDeliveryRadiusKm] = useState(tenant.deliveryRadiusKm || DEFAULT_DELIVERY_RADIUS_KM);
@@ -54,6 +71,11 @@ export default function MarketplaceSettingsPanel({
   );
   const [savedFlash, setSavedFlash] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const coverIsCustom = useMemo(
+    () => coverImageUrl.trim().length > 0 && !isPresetMarketplaceCoverUrl(coverImageUrl),
+    [coverImageUrl],
+  );
 
   const neighborhoods = useMemo(
     () => getNeighborhoodsForDistrict(city, district),
@@ -69,9 +91,9 @@ export default function MarketplaceSettingsPanel({
       cuisineTags,
       latitude,
       longitude,
-      coverImageUrl: tenant.coverImageUrl,
+      coverImageUrl,
       logoUrl: tenant.logoDataUrl,
-      publicDescription: tenant.publicDescription,
+      publicDescription,
       publicMenuEnabled: tenant.publicMenuEnabled,
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
@@ -85,9 +107,9 @@ export default function MarketplaceSettingsPanel({
       cuisineTags,
       latitude,
       longitude,
-      tenant.coverImageUrl,
+      coverImageUrl,
       tenant.logoDataUrl,
-      tenant.publicDescription,
+      publicDescription,
       tenant.publicMenuEnabled,
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
@@ -95,8 +117,10 @@ export default function MarketplaceSettingsPanel({
     ],
   );
 
+  const checklistStatus = useMemo(() => getMarketplaceChecklistStatus(profilePreview), [profilePreview]);
   const qualityIssues = useMemo(() => getMarketplaceQualityIssues(profilePreview), [profilePreview]);
   const canPublish = qualityIssues.length === 0;
+  const incompleteItems = checklistStatus.items.filter((i) => !i.complete);
 
   useEffect(() => {
     setMarketplaceEnabled(tenant.marketplaceEnabled);
@@ -104,6 +128,8 @@ export default function MarketplaceSettingsPanel({
     setDistrict(tenant.district || LAUNCH_DISTRICT);
     setNeighborhood(tenant.neighborhood);
     setCuisineTags(tenant.cuisineTags);
+    setCoverImageUrl(resolveAutoCoverImageUrl(tenant.coverImageUrl, tenant.cuisineTags));
+    setPublicDescription(tenant.publicDescription);
     setLatitude(tenant.latitude);
     setLongitude(tenant.longitude);
     setDeliveryRadiusKm(tenant.deliveryRadiusKm || DEFAULT_DELIVERY_RADIUS_KM);
@@ -115,7 +141,21 @@ export default function MarketplaceSettingsPanel({
   }, [tenant]);
 
   function toggleCuisineTag(tag: string) {
-    setCuisineTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+    setCuisineTags((prev) => {
+      const next = prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag];
+      setCoverImageUrl((current) => resolveAutoCoverImageUrl(current, next));
+      return next;
+    });
+  }
+
+  function handleChecklistActivate(item: MarketplaceChecklistItem & { complete: boolean }) {
+    if (item.target === "in-panel" && item.anchorId) {
+      document.getElementById(item.anchorId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (item.navTab && onNavigateToTab) {
+      onNavigateToTab(item.navTab);
+    }
   }
 
   function handleSave(e: FormEvent) {
@@ -144,6 +184,8 @@ export default function MarketplaceSettingsPanel({
       district,
       neighborhood,
       cuisineTags,
+      coverImageUrl,
+      publicDescription: publicDescription.trim(),
       latitude,
       longitude,
       deliveryRadiusKm,
@@ -174,6 +216,8 @@ export default function MarketplaceSettingsPanel({
           fulfillmentPickupEnabled,
           fulfillmentDeliveryEnabled,
           minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
+          coverImageUrl,
+          publicDescription: publicDescription.trim(),
         });
         if (!result.ok) {
           setSaveError(result.error);
@@ -181,6 +225,8 @@ export default function MarketplaceSettingsPanel({
         }
         onTenantUpdate(result.profile);
         setMarketplaceEnabled(result.profile.marketplaceEnabled);
+        setCoverImageUrl(result.profile.coverImageUrl);
+        setPublicDescription(result.profile.publicDescription);
         setSavedFlash(true);
         window.setTimeout(() => setSavedFlash(false), 2500);
       } catch (error) {
@@ -191,7 +237,193 @@ export default function MarketplaceSettingsPanel({
 
   return (
     <form onSubmit={handleSave} className="space-y-8">
+      <section className="rounded-2xl border border-surface-container-highest bg-gradient-to-b from-surface-container-lowest to-surface-container-low/30 p-5 shadow-sm sm:p-8">
+        <MarketplaceProfileRing
+          logoUrl={tenant.logoDataUrl}
+          businessName={tenant.businessName}
+          items={checklistStatus.items}
+          completedCount={checklistStatus.completedCount}
+          totalCount={checklistStatus.totalCount}
+          onItemActivate={handleChecklistActivate}
+        />
+
+        {incompleteItems.length > 0 ? (
+          <div className="mx-auto mt-6 max-w-lg rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+            <p className="text-center text-xs font-semibold text-amber-950">Eksik adımlar — tıklayarak ilgili alana gidin</p>
+            <ul className="mt-2 flex flex-wrap justify-center gap-2">
+              {incompleteItems.map((item) => (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    onClick={() => handleChecklistActivate(item)}
+                    className="rounded-full border border-amber-500/40 bg-white px-3 py-1 text-[11px] font-medium text-amber-900 transition hover:bg-amber-50"
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mx-auto mt-6 max-w-md rounded-xl border border-emerald-600/25 bg-emerald-600/5 px-4 py-3 text-center text-sm font-medium text-emerald-900">
+            Tüm adımlar tamam — marketplace&apos;te yayınlayabilirsiniz.
+          </p>
+        )}
+      </section>
+
       <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+        <h2 className="font-headline text-lg font-bold text-on-background">Marketplace profili</h2>
+        <p className="mt-1 text-sm text-secondary">
+          {LAUNCH_CITY} / {LAUNCH_DISTRICT} lansman bölgesi.
+        </p>
+
+        <div id="marketplace-cuisine" className="mt-5 scroll-mt-24">
+          <p className="text-xs font-medium text-secondary">Mutfak türü</p>
+          <p className="mt-0.5 text-[11px] text-secondary">
+            Seçtiğiniz türe göre kapak görseli otomatik atanır
+            {coverIsCustom ? " (özel kapak korunur)" : ""}.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {CUISINE_TAG_OPTIONS.map((tag) => {
+              const active = cuisineTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleCuisineTag(tag)}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                    active
+                      ? "bg-primary text-white"
+                      : "border border-surface-container-highest bg-white text-secondary hover:text-on-background",
+                  ].join(" ")}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div id="marketplace-cover" className="mt-5 scroll-mt-24">
+          <p className="text-xs font-medium text-secondary">Kapak önizleme</p>
+          <div className="mt-2 overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-low">
+            {coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coverImageUrl} alt="" className="aspect-[16/7] w-full object-cover" />
+            ) : (
+              <div className="flex aspect-[16/7] items-center justify-center text-sm text-secondary">
+                Mutfak türü seçince kapak görseli atanır
+              </div>
+            )}
+          </div>
+          {coverIsCustom ? (
+            <p className="mt-1.5 text-[11px] text-secondary">
+              Özel kapak yüklü — mutfak değişince güncellenmez.{" "}
+              {onNavigateToTab ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab("settings")}
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Ayarlar&apos;dan değiştir
+                </button>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+
+        <div id="marketplace-description" className="mt-5 scroll-mt-24">
+          <label className="block text-xs font-medium text-secondary" htmlFor="marketplace-description-input">
+            Restoran açıklaması
+          </label>
+          <textarea
+            id="marketplace-description-input"
+            value={publicDescription}
+            onChange={(e) => setPublicDescription(e.target.value.slice(0, MAX_PUBLIC_DESCRIPTION_LENGTH))}
+            rows={3}
+            placeholder="Keşfet ve ana sayfada görünecek kısa tanıtım…"
+            className="mt-1 w-full resize-y rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <p className="mt-1 text-[11px] text-secondary">
+            {publicDescription.length}/{MAX_PUBLIC_DESCRIPTION_LENGTH}
+          </p>
+        </div>
+
+        <div id="marketplace-location-fields" className="mt-5 grid scroll-mt-24 gap-4 sm:grid-cols-3">
+          <div>
+            <label className="block text-xs font-medium text-secondary">İl</label>
+            <select
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                setNeighborhood("");
+              }}
+              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+            >
+              {getLaunchCities().map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-secondary">İlçe</label>
+            <select
+              value={district}
+              onChange={(e) => {
+                setDistrict(e.target.value);
+                setNeighborhood("");
+              }}
+              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+            >
+              <option value={LAUNCH_DISTRICT}>{LAUNCH_DISTRICT}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-secondary">Mahalle</label>
+            <select
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+              required
+            >
+              <option value="">Mahalle seçin</option>
+              {neighborhoods.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="marketplace-map"
+        className="scroll-mt-24 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm sm:p-6"
+      >
+        <h2 className="font-headline text-lg font-bold text-on-background">Restoran konumu</h2>
+        <p className="mt-1 text-sm text-secondary">OpenStreetMap üzerinde pin bırakın. Teslimat mesafesi bu noktadan ölçülür.</p>
+        <div className="mt-4">
+          <LocationMapPicker
+            latitude={latitude}
+            longitude={longitude}
+            deliveryRadiusKm={deliveryRadiusKm}
+            showRadius={fulfillmentDeliveryEnabled}
+            onChange={({ lat, lng }) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+          />
+        </div>
+      </section>
+
+      <section
+        id="marketplace-fulfillment"
+        className="scroll-mt-24 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm sm:p-6"
+      >
         <h2 className="font-headline text-lg font-bold text-on-background">Sipariş & teslimat</h2>
         <p className="mt-1 text-sm text-secondary">
           Gel-al ve restoran teslimatı seçeneklerini yönetin. Teslimat yarıçapı restoran konumundan hesaplanır.
@@ -242,7 +474,9 @@ export default function MarketplaceSettingsPanel({
                 onChange={(e) => setDeliveryRadiusKm(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <p className="mt-1 text-[11px] text-secondary">{MIN_DELIVERY_RADIUS_KM}–{MAX_DELIVERY_RADIUS_KM} km</p>
+              <p className="mt-1 text-[11px] text-secondary">
+                {MIN_DELIVERY_RADIUS_KM}–{MAX_DELIVERY_RADIUS_KM} km
+              </p>
             </div>
             <div>
               <label className="block text-xs font-medium text-secondary" htmlFor="min-order">
@@ -260,120 +494,8 @@ export default function MarketplaceSettingsPanel({
             </div>
           </div>
         ) : null}
-      </section>
 
-      <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm sm:p-6">
-        <h2 className="font-headline text-lg font-bold text-on-background">Restoran konumu</h2>
-        <p className="mt-1 text-sm text-secondary">OpenStreetMap üzerinde pin bırakın. Teslimat mesafesi bu noktadan ölçülür.</p>
-        <div className="mt-4">
-          <LocationMapPicker
-            latitude={latitude}
-            longitude={longitude}
-            deliveryRadiusKm={deliveryRadiusKm}
-            showRadius={fulfillmentDeliveryEnabled}
-            onChange={({ lat, lng }) => {
-              setLatitude(lat);
-              setLongitude(lng);
-            }}
-          />
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm sm:p-6">
-        <h2 className="font-headline text-lg font-bold text-on-background">Marketplace profili</h2>
-        <p className="mt-1 text-sm text-secondary">
-          {LAUNCH_CITY} / {LAUNCH_DISTRICT} lansman bölgesi. Profil tamamlanınca marketplace&apos;te yayınlayabilirsiniz.
-        </p>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div>
-            <label className="block text-xs font-medium text-secondary">İl</label>
-            <select
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                setNeighborhood("");
-              }}
-              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
-            >
-              {getLaunchCities().map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary">İlçe</label>
-            <select
-              value={district}
-              onChange={(e) => {
-                setDistrict(e.target.value);
-                setNeighborhood("");
-              }}
-              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
-            >
-              <option value={LAUNCH_DISTRICT}>{LAUNCH_DISTRICT}</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-secondary">Mahalle</label>
-            <select
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
-              required
-            >
-              <option value="">Mahalle seçin</option>
-              {neighborhoods.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <p className="text-xs font-medium text-secondary">Mutfak türü</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CUISINE_TAG_OPTIONS.map((tag) => {
-              const active = cuisineTags.includes(tag);
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => toggleCuisineTag(tag)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    active
-                      ? "bg-primary text-white"
-                      : "border border-surface-container-highest bg-white text-secondary hover:text-on-background",
-                  ].join(" ")}
-                >
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {qualityIssues.length > 0 ? (
-          <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-950">
-            <p className="font-semibold">Marketplace için eksikler</p>
-            <ul className="mt-2 list-inside list-disc text-xs">
-              {qualityIssues.map((issue) => (
-                <li key={issue.key}>{issue.label}</li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <p className="mt-5 rounded-xl border border-emerald-600/20 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-900">
-            Profil marketplace için hazır.
-          </p>
-        )}
-
-        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-surface-container-high bg-surface-container-low/40 p-4">
+        <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-surface-container-high bg-surface-container-low/40 p-4">
           <input
             type="checkbox"
             checked={marketplaceEnabled}
@@ -387,12 +509,7 @@ export default function MarketplaceSettingsPanel({
             </span>
             {marketplaceEnabled && !canPublish ? (
               <span className="mt-2 block text-xs font-medium text-amber-800">
-                Kaydetmeden önce yukarıdaki eksikleri tamamlayın.
-              </span>
-            ) : null}
-            {!marketplaceEnabled && !canPublish ? (
-              <span className="mt-2 block text-xs text-secondary">
-                İşaretleyip kaydetmeden önce eksikleri tamamlamanız gerekir.
+                Kaydetmeden önce profil adımlarını tamamlayın.
               </span>
             ) : null}
           </span>
