@@ -1,7 +1,7 @@
 "use client";
 
 import { clearAllMenuDataAction } from "@/app/dashboard/menu-actions";
-import { updateTenantBusinessSettingsAction } from "@/app/dashboard/tenant-settings-actions";
+import type { TenantSettingsPatch } from "@/lib/dashboard/tenant-settings";
 import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { isValidGoogleMapsUrl } from "@/lib/google-maps";
 import {
@@ -9,6 +9,7 @@ import {
   saveLocalTenant,
   type LocalTenantProfile,
 } from "@/lib/local-tenant";
+import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
 
@@ -122,32 +123,47 @@ export default function DashboardSettings({
     };
 
     if (persistSettingsToSupabase) {
+      const patch: TenantSettingsPatch = {
+        businessName: bn,
+        ownerName: on,
+        email: em,
+        phone: ph,
+        logoDataUrl,
+        coverImageUrl,
+        publicDescription,
+        googleMapsUrl: gm,
+        seoIndexEnabled,
+        hoursDayMode,
+        openTime,
+        closeTime,
+        paymentCash,
+        paymentDoorCard,
+        paymentMealCard,
+      };
+
       startSaveTransition(async () => {
-        const res = await updateTenantBusinessSettingsAction({
-          businessName: bn,
-          ownerName: on,
-          email: em,
-          phone: ph,
-          logoDataUrl,
-          coverImageUrl,
-          publicDescription,
-          googleMapsUrl: gm,
-          seoIndexEnabled,
-          hoursDayMode,
-          openTime,
-          closeTime,
-          paymentCash,
-          paymentDoorCard,
-          paymentMealCard,
-        });
-        if (!res.ok) {
-          window.alert(res.error);
-          return;
+        try {
+          const res = await fetch("/api/dashboard/tenant", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          });
+          const result = (await res.json()) as
+            | { ok: true; profile: LocalTenantProfile }
+            | { ok: false; error: string };
+          if (!result.ok) {
+            window.alert(result.error);
+            return;
+          }
+          const merged = mergeDashboardTenantProfiles(tenant, result.profile);
+          saveLocalTenant(merged);
+          onTenantUpdate(merged);
+          setSavedFlash(true);
+          window.setTimeout(() => setSavedFlash(false), 2200);
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : "Kayıt güncellenemedi.");
         }
-        saveLocalTenant(res.profile);
-        onTenantUpdate(res.profile);
-        setSavedFlash(true);
-        window.setTimeout(() => setSavedFlash(false), 2200);
       });
       return;
     }
