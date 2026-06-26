@@ -3,12 +3,12 @@
 import {
   createMenuCategoryAction,
   deleteMenuCategoryAction,
-  loadDashboardMenuAction,
   toggleMenuCategoryHiddenAction,
   toggleMenuProductHiddenAction,
   updateMenuCategoryAction,
   upsertMenuProductAction,
   deleteMenuProductAction,
+  type MenuLoadResult,
 } from "@/app/dashboard/menu-actions";
 import CategoryEditModal, { type CategoryEditFields } from "@/components/dashboard/category-edit-modal";
 import ProductFormModal, { type ProductFormFields } from "@/components/dashboard/product-form-modal";
@@ -50,12 +50,20 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
 
   const load = useCallback(() => {
     startTransition(async () => {
-      const result = await loadDashboardMenuAction();
-      if (!result.ok) {
-        setActionError(result.error);
-      } else {
-        setState(result.state);
-        setActionError(null);
+      try {
+        const res = await fetch("/api/dashboard/menu", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const result = (await res.json()) as MenuLoadResult;
+        if (!result.ok) {
+          setActionError(result.error);
+        } else {
+          setState(result.state);
+          setActionError(null);
+        }
+      } catch {
+        setActionError("Menü yüklenemedi.");
       }
       setHydrated(true);
     });

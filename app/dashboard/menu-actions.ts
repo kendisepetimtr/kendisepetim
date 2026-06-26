@@ -2,6 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { createServerSupabaseClient, tryCreateServerSupabaseClient } from '@/lib/supabase/server';
+import {
+  getDashboardMenuProductCount,
+  loadDashboardMenuState,
+  type MenuLoadResult,
+} from '@/lib/dashboard/menu-load';
 import type { MenuCategoryRow, MenuProductRow } from '@/lib/supabase/menu-types';
 import type { LocalMenuState } from '@/lib/local-menu';
 import type { CategoryEditFields } from '@/components/dashboard/category-edit-modal';
@@ -9,11 +14,9 @@ import type { ProductFormFields } from '@/components/dashboard/product-form-moda
 import { buildLocalMenuState } from '@/lib/menu-map';
 import { sanitizeCustomMenuWarnings, sanitizeMenuWarningPresetKeys } from '@/lib/menu-product-warnings';
 
-const MAX_PRODUCT_DESCRIPTION_LENGTH = 280;
+export type { MenuLoadResult };
 
-export type MenuLoadResult =
-  | { ok: true; state: LocalMenuState }
-  | { ok: false; error: string };
+const MAX_PRODUCT_DESCRIPTION_LENGTH = 280;
 
 async function getOwnerTenantId() {
   try {
@@ -97,28 +100,11 @@ async function readMenuState(supabase: Awaited<ReturnType<typeof createServerSup
 }
 
 export async function loadDashboardMenuAction(): Promise<MenuLoadResult> {
-  try {
-    const { supabase, tenantId, error } = await getOwnerTenantId();
-    if (!supabase || !tenantId) return { ok: false, error: error ?? 'Menü yüklenemedi.' };
-    const state = await readMenuState(supabase, tenantId);
-    return { ok: true, state };
-  } catch {
-    return { ok: false, error: 'Menü yüklenemedi.' };
-  }
+  return loadDashboardMenuState();
 }
 
 export async function getDashboardMenuProductCountAction(): Promise<number> {
-  try {
-    const { supabase, tenantId } = await getOwnerTenantId();
-    if (!supabase || !tenantId) return 0;
-    const { count } = await supabase
-      .from('menu_products')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId);
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
+  return getDashboardMenuProductCount();
 }
 
 export async function createMenuCategoryAction(nameRaw: string): Promise<MenuLoadResult> {

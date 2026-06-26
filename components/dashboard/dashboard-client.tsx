@@ -6,9 +6,8 @@ import DashboardReports from "@/components/dashboard/dashboard-reports";
 import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain";
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
 import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-settings-panel";
-import { getDashboardMenuProductCountAction } from "@/app/dashboard/menu-actions";
-import { syncDashboardTenantAction } from "@/app/dashboard/tenant-sync-actions";
 import MenuManager from "@/components/dashboard/menu-manager";
+import type { SyncDashboardTenantResult } from "@/app/dashboard/tenant-sync-actions";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
 import { clearLocalCustomers, countLocalCustomers } from "@/lib/local-customers";
 import { clearLocalOrders } from "@/lib/local-orders";
@@ -101,6 +100,37 @@ function getNavLabel(navId: string): string {
   return m?.label ?? "Panel";
 }
 
+async function fetchDashboardTenantProfile(): Promise<SyncDashboardTenantResult> {
+  try {
+    const res = await fetch("/api/dashboard/tenant", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as SyncDashboardTenantResult;
+    if (data && typeof data === "object" && "ok" in data) {
+      return data;
+    }
+    return { ok: false, error: "Profil yanıtı geçersiz." };
+  } catch {
+    return { ok: false, error: "Profil senkronu başarısız." };
+  }
+}
+
+async function fetchDashboardMenuProductCount(): Promise<number> {
+  try {
+    const res = await fetch("/api/dashboard/menu/count", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return 0;
+    const data = (await res.json()) as { count?: number };
+    return data.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 function DashboardPlaceholder({ navId }: { navId: string }) {
   const label = getNavLabel(navId);
   return (
@@ -150,37 +180,49 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
     let cancelled = false;
 
     async function hydrateTenant() {
-      const local = getLocalTenant();
+      try {
+        const local = getLocalTenant();
 
-      if (remoteAuthEnabled) {
-        const result = await syncDashboardTenantAction();
-        if (cancelled) return;
+        if (remoteAuthEnabled) {
+          const result = await fetchDashboardTenantProfile();
+          if (cancelled) return;
 
-        if (!result.ok) {
-          if (!local) {
-            router.replace("/kayit");
-            setTenant(null);
+          if (!result.ok) {
+            if (!local) {
+              router.replace("/kayit");
+              setTenant(null);
+              return;
+            }
+            setTenant(local);
+            writePublicCheckoutMirror(local);
             return;
           }
+
+          const merged = mergeDashboardTenantProfiles(local, result.profile);
+          saveLocalTenant(merged);
+          setTenant(merged);
+          writePublicCheckoutMirror(merged);
+          return;
+        }
+
+        if (!local) {
+          router.replace("/kayit");
+          setTenant(null);
+          return;
+        }
+        setTenant(local);
+        writePublicCheckoutMirror(local);
+      } catch {
+        if (cancelled) return;
+        const local = getLocalTenant();
+        if (local) {
           setTenant(local);
           writePublicCheckoutMirror(local);
           return;
         }
-
-        const merged = mergeDashboardTenantProfiles(local, result.profile);
-        saveLocalTenant(merged);
-        setTenant(merged);
-        writePublicCheckoutMirror(merged);
-        return;
-      }
-
-      if (!local) {
-        router.replace("/kayit");
+        router.replace("/giris?next=/dashboard");
         setTenant(null);
-        return;
       }
-      setTenant(local);
-      writePublicCheckoutMirror(local);
     }
 
     void hydrateTenant();
@@ -193,7 +235,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
     if (!tenant) return;
     setCustomerCount(countLocalCustomers(tenant.subdomain));
     if (remoteAuthEnabled) {
-      void getDashboardMenuProductCountAction()
+      void fetchDashboardMenuProductCount()
         .then((count) => setMenuProductCount(count))
         .catch(() => setMenuProductCount(0));
     } else {
@@ -524,7 +566,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 onTenantUpdate={setTenant}
                 onMenuCleared={() => {
                   if (remoteAuthEnabled) {
-                    void getDashboardMenuProductCountAction().then((count) => setMenuProductCount(count));
+                    void fetchDashboardMenuProductCount().then((count) => setMenuProductCount(count));
                   } else {
                     setMenuProductCount(0);
                   }
