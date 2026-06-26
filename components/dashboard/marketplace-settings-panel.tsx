@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { updateMarketplaceSettingsAction } from "@/app/dashboard/marketplace-settings-actions";
+import type { MarketplaceSettingsPatch } from "@/app/dashboard/marketplace-settings-actions";
 import MarketplaceProfileRing from "@/components/dashboard/marketplace-profile-ring";
 import {
   resolveAutoCoverImageUrl,
@@ -23,6 +23,7 @@ import {
 } from "@/lib/fulfillment";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, getLaunchCities, getNeighborhoodsForDistrict } from "@/lib/turkey-geography";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
+import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { type FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 
 const MAX_PUBLIC_DESCRIPTION_LENGTH = 280;
@@ -202,31 +203,43 @@ export default function MarketplaceSettingsPanel({
       return;
     }
 
+    const patch: MarketplaceSettingsPatch = {
+      marketplaceEnabled,
+      city,
+      district,
+      neighborhood,
+      cuisineTags,
+      latitude,
+      longitude,
+      deliveryRadiusKm,
+      fulfillmentPickupEnabled,
+      fulfillmentDeliveryEnabled,
+      minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
+      coverImageUrl,
+      publicDescription: publicDescription.trim(),
+    };
+
     startSaveTransition(async () => {
       try {
-        const result = await updateMarketplaceSettingsAction({
-          marketplaceEnabled,
-          city,
-          district,
-          neighborhood,
-          cuisineTags,
-          latitude,
-          longitude,
-          deliveryRadiusKm,
-          fulfillmentPickupEnabled,
-          fulfillmentDeliveryEnabled,
-          minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
-          coverImageUrl,
-          publicDescription: publicDescription.trim(),
+        const res = await fetch("/api/dashboard/marketplace", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
         });
+        const result = (await res.json()) as
+          | { ok: true; profile: LocalTenantProfile }
+          | { ok: false; error: string };
         if (!result.ok) {
           setSaveError(result.error);
           return;
         }
-        onTenantUpdate(result.profile);
-        setMarketplaceEnabled(result.profile.marketplaceEnabled);
-        setCoverImageUrl(result.profile.coverImageUrl);
-        setPublicDescription(result.profile.publicDescription);
+        const merged = mergeDashboardTenantProfiles(tenant, result.profile);
+        saveLocalTenant(merged);
+        onTenantUpdate(merged);
+        setMarketplaceEnabled(merged.marketplaceEnabled);
+        setCoverImageUrl(merged.coverImageUrl);
+        setPublicDescription(merged.publicDescription);
         setSavedFlash(true);
         window.setTimeout(() => setSavedFlash(false), 2500);
       } catch (error) {
