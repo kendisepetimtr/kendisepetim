@@ -1,17 +1,10 @@
 "use client";
 
-import {
-  createMenuCategoryAction,
-  deleteMenuCategoryAction,
-  toggleMenuCategoryHiddenAction,
-  toggleMenuProductHiddenAction,
-  updateMenuCategoryAction,
-  upsertMenuProductAction,
-  deleteMenuProductAction,
-  type MenuLoadResult,
-} from "@/app/dashboard/menu-actions";
 import CategoryEditModal, { type CategoryEditFields } from "@/components/dashboard/category-edit-modal";
 import ProductFormModal, { type ProductFormFields } from "@/components/dashboard/product-form-modal";
+import type { MenuMutationBody } from "@/lib/dashboard/menu-mutations";
+import type { MenuLoadResult } from "@/lib/dashboard/menu-load";
+import { mergeDashboardMenuStates } from "@/lib/menu-client-sync";
 import {
   getDisplayedProductPrice,
   getOrphanProducts,
@@ -25,6 +18,24 @@ import { type FormEvent, useCallback, useEffect, useId, useState, useTransition 
 
 function formatTry(n: number) {
   return `${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+}
+
+async function postMenuMutation(body: MenuMutationBody): Promise<MenuLoadResult> {
+  try {
+    const res = await fetch("/api/dashboard/menu", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = (await res.json()) as MenuLoadResult;
+    if (result && typeof result === "object" && "ok" in result) {
+      return result;
+    }
+    return { ok: false, error: "Menü yanıtı geçersiz." };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Menü güncellenemedi." };
+  }
 }
 
 type MenuManagerProps = {
@@ -59,7 +70,7 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
         if (!result.ok) {
           setActionError(result.error);
         } else {
-          setState(result.state);
+          setState((prev) => mergeDashboardMenuStates(prev, result.state));
           setActionError(null);
         }
       } catch {
@@ -74,7 +85,7 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
   }, [load]);
 
   function applyResult(
-    promise: Promise<{ ok: true; state: LocalMenuState } | { ok: false; error: string }>,
+    promise: Promise<MenuLoadResult>,
     opts?: { onSuccess?: () => void },
   ) {
     startTransition(async () => {
@@ -84,7 +95,7 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
         window.alert(result.error);
         return;
       }
-      setState(result.state);
+      setState((prev) => mergeDashboardMenuStates(prev, result.state));
       setActionError(null);
       opts?.onSuccess?.();
     });
@@ -94,7 +105,7 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
     e.preventDefault();
     const name = newCategoryName.trim();
     if (!name) return;
-    applyResult(createMenuCategoryAction(name), { onSuccess: () => setNewCategoryName("") });
+    applyResult(postMenuMutation({ action: "createCategory", name }), { onSuccess: () => setNewCategoryName("") });
   }
 
   function handleDeleteCategory(cat: LocalMenuCategory) {
@@ -104,7 +115,7 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
         ? `«${cat.name}» kategorisi silinecek. ${n} ürün silinmeyecek; bu ürünler «Kategorisiz ürünler» bölümüne taşınır. Devam edilsin mi?`
         : `«${cat.name}» kategorisini silmek istiyor musunuz?`;
     if (!window.confirm(msg)) return;
-    applyResult(deleteMenuCategoryAction(cat.id));
+    applyResult(postMenuMutation({ action: "deleteCategory", id: cat.id }));
   }
 
   function toggleCategoryHidden(cat: LocalMenuCategory) {
@@ -117,33 +128,33 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
           `Bu kategorideki ${inCat.length} ürün de menüden gizlensin mi? (İsterseniz hayır deyin; sadece kategori gizlenir.)`,
         );
       }
-      applyResult(toggleMenuCategoryHiddenAction(cat.id, hideProducts));
+      applyResult(postMenuMutation({ action: "toggleCategoryHidden", id: cat.id, hideProducts }));
     } else {
       if (!confirm(`«${cat.name}» yeniden menüde gösterilsin mi?`)) return;
-      applyResult(toggleMenuCategoryHiddenAction(cat.id, false));
+      applyResult(postMenuMutation({ action: "toggleCategoryHidden", id: cat.id, hideProducts: false }));
     }
   }
 
   function handleCategoryEditSave(id: string, fields: CategoryEditFields) {
-    applyResult(updateMenuCategoryAction(id, fields));
+    applyResult(postMenuMutation({ action: "updateCategory", id, fields }));
   }
 
   function toggleProductHidden(p: LocalMenuProduct) {
-    applyResult(toggleMenuProductHiddenAction(p.id));
+    applyResult(postMenuMutation({ action: "toggleProductHidden", id: p.id }));
   }
 
   function handleDeleteProduct(id: string) {
     if (!window.confirm("Bu ürünü silmek istiyor musunuz?")) return;
-    applyResult(deleteMenuProductAction(id));
+    applyResult(postMenuMutation({ action: "deleteProduct", id }));
   }
 
   async function handleProductSave(fields: ProductFormFields, productId?: string) {
-    const result = await upsertMenuProductAction(fields, productId);
+    const result = await postMenuMutation({ action: "upsertProduct", fields, productId });
     if (!result.ok) {
       setActionError(result.error);
       throw new Error(result.error);
     }
-    setState(result.state);
+    setState((prev) => mergeDashboardMenuStates(prev, result.state));
     setActionError(null);
     setProductModal(null);
   }

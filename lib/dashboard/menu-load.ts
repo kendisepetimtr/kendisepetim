@@ -1,4 +1,5 @@
 import { buildLocalMenuState } from "@/lib/menu-map";
+import { slimMenuStateForClient } from "@/lib/menu-client-sync";
 import type { LocalMenuState } from "@/lib/local-menu";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
 import { createServerSupabaseClient, tryCreateServerSupabaseClient } from "@/lib/supabase/server";
@@ -91,7 +92,7 @@ export async function loadDashboardMenuState(): Promise<MenuLoadResult> {
   try {
     const { supabase, tenantId, error } = await getOwnerTenantId();
     if (!supabase || !tenantId) return { ok: false, error: error ?? "Menü yüklenemedi." };
-    const state = await readMenuState(supabase, tenantId);
+    const state = slimMenuStateForClient(await readMenuState(supabase, tenantId));
     return { ok: true, state };
   } catch {
     return { ok: false, error: "Menü yüklenemedi." };

@@ -1,6 +1,7 @@
 "use client";
 
-import { clearAllMenuDataAction } from "@/app/dashboard/menu-actions";
+import type { MenuLoadResult } from "@/lib/dashboard/menu-load";
+import type { MenuMutationBody } from "@/lib/dashboard/menu-mutations";
 import type { TenantSettingsPatch } from "@/lib/dashboard/tenant-settings";
 import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { isValidGoogleMapsUrl } from "@/lib/google-maps";
@@ -15,6 +16,20 @@ import { type FormEvent, useEffect, useId, useState, useTransition } from "react
 
 const LOGO_MAX_FILE_BYTES = 600 * 1024;
 const MAX_PUBLIC_DESCRIPTION_LENGTH = 280;
+
+async function postMenuMutation(body: MenuMutationBody): Promise<MenuLoadResult> {
+  try {
+    const res = await fetch("/api/dashboard/menu", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return (await res.json()) as MenuLoadResult;
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Menü güncellenemedi." };
+  }
+}
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -192,7 +207,7 @@ export default function DashboardSettings({
     }
     if (persistSettingsToSupabase) {
       startSaveTransition(async () => {
-        const res = await clearAllMenuDataAction();
+        const res = await postMenuMutation({ action: "clearAll" });
         if (!res.ok) {
           window.alert(res.error);
           return;
