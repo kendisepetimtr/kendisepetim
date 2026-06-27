@@ -1,5 +1,10 @@
 import { writeActivityLog } from "@/lib/activity-log";
 import { getAuthenticatedOwnerTenant } from "@/lib/dashboard/owner-tenant";
+import {
+  parseNotificationSettings,
+  type TenantNotificationSettings,
+} from "@/lib/notification-settings";
+import { parseReceiptSettings, type TenantReceiptSettings } from "@/lib/receipt-settings";
 import { hashStaffPin, isValidStaffPin, verifyStaffPin, type StaffPinRole } from "@/lib/staff/pin";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { CourierRow } from "@/lib/supabase/courier-types";
@@ -13,6 +18,9 @@ export type OperationsSettingsState = {
   hasWaiterPin: boolean;
   hasCashierPin: boolean;
   couriers: CourierRow[];
+  notificationSettings: TenantNotificationSettings;
+  receiptSettings: TenantReceiptSettings;
+  businessName: string;
 };
 
 export type OperationsSettingsResult =
@@ -72,6 +80,8 @@ export async function loadOperationsSettings(): Promise<OperationsSettingsResult
 
     if (error) return { ok: false, error: error.message };
 
+    const row = tenant as unknown as Record<string, unknown>;
+
     return {
       ok: true,
       settings: {
@@ -81,6 +91,9 @@ export async function loadOperationsSettings(): Promise<OperationsSettingsResult
         hasWaiterPin: Boolean(tenant.waiter_pin_hash),
         hasCashierPin: Boolean(tenant.cashier_pin_hash),
         couriers: (couriers ?? []) as CourierRow[],
+        notificationSettings: parseNotificationSettings(row.notification_settings),
+        receiptSettings: parseReceiptSettings(row.receipt_settings),
+        businessName: tenant.business_name ?? tenant.subdomain,
       },
     };
   } catch (error) {
@@ -267,7 +280,81 @@ export async function upsertCourier(
   }
 }
 
-export async function deleteCourier(courierId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function updateNotificationSettings(
+  patch: TenantNotificationSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+
+  const settings = parseNotificationSettings(patch);
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { error } = await svc
+      .from("tenants")
+      .update({ notification_settings: settings })
+      .eq("id", tenant.id);
+    if (error) return { ok: false, error: error.message };
+
+    await writeActivityLog({
+      tenant_id: tenant.id,
+      actor_type: "owner",
+      actor_label: tenant.owner_name || "Dashboard",
+      action: "notification_settings_updated",
+      entity_type: "tenant",
+      entity_id: tenant.id,
+      order_code: null,
+      metadata: { soundId: settings.soundId },
+    });
+
+    revalidatePath(`/m/${tenant.subdomain}/dashboard`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Bildirim ayarları kaydedilemedi.",
+    };
+  }
+}
+
+export async function updateReceiptSettings(
+  patch: TenantReceiptSettings,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+
+  const settings = parseReceiptSettings(patch);
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { error } = await svc
+      .from("tenants")
+      .update({ receipt_settings: settings })
+      .eq("id", tenant.id);
+    if (error) return { ok: false, error: error.message };
+
+    await writeActivityLog({
+      tenant_id: tenant.id,
+      actor_type: "owner",
+      actor_label: tenant.owner_name || "Dashboard",
+      action: "receipt_settings_updated",
+      entity_type: "tenant",
+      entity_id: tenant.id,
+      order_code: null,
+      metadata: { enabled: settings.enabled },
+    });
+
+    revalidatePath(`/m/${tenant.subdomain}/dashboard`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Fiş ayarları kaydedilemedi.",
+    };
+  }
+}
+
+export async function deleteCourier(courierId: string): Promise<{ ok: false; error: string } | { ok: true }> {
   const tenant = await getAuthenticatedOwnerTenant();
   if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
   if (!courierId) return { ok: false, error: "Geçersiz kurye." };

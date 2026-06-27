@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import { signOutWaiterAction } from "@/app/garson/actions";
 import type { GarsonTableCell } from "@/lib/garson/tables-service";
+import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+
+const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -63,6 +67,12 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
       setLoading(false);
     }
   }, []);
+
+  const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
+    streamUrl: "/api/garson/notifications/stream",
+    refreshOnActions: REFRESH_ON_ACTIONS,
+    onRefresh: refresh,
+  });
 
   useEffect(() => {
     const id = window.setInterval(() => void refresh(), 20_000);
@@ -180,6 +190,13 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
           })}
         </div>
       </main>
+
+      <NotificationToastStack
+        toasts={toasts}
+        onDismiss={dismissToast}
+        formatTitle={formatToastTitle}
+        formatSummary={formatActivityLogSummary}
+      />
     </div>
   );
 }

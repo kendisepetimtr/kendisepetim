@@ -5,10 +5,12 @@ import type { ReactNode } from "react";
 import { signOutCashierAction } from "@/app/kasa/actions";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 
+type TabId = "masalar" | "gel-al" | "paket";
+
 type KasaShellHeaderProps = {
   businessName: string;
   features: KasaFeatures;
-  active: "masalar" | "gel-al";
+  active: TabId;
   onRefresh?: () => void;
   refreshing?: boolean;
   children?: ReactNode;
@@ -22,7 +24,15 @@ export default function KasaShellHeader({
   refreshing,
   children,
 }: KasaShellHeaderProps) {
-  const showTabs = features.dineIn && features.pickup;
+  const tabs = (
+    [
+      { id: "masalar" as const, href: "/kasa", label: "Masalar", enabled: features.dineIn },
+      { id: "gel-al" as const, href: "/kasa/gel-al", label: "Gel-Al", enabled: features.pickup },
+      { id: "paket" as const, href: "/kasa/paket", label: "Paket", enabled: features.delivery },
+    ] as const
+  ).filter((t) => t.enabled);
+
+  const showTabs = tabs.length > 1;
 
   return (
     <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
@@ -58,29 +68,21 @@ export default function KasaShellHeader({
       </div>
 
       {showTabs ? (
-        <nav className="mx-auto flex max-w-6xl gap-2 px-4 pb-3 sm:px-6">
-          <Link
-            href="/kasa"
-            className={[
-              "rounded-xl px-4 py-2 text-sm font-semibold transition",
-              active === "masalar"
-                ? "bg-primary text-white"
-                : "border border-surface-container-highest bg-white text-on-background hover:bg-surface-container-low",
-            ].join(" ")}
-          >
-            Masalar
-          </Link>
-          <Link
-            href="/kasa/gel-al"
-            className={[
-              "rounded-xl px-4 py-2 text-sm font-semibold transition",
-              active === "gel-al"
-                ? "bg-primary text-white"
-                : "border border-surface-container-highest bg-white text-on-background hover:bg-surface-container-low",
-            ].join(" ")}
-          >
-            Gel-Al
-          </Link>
+        <nav className="mx-auto flex max-w-6xl flex-wrap gap-2 px-4 pb-3 sm:px-6">
+          {tabs.map((tab) => (
+            <Link
+              key={tab.id}
+              href={tab.href}
+              className={[
+                "rounded-xl px-4 py-2 text-sm font-semibold transition",
+                active === tab.id
+                  ? "bg-primary text-white"
+                  : "border border-surface-container-highest bg-white text-on-background hover:bg-surface-container-low",
+              ].join(" ")}
+            >
+              {tab.label}
+            </Link>
+          ))}
         </nav>
       ) : null}
 

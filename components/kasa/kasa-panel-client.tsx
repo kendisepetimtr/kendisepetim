@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
+import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import type { GarsonTableCell } from "@/lib/garson/tables-service";
+import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
+
+const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -64,6 +68,12 @@ export default function KasaPanelClient({ businessName, features, initialTables 
       setLoading(false);
     }
   }, []);
+
+  const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
+    streamUrl: "/api/kasa/notifications/stream",
+    refreshOnActions: REFRESH_ON_ACTIONS,
+    onRefresh: refresh,
+  });
 
   useEffect(() => {
     const id = window.setInterval(() => void refresh(), 20_000);
@@ -158,6 +168,13 @@ export default function KasaPanelClient({ businessName, features, initialTables 
           </>
         ) : null}
       </main>
+
+      <NotificationToastStack
+        toasts={toasts}
+        onDismiss={dismissToast}
+        formatTitle={formatToastTitle}
+        formatSummary={formatActivityLogSummary}
+      />
     </div>
   );
 }

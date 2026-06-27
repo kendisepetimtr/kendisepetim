@@ -37,8 +37,7 @@ export default async function TenantKasaPinPage({ params, searchParams }: Props)
             Kasa
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-7 text-secondary sm:text-base">
-            Masa ödemeleri ve online gel-al siparişlerini buradan yönetin. Paket teslimat operasyonu sonraki fazda
-            eklenecek.
+            Masa ödemeleri, online gel-al ve paket sipariş operasyonunu buradan yönetin.
           </p>
           <div className="mt-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-secondary">İşletme</p>
@@ -46,6 +45,7 @@ export default async function TenantKasaPinPage({ params, searchParams }: Props)
             <ul className="mt-2 space-y-1 text-sm text-secondary">
               {features.dineIn ? <li>{tenant.table_count} masa · masa ödemesi</li> : null}
               {features.pickup ? <li>Gel-al siparişleri</li> : null}
+              {features.delivery ? <li>Paket · kurye ve teslimat</li> : null}
             </ul>
           </div>
         </section>

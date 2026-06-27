@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import KasaPanelClient from "@/components/kasa/kasa-panel-client";
 import { loadGarsonTableGrid } from "@/lib/garson/tables-service";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
-import { getKasaFeatures } from "@/lib/kasa/kasa-access";
+import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
 
 export default async function TenantKasaPanelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -12,13 +12,11 @@ export default async function TenantKasaPanelPage({ params }: { params: Promise<
   }
 
   const features = getKasaFeatures(auth.tenant);
-  if (!features.dineIn && features.pickup) {
-    redirect("/kasa/gel-al");
+  if (!features.dineIn) {
+    redirect(getDefaultKasaPath(features));
   }
 
-  const grid = features.dineIn
-    ? await loadGarsonTableGrid(auth.tenant.id, auth.tenant.table_count ?? 0)
-    : { ok: true as const, tables: [] };
+  const grid = await loadGarsonTableGrid(auth.tenant.id, auth.tenant.table_count ?? 0);
 
   return (
     <KasaPanelClient

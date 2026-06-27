@@ -9,6 +9,17 @@ import { formatTry } from "@/lib/orders-report";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import NotificationToastStack from "@/components/notifications/notification-toast-stack";
+import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+
+const REFRESH_ON_ACTIONS = [
+  "order_created",
+  "bill_requested",
+  "payment_closed",
+  "order_status_updated",
+  "delivery_status_updated",
+  "courier_assigned",
+];
 
 const CHANNEL_TABS: { id: OrderChannelFilter; label: string }[] = [
   { id: "all", label: "Tümü" },
@@ -87,6 +98,13 @@ export default function DashboardOrdersList({ remoteAuthEnabled = false }: Dashb
       setLoading(false);
     }
   }, [channel, remoteAuthEnabled]);
+
+  const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
+    streamUrl: "/api/dashboard/notifications/stream",
+    enabled: remoteAuthEnabled,
+    refreshOnActions: REFRESH_ON_ACTIONS,
+    onRefresh: load,
+  });
 
   useEffect(() => {
     void load();
@@ -263,6 +281,13 @@ export default function DashboardOrdersList({ remoteAuthEnabled = false }: Dashb
           })}
         </ul>
       )}
+
+      <NotificationToastStack
+        toasts={toasts}
+        onDismiss={dismissToast}
+        formatTitle={formatToastTitle}
+        formatSummary={formatActivityLogSummary}
+      />
     </div>
   );
 }

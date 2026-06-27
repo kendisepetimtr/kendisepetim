@@ -283,6 +283,7 @@ export async function POST(request: Request) {
         payment_method: paymentMethod ?? "cash",
         meal_card_brand_id: paymentMethod === "meal_card" ? mealCardBrandId ?? null : null,
         order_note: orderNote,
+        delivery_status: fulfillmentType === "delivery" ? "pending" : null,
       })
       .select("id, order_code")
       .single();

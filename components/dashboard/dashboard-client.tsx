@@ -2,6 +2,7 @@
 
 import CustomersManager from "@/components/dashboard/customers-manager";
 import DashboardOrdersList from "@/components/dashboard/dashboard-orders-list";
+import DashboardNotificationsBell from "@/components/dashboard/dashboard-notifications-bell";
 import DashboardReports from "@/components/dashboard/dashboard-reports";
 import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain";
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
@@ -501,14 +502,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           </div>
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              className="hidden rounded-xl p-2 text-secondary hover:bg-surface-container-low sm:inline-flex"
-              aria-label="Bildirimler"
-              title="Yakında"
-            >
-              <span className="material-symbols-outlined text-[24px]">notifications</span>
-            </button>
+            <DashboardNotificationsBell enabled={remoteAuthEnabled} />
             <div
               className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-white sm:h-10 sm:w-10"
               title={tenant.ownerName}

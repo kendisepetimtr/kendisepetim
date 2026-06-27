@@ -48,6 +48,9 @@ export type AdminOrder = {
   fulfillmentType: FulfillmentType;
   tableNumber: number | null;
   deliveryStatus: DeliveryStatus | null;
+  courierId: string | null;
+  customerLatitude: number | null;
+  customerLongitude: number | null;
   lines: AdminOrderLine[];
   total: number;
   firstName: string;

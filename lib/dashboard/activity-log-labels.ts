@@ -9,6 +9,7 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   payment_closed: "Ödeme alındı",
   payment_method_updated: "Ödeme yöntemi güncellendi",
   delivery_completed: "Paket teslimat tamamlandı",
+  delivery_status_updated: "Paket durumu güncellendi",
   courier_assigned: "Kurye atandı",
   courier_created: "Kurye eklendi",
   courier_updated: "Kurye güncellendi",
@@ -16,6 +17,8 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   operations_settings_updated: "Operasyon ayarları güncellendi",
   staff_pin_updated: "Personel PIN güncellendi",
   bill_requested: "Hesap istendi",
+  notification_settings_updated: "Bildirim ayarları güncellendi",
+  receipt_settings_updated: "Fiş ayarları güncellendi",
 };
 
 export const ACTIVITY_ACTOR_LABELS: Record<string, string> = {

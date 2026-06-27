@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import PickupOrdersClient from "@/components/kasa/pickup-orders-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
-import { getKasaFeatures } from "@/lib/kasa/kasa-access";
+import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadKasaPickupOrders } from "@/lib/kasa/pickup-orders-service";
 
 export default async function KasaPickupOrdersPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -13,7 +13,7 @@ export default async function KasaPickupOrdersPage({ params }: { params: Promise
 
   const features = getKasaFeatures(auth.tenant);
   if (!features.pickup) {
-    redirect("/kasa");
+    redirect(getDefaultKasaPath(features));
   }
 
   const result = await loadKasaPickupOrders(auth.tenant.id);

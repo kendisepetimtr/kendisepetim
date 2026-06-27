@@ -1,6 +1,15 @@
 "use client";
 
+import ReceiptSettingsPreview from "@/components/dashboard/receipt-settings-preview";
 import type { OperationsSettingsState } from "@/lib/dashboard/operations-settings";
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NOTIFICATION_SOUND_OPTIONS,
+  type NotificationSoundId,
+  type TenantNotificationSettings,
+} from "@/lib/notification-settings";
+import { playNotificationSound } from "@/lib/notification-sounds";
+import { DEFAULT_RECEIPT_SETTINGS, type TenantReceiptSettings } from "@/lib/receipt-settings";
 import type { CourierRow } from "@/lib/supabase/courier-types";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
 import type { StaffPinRole } from "@/lib/staff/pin";
@@ -36,6 +45,14 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
   const [courierPhone, setCourierPhone] = useState("");
   const [editingCourierId, setEditingCourierId] = useState<string | null>(null);
 
+  const [notificationSettings, setNotificationSettings] = useState<TenantNotificationSettings>(
+    DEFAULT_NOTIFICATION_SETTINGS,
+  );
+  const [receiptSettings, setReceiptSettings] = useState<TenantReceiptSettings>(DEFAULT_RECEIPT_SETTINGS);
+  const [businessName, setBusinessName] = useState("");
+  const [notifSavedFlash, setNotifSavedFlash] = useState(false);
+  const [receiptSavedFlash, setReceiptSavedFlash] = useState(false);
+
   const loadSettings = useCallback(async () => {
     if (!enabled) return;
     setLoadError(null);
@@ -50,6 +67,9 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       setTableCount(data.settings.tableCount);
       setDineInEnabled(data.settings.dineInEnabled);
       setCouriers(data.settings.couriers);
+      setNotificationSettings(data.settings.notificationSettings);
+      setReceiptSettings(data.settings.receiptSettings);
+      setBusinessName(data.settings.businessName);
     } catch {
       setLoadError("Operasyon ayarları yüklenemedi.");
     }
@@ -191,6 +211,48 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       }
       await loadSettings();
     });
+  }
+
+  function handleSaveNotification(e: FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/operations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "notification-settings", patch: notificationSettings }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Kaydedilemedi.");
+        return;
+      }
+      setNotifSavedFlash(true);
+      window.setTimeout(() => setNotifSavedFlash(false), 2500);
+    });
+  }
+
+  function handleSaveReceipt(e: FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/operations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "receipt-settings", patch: receiptSettings }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Kaydedilemedi.");
+        return;
+      }
+      setReceiptSavedFlash(true);
+      window.setTimeout(() => setReceiptSavedFlash(false), 2500);
+    });
+  }
+
+  function patchReceipt<K extends keyof TenantReceiptSettings>(key: K, value: TenantReceiptSettings[K]) {
+    setReceiptSettings((prev) => ({ ...prev, [key]: value }));
   }
 
   if (!enabled) return null;
@@ -415,6 +477,265 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
           </div>
         </form>
       </div>
+
+      <form
+        onSubmit={handleSaveNotification}
+        className="rounded-2xl border border-surface-container-high bg-surface-container-low/50 p-5 sm:p-6"
+      >
+        <h3 className="font-headline text-base font-bold text-on-background">Bildirim ve zil sesi</h3>
+        <p className="mt-1 text-xs leading-relaxed text-secondary">
+          Dashboard, garson ve kasa panellerinde yeni sipariş veya hesap isteği geldiğinde ses ve toast bildirimi
+          çalar.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={notificationSettings.soundEnabled}
+              onChange={(e) =>
+                setNotificationSettings((s) => ({ ...s, soundEnabled: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+            />
+            <span className="text-sm text-on-background">Zil sesi açık</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={notificationSettings.toastEnabled}
+              onChange={(e) =>
+                setNotificationSettings((s) => ({ ...s, toastEnabled: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+            />
+            <span className="text-sm text-on-background">Ekranda toast bildirimi</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={notificationSettings.alertOnOrderCreated}
+              onChange={(e) =>
+                setNotificationSettings((s) => ({ ...s, alertOnOrderCreated: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+            />
+            <span className="text-sm text-on-background">Yeni siparişte uyar</span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={notificationSettings.alertOnBillRequested}
+              onChange={(e) =>
+                setNotificationSettings((s) => ({ ...s, alertOnBillRequested: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+            />
+            <span className="text-sm text-on-background">Hesap istendiğinde uyar</span>
+          </label>
+        </div>
+
+        <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-secondary">Zil sesi seçimi</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {NOTIFICATION_SOUND_OPTIONS.map((opt) => (
+            <label
+              key={opt.id}
+              className={[
+                "flex cursor-pointer flex-col rounded-xl border p-3 transition-colors",
+                notificationSettings.soundId === opt.id
+                  ? "border-primary bg-primary/5"
+                  : "border-surface-container-highest bg-white hover:border-primary/30",
+              ].join(" ")}
+            >
+              <span className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name={`${baseId}-sound`}
+                  checked={notificationSettings.soundId === opt.id}
+                  onChange={() =>
+                    setNotificationSettings((s) => ({ ...s, soundId: opt.id as NotificationSoundId }))
+                  }
+                  className="text-primary"
+                />
+                <span className="text-sm font-semibold text-on-background">{opt.label}</span>
+              </span>
+              <span className="mt-1 pl-6 text-xs text-secondary">{opt.description}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void playNotificationSound(opt.id);
+                }}
+                className="mt-2 ml-6 w-fit rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                Dinle
+              </button>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-60"
+          >
+            {pending ? "Kaydediliyor…" : "Bildirim ayarlarını kaydet"}
+          </button>
+          {notifSavedFlash ? <span className="text-sm font-medium text-primary">Kaydedildi</span> : null}
+        </div>
+      </form>
+
+      <form
+        onSubmit={handleSaveReceipt}
+        className="rounded-2xl border border-surface-container-high bg-surface-container-low/50 p-5 sm:p-6"
+      >
+        <h3 className="font-headline text-base font-bold text-on-background">Fiş ayarları</h3>
+        <p className="mt-1 text-xs leading-relaxed text-secondary">
+          Standart 80 mm termal yazıcı (ESC/POS) — Yemeksepeti / Getir tarzı sipariş fişi. Kasa ödemesinde
+          otomatik basılacak; yazıcı bağlantısı sonraki adımda eklenecek.
+        </p>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={receiptSettings.enabled}
+                onChange={(e) => patchReceipt("enabled", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+              />
+              <span>
+                <span className="block text-sm font-medium text-on-background">Fiş yazdırmayı etkinleştir</span>
+                <span className="mt-0.5 block text-xs text-secondary">Kasa kapanışında fiş üretilir (yakında).</span>
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={receiptSettings.autoPrintOnPayment}
+                onChange={(e) => patchReceipt("autoPrintOnPayment", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+              />
+              <span className="text-sm text-on-background">Ödeme alındığında otomatik yazdır</span>
+            </label>
+
+            <div>
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-copies`}>
+                Kopya sayısı
+              </label>
+              <input
+                id={`${baseId}-copies`}
+                type="number"
+                min={1}
+                max={3}
+                value={receiptSettings.copies}
+                onChange={(e) => patchReceipt("copies", Number(e.target.value))}
+                className="mt-1 w-24 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-paper`}>
+                Kağıt genişliği
+              </label>
+              <select
+                id={`${baseId}-paper`}
+                value={receiptSettings.paperWidthMm}
+                onChange={(e) => patchReceipt("paperWidthMm", Number(e.target.value) as 58 | 80)}
+                className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
+              >
+                <option value={80}>80 mm (standart termal)</option>
+                <option value={58}>58 mm (küçük termal)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-header`}>
+                Üst metin (opsiyonel)
+              </label>
+              <input
+                id={`${baseId}-header`}
+                value={receiptSettings.headerText}
+                onChange={(e) => patchReceipt("headerText", e.target.value)}
+                placeholder="Örn. Hoş geldiniz"
+                className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-footer`}>
+                Alt metin
+              </label>
+              <textarea
+                id={`${baseId}-footer`}
+                value={receiptSettings.footerText}
+                onChange={(e) => patchReceipt("footerText", e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
+              />
+            </div>
+
+            <fieldset className="rounded-xl border border-surface-container-highest p-3">
+              <legend className="px-1 text-xs font-semibold text-secondary">Fişte göster</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    ["showLogo", "Logo"],
+                    ["showBusinessName", "İşletme adı"],
+                    ["showOrderCode", "Sipariş no"],
+                    ["showDateTime", "Tarih / saat"],
+                    ["showTableNumber", "Sipariş tipi (Gel-Al / Paket / Masa)"],
+                    ["showCustomerInfo", "Müşteri ve adres"],
+                    ["showItemUnitPrices", "Kalem tutarları (sağda)"],
+                    ["showPaymentMethod", "Ödeme yöntemi"],
+                    ["showOrderNote", "Sipariş notu"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm text-on-background">
+                    <input
+                      type="checkbox"
+                      checked={receiptSettings[key]}
+                      onChange={(e) => patchReceipt(key, e.target.checked)}
+                      className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={receiptSettings.kitchenTicketEnabled}
+                onChange={(e) => patchReceipt("kitchenTicketEnabled", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+              />
+              <span>
+                <span className="block text-sm font-medium text-on-background">Mutfak fişi</span>
+                <span className="mt-0.5 block text-xs text-secondary">
+                  Sipariş kalemleri için ayrı mutfak çıktısı (yazıcı entegrasyonu ile).
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <ReceiptSettingsPreview businessName={businessName} settings={receiptSettings} />
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-60"
+          >
+            {pending ? "Kaydediliyor…" : "Fiş ayarlarını kaydet"}
+          </button>
+          {receiptSavedFlash ? <span className="text-sm font-medium text-primary">Kaydedildi</span> : null}
+        </div>
+      </form>
     </div>
   );
 }
