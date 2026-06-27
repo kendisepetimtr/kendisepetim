@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { kasaAccessError } from "@/lib/kasa/kasa-access";
 import { isValidStaffPin, verifyStaffPin } from "@/lib/staff/pin";
 import { getTenantBySubdomain } from "@/lib/staff/tenant-by-slug";
 import {
@@ -36,8 +37,8 @@ export async function verifyCashierPinAction(
   if (!tenant) {
     return { error: "İşletme bulunamadı." };
   }
-  if (tenant.dine_in_enabled !== true || (tenant.table_count ?? 0) < 1) {
-    return { error: "Masa servisi bu işletmede aktif değil." };
+  if (kasaAccessError(tenant)) {
+    return { error: kasaAccessError(tenant)! };
   }
   if (!tenant.cashier_pin_hash || !tenant.cashier_pin_set_at) {
     return { error: "Kasa PIN henüz tanımlanmadı. Dashboard → Ayarlar → Operasyon." };

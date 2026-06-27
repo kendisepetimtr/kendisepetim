@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import CashierPinForm from "@/components/kasa/cashier-pin-form";
 import { getCashierSessionValidForSlug } from "@/lib/kasa/cashier-tenant";
+import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { requireCashierTenantForSlug } from "@/lib/staff/guard";
 
 type Props = {
@@ -25,6 +26,7 @@ export default async function TenantKasaPinPage({ params, searchParams }: Props)
   }
 
   const pinConfigured = !!tenant.cashier_pin_hash && !!tenant.cashier_pin_set_at;
+  const features = getKasaFeatures(tenant);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-4 py-10 sm:px-6">
@@ -35,13 +37,16 @@ export default async function TenantKasaPinPage({ params, searchParams }: Props)
             Kasa
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-7 text-secondary sm:text-base">
-            Masa hesaplarını görüntüleyin, ödemeyi alın ve oturumu kapatın. Gel-al ve paket siparişler sonraki
-            fazlarda buraya eklenecek.
+            Masa ödemeleri ve online gel-al siparişlerini buradan yönetin. Paket teslimat operasyonu sonraki fazda
+            eklenecek.
           </p>
           <div className="mt-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-secondary">İşletme</p>
             <p className="mt-2 font-headline text-2xl font-bold text-on-background">{tenant.business_name}</p>
-            <p className="mt-1 text-sm text-secondary">{tenant.table_count} masa</p>
+            <ul className="mt-2 space-y-1 text-sm text-secondary">
+              {features.dineIn ? <li>{tenant.table_count} masa · masa ödemesi</li> : null}
+              {features.pickup ? <li>Gel-al siparişleri</li> : null}
+            </ul>
           </div>
         </section>
 

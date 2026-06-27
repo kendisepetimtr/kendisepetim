@@ -4,6 +4,7 @@ import { getTenantBySubdomain } from "@/lib/staff/tenant-by-slug";
 
 import { getWaiterSessionValidForSlug } from "@/lib/garson/waiter-tenant";
 import { getCashierSessionValidForSlug } from "@/lib/kasa/cashier-tenant";
+import { kasaAccessError } from "@/lib/kasa/kasa-access";
 
 
 
@@ -42,7 +43,7 @@ export async function requireCashierTenantForSlug(slug: string) {
   if (!tenant) {
     redirect("/");
   }
-  if (tenant.dine_in_enabled !== true || (tenant.table_count ?? 0) < 1) {
+  if (kasaAccessError(tenant)) {
     redirect("/");
   }
   return tenant;

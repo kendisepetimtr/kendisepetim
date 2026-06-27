@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { canUseKasa, kasaAccessError } from "@/lib/kasa/kasa-access";
 import { getTenantBySubdomain } from "@/lib/staff/tenant-by-slug";
 import { CASHIER_SESSION_COOKIE, verifyStaffSessionToken } from "@/lib/staff/session";
 
@@ -32,11 +33,9 @@ export async function getAuthenticatedCashierTenant(
   if (!tenant) {
     return { ok: false, error: "İşletme bulunamadı." };
   }
-  if (tenant.dine_in_enabled !== true) {
-    return { ok: false, error: "Masa servisi kapalı." };
-  }
-  if ((tenant.table_count ?? 0) < 1) {
-    return { ok: false, error: "Masa sayısı tanımlı değil." };
+  const accessErr = kasaAccessError(tenant);
+  if (accessErr) {
+    return { ok: false, error: accessErr };
   }
   if (!tenant.cashier_pin_hash || !tenant.cashier_pin_set_at) {
     return { ok: false, error: "Kasa PIN tanımlı değil." };
@@ -69,8 +68,8 @@ export async function getAuthenticatedCashierTenantByCookie(): Promise<
     if (!isValidCashierSessionForTenant(tenant, jar.get(CASHIER_SESSION_COOKIE)?.value)) {
       return { ok: false, error: "Kasa oturumu geçersiz." };
     }
-    if (tenant.dine_in_enabled !== true || (tenant.table_count ?? 0) < 1) {
-      return { ok: false, error: "Masa servisi kullanılamıyor." };
+    if (!canUseKasa(tenant)) {
+      return { ok: false, error: "Kasa kullanılamıyor." };
     }
     return { ok: true, tenant };
   } catch {
