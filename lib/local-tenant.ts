@@ -58,6 +58,8 @@ export type LocalTenantProfile = {
   fulfillmentPickupEnabled: boolean;
   fulfillmentDeliveryEnabled: boolean;
   minOrderAmount: number | null;
+  tableCount: number;
+  dineInEnabled: boolean;
 };
 
 export function saveLocalTenant(
@@ -102,6 +104,9 @@ export function saveLocalTenant(
       typeof data.minOrderAmount === "number" && Number.isFinite(data.minOrderAmount)
         ? data.minOrderAmount
         : null,
+    tableCount:
+      typeof data.tableCount === "number" && Number.isFinite(data.tableCount) ? Math.max(0, data.tableCount) : 0,
+    dineInEnabled: data.dineInEnabled === true,
     registeredAt: data.registeredAt ?? new Date().toISOString(),
   };
   window.localStorage.setItem(LOCAL_TENANT_STORAGE_KEY, JSON.stringify(profile));
@@ -160,6 +165,8 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const fulfillmentDeliveryEnabled = p.fulfillmentDeliveryEnabled === true;
     const minOrderAmount =
       typeof p.minOrderAmount === "number" && Number.isFinite(p.minOrderAmount) ? p.minOrderAmount : null;
+    const tableCount = typeof p.tableCount === "number" && Number.isFinite(p.tableCount) ? Math.max(0, p.tableCount) : 0;
+    const dineInEnabled = p.dineInEnabled === true;
 
     return {
       businessName: p.businessName,
@@ -191,6 +198,8 @@ export function getLocalTenant(): LocalTenantProfile | null {
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       minOrderAmount,
+      tableCount,
+      dineInEnabled,
     };
   } catch {
     return null;

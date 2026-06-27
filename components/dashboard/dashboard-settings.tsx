@@ -12,6 +12,7 @@ import {
 } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
+import DashboardOperationsSettings from "@/components/dashboard/dashboard-operations-settings";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
 
 const LOGO_MAX_FILE_BYTES = 600 * 1024;
@@ -696,6 +697,8 @@ export default function DashboardSettings({
             Çıkış yap
           </button>
         </section>
+
+        <DashboardOperationsSettings enabled={persistSettingsToSupabase} />
 
         <section className="rounded-2xl border border-error/25 bg-error/5 p-6 shadow-sm lg:col-span-2">
           <div className="flex flex-wrap items-start gap-3">

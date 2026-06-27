@@ -44,6 +44,8 @@ const TENANT_SETTINGS_COLUMNS = [
   "fulfillment_pickup_enabled",
   "fulfillment_delivery_enabled",
   "min_order_amount",
+  "table_count",
+  "dine_in_enabled",
 ].join(", ");
 
 export type TenantSettingsPatch = {

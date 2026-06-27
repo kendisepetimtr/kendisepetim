@@ -1,5 +1,5 @@
 import type { CustomerAddress } from "@/lib/customer-address";
-import type { FulfillmentType } from "@/lib/fulfillment";
+import type { DeliveryStatus, FulfillmentType } from "@/lib/fulfillment";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 
@@ -15,6 +15,7 @@ export type PublicOrderCreatePayload = {
   subdomain: string;
   orderSource: string;
   fulfillmentType: FulfillmentType;
+  tableNumber?: number;
   lines: PublicOrderLineInput[];
   total: number;
   firstName: string;
@@ -44,6 +45,9 @@ export type AdminOrder = {
   createdAt: string;
   status: OrderStatus;
   orderSource: string;
+  fulfillmentType: FulfillmentType;
+  tableNumber: number | null;
+  deliveryStatus: DeliveryStatus | null;
   lines: AdminOrderLine[];
   total: number;
   firstName: string;
@@ -52,6 +56,7 @@ export type AdminOrder = {
   email: string;
   address: CustomerAddress;
   paymentMethod: CheckoutPaymentMethod;
+  paymentMethodAtClose: CheckoutPaymentMethod | null;
   mealCardBrandId?: MealCardBrandId;
   orderNote: string;
 };

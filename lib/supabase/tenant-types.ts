@@ -43,6 +43,12 @@ export type TenantRow = {
   min_order_amount: number | null;
   owner_admin_pin_hash: string | null;
   owner_admin_pin_set_at: string | null;
+  table_count: number;
+  dine_in_enabled: boolean;
+  waiter_pin_hash: string | null;
+  waiter_pin_set_at: string | null;
+  cashier_pin_hash: string | null;
+  cashier_pin_set_at: string | null;
 };
 
 export type TenantInsert = Omit<

@@ -45,5 +45,7 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
       row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
         ? Number(row.min_order_amount)
         : null,
+    tableCount: Number.isFinite(Number(row.table_count)) ? Math.max(0, Number(row.table_count)) : 0,
+    dineInEnabled: row.dine_in_enabled === true,
   };
 }

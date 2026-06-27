@@ -1,3 +1,5 @@
+import type { FulfillmentType } from "@/lib/fulfillment";
+
 export type CustomerAddress = {
   neighborhood: string;
   street: string;
@@ -107,15 +109,15 @@ export function validateCustomerFormRequired(v: CustomerFormValues): string | nu
   return null;
 }
 
-/** Gel-al siparişte adres alanları zorunlu değil. */
+/** Gel-al ve masa siparisinde adres alanlari zorunlu degil. */
 export function validateCustomerFormForFulfillment(
   v: CustomerFormValues,
-  fulfillmentType: "pickup" | "delivery",
+  fulfillmentType: FulfillmentType,
 ): string | null {
   const t = (s: string) => s.trim();
   if (!t(v.firstName)) return "Ad zorunludur.";
   if (!t(v.lastName)) return "Soyad zorunludur.";
   if (!t(v.phone)) return "Telefon zorunludur.";
-  if (fulfillmentType === "pickup") return null;
+  if (fulfillmentType === "pickup" || fulfillmentType === "dine_in") return null;
   return validateCustomerFormRequired(v);
 }

@@ -14,7 +14,7 @@ import { clearLocalOrders } from "@/lib/local-orders";
 import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
 import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
-import { getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
+import { getDashboardQuickLinks, getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -294,20 +294,10 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   const firstName = tenant.ownerName.split(/\s+/)[0] || "işletme";
   const initials = ownerInitials(tenant.ownerName);
 
-  /** Sidebar’daki bağlantı alanı — üretim + yerelde path / alt alan adı. */
-  const sidebarConnectionLinks = getPublicMenuConnectionLinks(tenant.subdomain);
+  /** Sidebar’daki bağlantı alanı — menü + personel panelleri. */
   const quickLinks = remoteAuthEnabled
-    ? [
-        ...sidebarConnectionLinks,
-        {
-          key: "admin-panel",
-          href: "/dashboard/admin",
-          label: "Admin",
-          hint: "Sahip görünümü",
-          icon: "admin_panel_settings",
-        },
-      ]
-    : sidebarConnectionLinks;
+    ? getDashboardQuickLinks(tenant.subdomain)
+    : getPublicMenuConnectionLinks(tenant.subdomain);
 
   const dateSubtitle = new Date().toLocaleDateString("tr-TR", {
     weekday: "long",
@@ -332,7 +322,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
         : activeNav === "customers"
           ? "Kayıtlı müşteriler ve sipariş bilgileri"
           : activeNav === "orders"
-            ? "Bu cihazda kayıtlı QR siparişleri"
+            ? "Canlı siparişler — gel-al, paket ve masa"
             : activeNav === "settings"
               ? "İşletme, hesap ve veri"
               : activeNav === "qr"
@@ -468,7 +458,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           <p
             className={`mt-1.5 text-center text-[9px] leading-tight text-secondary ${sidebarCollapsed ? "lg:hidden" : ""}`}
           >
-            İkonun üzerine gelin; yerel önizleme oturumu.
+            İkonun üzerine gelin; menü ve personel panelleri.
           </p>
         </div>
       </aside>
@@ -540,7 +530,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
             {activeNav === "menu" ? (
               <MenuManager subdomain={tenant.subdomain} businessName={tenant.businessName} />
             ) : activeNav === "orders" ? (
-              <DashboardOrdersList subdomain={tenant.subdomain} />
+              <DashboardOrdersList remoteAuthEnabled={remoteAuthEnabled} />
             ) : activeNav === "customers" ? (
               <CustomersManager subdomain={tenant.subdomain} />
             ) : activeNav === "qr" ? (

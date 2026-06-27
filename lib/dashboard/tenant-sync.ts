@@ -38,6 +38,8 @@ const TENANT_SYNC_COLUMNS = [
   "fulfillment_pickup_enabled",
   "fulfillment_delivery_enabled",
   "min_order_amount",
+  "table_count",
+  "dine_in_enabled",
 ].join(", ");
 
 /** Panel profilini sunucudan okur; logo/kapak client yanıtında kırpılır. */

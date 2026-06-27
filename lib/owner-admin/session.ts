@@ -93,7 +93,7 @@ export function ownerAdminCookieOptions() {
     httpOnly: true as const,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path: "/dashboard/admin",
+    path: "/admin",
     maxAge: MAX_AGE_SEC,
   };
 }

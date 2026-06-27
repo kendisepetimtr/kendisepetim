@@ -3,6 +3,8 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { describeSupabaseEnvGap } from "@/lib/supabase/env";
 import { humanizeLoginError } from "@/lib/auth-errors";
+import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
+import { getRequestSiteUrl } from "@/lib/site-url";
 import { redirect } from "next/navigation";
 
 export type LoginActionState = { error: string } | null;
@@ -28,10 +30,16 @@ export async function loginAction(
   }
 
   const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { error: humanizeLoginError(error.message) };
+  }
+
+  const userId = signInData.user?.id;
+  if (userId && (next === "/dashboard" || next.startsWith("/dashboard/"))) {
+    const siteOrigin = await getRequestSiteUrl();
+    redirect(await resolveOwnerDashboardUrl(userId, siteOrigin));
   }
 
   redirect(next);

@@ -32,6 +32,9 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
     createdAt: row.created_at,
     status: row.status,
     orderSource: row.order_source,
+    fulfillmentType: row.fulfillment_type,
+    tableNumber: row.table_number,
+    deliveryStatus: row.delivery_status,
     total: row.total,
     firstName: row.customer_first_name,
     lastName: row.customer_last_name,
@@ -39,6 +42,7 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
     email: row.customer_email,
     address: parseAddressJson(row.address_json),
     paymentMethod: row.payment_method,
+    paymentMethodAtClose: row.payment_method_at_close,
     mealCardBrandId: row.meal_card_brand_id ?? undefined,
     orderNote: row.order_note,
     lines: (linesByOrderId.get(row.id) ?? [])

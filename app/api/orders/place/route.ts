@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writeActivityLog } from "@/lib/activity-log";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { PublicOrderCreatePayload } from "@/lib/orders";
 import { emptyCustomerAddress } from "@/lib/customer-address";
@@ -7,6 +8,7 @@ import { isWithinDeliveryRadius, asGeoPoint } from "@/lib/geo";
 import type { FulfillmentType } from "@/lib/fulfillment";
 import { clampDeliveryRadiusKm } from "@/lib/fulfillment";
 import { getProductPriceForFulfillment } from "@/lib/product-pricing";
+import { ensureTableSession } from "@/lib/table-sessions";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 
 function isUuid(id: string): boolean {
@@ -50,12 +52,22 @@ export async function POST(request: Request) {
   }
 
   const subdomain = typeof payload.subdomain === "string" ? payload.subdomain.trim().toLowerCase() : "";
-  const orderSource =
-    payload.orderSource === "marketplace" || payload.orderSource === "qr_menu" ? payload.orderSource : "qr_menu";
-  const fulfillmentType: FulfillmentType =
-    payload.fulfillmentType === "pickup" || payload.fulfillmentType === "delivery"
+  const rawOrderSource = typeof payload.orderSource === "string" ? payload.orderSource : "qr_menu";
+  const isTableOrder = rawOrderSource === "table_qr" || payload.fulfillmentType === "dine_in";
+  const orderSource = isTableOrder
+    ? "table_qr"
+    : rawOrderSource === "marketplace"
+      ? "marketplace"
+      : "qr_menu";
+  const fulfillmentType: FulfillmentType = isTableOrder
+    ? "dine_in"
+    : payload.fulfillmentType === "pickup" || payload.fulfillmentType === "delivery"
       ? payload.fulfillmentType
       : "delivery";
+  const tableNumberRaw =
+    typeof payload.tableNumber === "number" && Number.isFinite(payload.tableNumber)
+      ? Math.round(payload.tableNumber)
+      : null;
   const firstName = typeof payload.firstName === "string" ? payload.firstName.trim() : "";
   const lastName = typeof payload.lastName === "string" ? payload.lastName.trim() : "";
   const phone = typeof payload.phone === "string" ? payload.phone.trim() : "";
@@ -64,7 +76,9 @@ export async function POST(request: Request) {
   const paymentMethod =
     payload.paymentMethod === "cash" || payload.paymentMethod === "door_card" || payload.paymentMethod === "meal_card"
       ? payload.paymentMethod
-      : null;
+      : isTableOrder
+        ? "cash"
+        : null;
   const mealCardBrandId =
     payload.mealCardBrandId === "multinet" ||
     payload.mealCardBrandId === "sodexo" ||
@@ -81,8 +95,14 @@ export async function POST(request: Request) {
       ? payload.customerLongitude
       : null;
 
-  if (!subdomain || !firstName || !lastName || !phone || !paymentMethod) {
+  if (!subdomain || !firstName || !lastName || !phone) {
     return NextResponse.json({ error: "Sipariş bilgileri eksik." }, { status: 400 });
+  }
+  if (!isTableOrder && !paymentMethod) {
+    return NextResponse.json({ error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
+  }
+  if (isTableOrder && (tableNumberRaw == null || tableNumberRaw < 1)) {
+    return NextResponse.json({ error: "Geçersiz masa numarası." }, { status: 400 });
   }
 
   const rawLines = Array.isArray(payload.lines) ? payload.lines : [];
@@ -97,7 +117,7 @@ export async function POST(request: Request) {
     const { data: tenant, error: tenantError } = await svc
       .from("tenants")
       .select(
-        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount",
+        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count",
       )
       .eq("subdomain", subdomain)
       .maybeSingle();
@@ -113,7 +133,15 @@ export async function POST(request: Request) {
     const pickupEnabled = tenant.fulfillment_pickup_enabled !== false;
     const deliveryEnabled = tenant.fulfillment_delivery_enabled === true;
 
-    if (fulfillmentType === "pickup" && !pickupEnabled) {
+    if (fulfillmentType === "dine_in") {
+      if (tenant.dine_in_enabled !== true) {
+        return NextResponse.json({ error: "Masa siparişi şu an kapalı." }, { status: 409 });
+      }
+      const tableCount = Number(tenant.table_count ?? 0);
+      if (tableNumberRaw == null || tableNumberRaw < 1 || tableNumberRaw > tableCount) {
+        return NextResponse.json({ error: "Geçersiz masa numarası." }, { status: 400 });
+      }
+    } else if (fulfillmentType === "pickup" && !pickupEnabled) {
       return NextResponse.json({ error: "Gel-al siparişi şu an kabul edilmiyor." }, { status: 409 });
     }
     if (fulfillmentType === "delivery" && !deliveryEnabled) {
@@ -229,6 +257,12 @@ export async function POST(request: Request) {
     }
 
     const code = orderCode();
+    let tableSessionId: string | null = null;
+
+    if (fulfillmentType === "dine_in" && tableNumberRaw != null) {
+      tableSessionId = await ensureTableSession(svc, tenant.id, tableNumberRaw, "table_qr");
+    }
+
     const { data: insertedOrder, error: orderError } = await svc
       .from("orders")
       .insert({
@@ -236,15 +270,17 @@ export async function POST(request: Request) {
         order_code: code,
         order_source: orderSource,
         fulfillment_type: fulfillmentType,
+        table_number: fulfillmentType === "dine_in" ? tableNumberRaw : null,
+        table_session_id: tableSessionId,
         total,
         customer_first_name: firstName,
         customer_last_name: lastName,
         customer_phone: phone,
         customer_email: email,
-        address_json: fulfillmentType === "pickup" ? emptyCustomerAddress() : address,
+        address_json: fulfillmentType === "delivery" ? address : emptyCustomerAddress(),
         customer_latitude: fulfillmentType === "delivery" ? savedCustomerLat : null,
         customer_longitude: fulfillmentType === "delivery" ? savedCustomerLng : null,
-        payment_method: paymentMethod,
+        payment_method: paymentMethod ?? "cash",
         meal_card_brand_id: paymentMethod === "meal_card" ? mealCardBrandId ?? null : null,
         order_note: orderNote,
       })
@@ -267,6 +303,22 @@ export async function POST(request: Request) {
       await svc.from("orders").delete().eq("id", insertedOrder.id);
       return NextResponse.json({ error: "Sipariş kalemleri kaydedilemedi." }, { status: 500 });
     }
+
+    await writeActivityLog({
+      tenant_id: tenant.id,
+      actor_type: "customer",
+      actor_label: `${firstName} ${lastName}`.trim(),
+      action: "order_created",
+      entity_type: "order",
+      entity_id: insertedOrder.id,
+      order_code: insertedOrder.order_code as string,
+      metadata: {
+        source: orderSource,
+        fulfillment_type: fulfillmentType,
+        table: tableNumberRaw,
+        item_count: lines.length,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

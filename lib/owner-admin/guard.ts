@@ -46,7 +46,7 @@ export async function getOwnerAdminSessionValid(): Promise<boolean> {
   return isValidOwnerAdminSessionForTenant(tenant, jar.get(OWNER_ADMIN_COOKIE)?.value);
 }
 
-export async function requireOwnerAdminOrRedirect(nextPath = "/dashboard/admin"): Promise<TenantRow> {
+export async function requireOwnerAdminOrRedirect(nextPath = "/admin"): Promise<TenantRow> {
   const tenant = await getCurrentOwnerTenant();
   if (!tenant?.owner_user_id) {
     redirect(`/giris?next=${encodeURIComponent(nextPath)}`);
@@ -55,7 +55,7 @@ export async function requireOwnerAdminOrRedirect(nextPath = "/dashboard/admin")
   const jar = await cookies();
   const isValid = isValidOwnerAdminSessionForTenant(tenant, jar.get(OWNER_ADMIN_COOKIE)?.value);
   if (!isValid) {
-    redirect(`/dashboard/admin/pin?next=${encodeURIComponent(nextPath)}`);
+    redirect(`/admin/pin?next=${encodeURIComponent(nextPath)}`);
   }
 
   return tenant;

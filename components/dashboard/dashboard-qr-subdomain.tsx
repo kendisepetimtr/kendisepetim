@@ -6,6 +6,7 @@ import {
   getPrimaryPublicMenuUrl,
   getPublicMenuConnectionLinks,
   getPublicMenuPathUrl,
+  getTableMenuUrl,
   type PublicMenuConnectionLink,
 } from "@/lib/public-menu-urls";
 import type { LocalTenantProfile } from "@/lib/local-tenant";
@@ -21,6 +22,8 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
   const [selectedKey, setSelectedKey] = useState<string>("");
   const [copyFlash, setCopyFlash] = useState<string | null>(null);
   const [downloadBusy, setDownloadBusy] = useState(false);
+  const [tableDownloadBusy, setTableDownloadBusy] = useState(false);
+  const [tableDownloadProgress, setTableDownloadProgress] = useState<string | null>(null);
 
   useEffect(() => {
     setLinks(getPublicMenuConnectionLinks(tenant.subdomain));
@@ -94,6 +97,92 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
       setDownloadBusy(false);
     }
   }
+
+  const tableNumbers = useMemo(() => {
+    if (!tenant.dineInEnabled || tenant.tableCount < 1) return [];
+    return Array.from({ length: tenant.tableCount }, (_, i) => i + 1);
+  }, [tenant.dineInEnabled, tenant.tableCount]);
+
+  const [selectedTable, setSelectedTable] = useState(1);
+
+  useEffect(() => {
+    if (tableNumbers.length && !tableNumbers.includes(selectedTable)) {
+      setSelectedTable(tableNumbers[0]!);
+    }
+  }, [tableNumbers, selectedTable]);
+
+  const tableSiteOrigin = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    const { protocol, hostname, port } = window.location;
+    const hostPort = port && port !== "80" && port !== "443" ? `:${port}` : "";
+    return `${protocol}//${hostname}${hostPort}`;
+  }, []);
+
+  const getTableMenuHref = useCallback(
+    (tableNumber: number) => getTableMenuUrl(tenant.subdomain, tableNumber, tableSiteOrigin),
+    [tenant.subdomain, tableSiteOrigin],
+  );
+
+  async function downloadTableQrPng(tableNumber: number) {
+    const href = getTableMenuHref(tableNumber);
+    const logoSrc = tenant.logoDataUrl.trim() ? tenant.logoDataUrl : defaultKendiSepetimLogoUrl();
+    const fallbackSrc = qrCodeApiUrl(href, 320);
+    const composite = await createQrPngWithCenterLogo(href, 320, logoSrc);
+    if (composite) {
+      const res = await fetch(composite);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kendisepetim-masa-${tenant.subdomain}-${tableNumber}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    const res = await fetch(fallbackSrc);
+    if (!res.ok) throw new Error("fetch");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kendisepetim-masa-${tenant.subdomain}-${tableNumber}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleDownloadTablePng(tableNumber: number) {
+    setTableDownloadBusy(true);
+    try {
+      await downloadTableQrPng(tableNumber);
+    } catch {
+      window.open(qrCodeApiUrl(getTableMenuHref(tableNumber), 320), "_blank", "noopener,noreferrer");
+    } finally {
+      setTableDownloadBusy(false);
+    }
+  }
+
+  async function handleDownloadAllTableQr() {
+    if (!tableNumbers.length) return;
+    setTableDownloadBusy(true);
+    setTableDownloadProgress(`0 / ${tableNumbers.length}`);
+    try {
+      for (let i = 0; i < tableNumbers.length; i++) {
+        const n = tableNumbers[i]!;
+        setTableDownloadProgress(`${i + 1} / ${tableNumbers.length}`);
+        await downloadTableQrPng(n);
+        if (i < tableNumbers.length - 1) {
+          await new Promise((r) => window.setTimeout(r, 400));
+        }
+      }
+    } catch {
+      window.alert("Toplu indirme sırasında hata oluştu. Masaları tek tek indirmeyi deneyin.");
+    } finally {
+      setTableDownloadBusy(false);
+      setTableDownloadProgress(null);
+    }
+  }
+
+  const selectedTableHref = tableNumbers.length ? getTableMenuHref(selectedTable) : null;
 
   return (
     <div className="space-y-8">
@@ -269,6 +358,131 @@ export default function DashboardQrSubdomain({ tenant }: DashboardQrSubdomainPro
           ))}
         </ul>
       </section>
+
+      {tableNumbers.length > 0 ? (
+        <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
+          <h2 className="font-headline text-lg font-bold text-on-background">Masa QR kodları</h2>
+          <p className="mt-1 text-sm text-secondary">
+            Her masa için ayrı menü adresi:{" "}
+            <span className="font-mono text-on-background/90">
+              {tenant.subdomain}.kendisepetim.com/masa/N
+            </span>
+            . Müşteriler masadan sipariş verir; ödeme kasada alınır.
+          </p>
+
+          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-surface-container-high bg-white p-6 lg:flex-row lg:items-start lg:gap-8">
+            {selectedTableHref ? (
+              <QrCodeWithLogoPreview
+                menuUrl={selectedTableHref}
+                tenantLogoDataUrl={tenant.logoDataUrl}
+                displaySize={200}
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-table-select`}>
+                Önizleme masası
+              </label>
+              <select
+                id={`${baseId}-table-select`}
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(Number(e.target.value))}
+                className="mt-1 w-full max-w-xs rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                {tableNumbers.map((n) => (
+                  <option key={n} value={n}>
+                    Masa {n}
+                  </option>
+                ))}
+              </select>
+              {selectedTableHref ? (
+                <>
+                  <p className="mt-3 break-all font-mono text-xs leading-relaxed text-on-background">
+                    {selectedTableHref}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyText(`table-${selectedTable}`, selectedTableHref)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-highest bg-white px-4 py-2.5 text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">link</span>
+                      {copyFlash === `table-${selectedTable}` ? "Kopyalandı" : "Adresi kopyala"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={tableDownloadBusy}
+                      onClick={() => void handleDownloadTablePng(selectedTable)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-highest bg-white px-4 py-2.5 text-sm font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">download</span>
+                      Masa {selectedTable} PNG
+                    </button>
+                    <button
+                      type="button"
+                      disabled={tableDownloadBusy}
+                      onClick={() => void handleDownloadAllTableQr()}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-container disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">folder_zip</span>
+                      {tableDownloadBusy
+                        ? tableDownloadProgress
+                          ? `İndiriliyor… ${tableDownloadProgress}`
+                          : "İndiriliyor…"
+                        : `Tümünü indir (${tableNumbers.length})`}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-6 max-h-80 overflow-y-auto rounded-xl border border-surface-container-high">
+            <table className="w-full min-w-[320px] text-left text-sm">
+              <thead className="sticky top-0 bg-surface-container-low text-xs font-semibold uppercase tracking-wide text-secondary">
+                <tr>
+                  <th className="px-4 py-3">Masa</th>
+                  <th className="px-4 py-3">Adres</th>
+                  <th className="px-4 py-3 text-right">İşlem</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-container-high">
+                {tableNumbers.map((n) => {
+                  const href = getTableMenuHref(n);
+                  return (
+                    <tr key={n} className="bg-white/80 hover:bg-surface-container-low/60">
+                      <td className="whitespace-nowrap px-4 py-2.5 font-headline font-bold text-on-background">
+                        {n}
+                      </td>
+                      <td className="max-w-[240px] truncate px-4 py-2.5 font-mono text-xs text-secondary" title={href}>
+                        {href.replace(/^https:\/\//, "")}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                        <div className="inline-flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => copyText(`table-row-${n}`, href)}
+                            className="rounded-lg border border-surface-container-highest bg-white px-2.5 py-1 text-xs font-semibold text-on-background hover:bg-surface-container-low"
+                          >
+                            {copyFlash === `table-row-${n}` ? "✓" : "Kopyala"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={tableDownloadBusy}
+                            onClick={() => void handleDownloadTablePng(n)}
+                            className="rounded-lg border border-surface-container-highest bg-white px-2.5 py-1 text-xs font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-60"
+                          >
+                            PNG
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

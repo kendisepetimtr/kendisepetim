@@ -57,7 +57,10 @@ type CartCheckoutModalProps = {
   visibleProducts: LocalMenuProduct[];
   paymentFlags: TenantPaymentFlags;
   fulfillmentFlags: TenantFulfillmentFlags;
-  orderSource?: "qr_menu" | "marketplace";
+  orderSource?: "qr_menu" | "marketplace" | "table_qr";
+  tableNumber?: number;
+  /** Garson panelinden siparis — musteri formu yok */
+  waiterMode?: boolean;
   /** Menü subdomain (işletme kimliği) */
   subdomain: string;
   orderingEnabled: boolean;
@@ -73,14 +76,20 @@ export default function CartCheckoutModal({
   paymentFlags,
   fulfillmentFlags,
   orderSource = "qr_menu",
+  tableNumber,
+  waiterMode = false,
   subdomain,
   orderingEnabled,
   closedMessage,
 }: CartCheckoutModalProps) {
   const baseId = useId();
-  const defaultFulfillment = resolveDefaultFulfillmentType(fulfillmentFlags);
+  const isTableOrder = tableNumber != null && tableNumber > 0;
+  const isWaiterOrder = waiterMode && isTableOrder;
+  const defaultFulfillment = isTableOrder ? "dine_in" : resolveDefaultFulfillmentType(fulfillmentFlags);
   const [step, setStep] = useState<Step>("cart");
-  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(defaultFulfillment ?? "pickup");
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(
+    isTableOrder ? "dine_in" : defaultFulfillment ?? "pickup",
+  );
   const [customerLatitude, setCustomerLatitude] = useState<number | null>(null);
   const [customerLongitude, setCustomerLongitude] = useState<number | null>(null);
   const [formValues, setFormValues] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
@@ -244,6 +253,43 @@ export default function CartCheckoutModal({
       window.alert(closedMessage);
       return;
     }
+
+    const lines: LocalOrderLine[] = cartLines.map(({ product: p, qty, removedIngredients }) => ({
+      productId: p.id,
+      name: p.name,
+      qty,
+      unitPrice: getProductPriceForFulfillment(p, fulfillmentType),
+      removedIngredients: removedIngredients.length > 0 ? removedIngredients : undefined,
+    }));
+
+    if (isWaiterOrder) {
+      setSubmitting(true);
+      try {
+        const response = await fetch("/api/garson/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tableNumber,
+            lines,
+            orderNote: formValues.orderNote.trim(),
+          }),
+        });
+        const result = (await response.json()) as { ok?: boolean; orderCode?: string; error?: string };
+        if (!response.ok || !result.ok || !result.orderCode) {
+          window.alert(result.error ?? "Sipariş kaydedilemedi.");
+          return;
+        }
+        setCart({});
+        onClose();
+        window.alert(`Sipariş masaya iletildi.\nNo: ${result.orderCode}`);
+      } catch {
+        window.alert("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     const err = validateCustomerFormForFulfillment(formValues, fulfillmentType);
     if (err) {
       window.alert(err);
@@ -253,16 +299,19 @@ export default function CartCheckoutModal({
       window.alert("Teslimat için «Konum al» ile adresinizi paylaşın.");
       return;
     }
-    if (!payMethod) {
+    if (!payMethod && !isTableOrder) {
       window.alert("Lütfen bir ödeme yöntemi seçin.");
       return;
     }
-    if (payMethod === "meal_card") {
+    if (payMethod === "meal_card" && !isTableOrder) {
       if (!mealBrand) {
         window.alert("Lütfen yemek kartı türünü seçin.");
         return;
       }
     }
+
+    const resolvedPayMethod: CheckoutPaymentMethod = isTableOrder ? "cash" : (payMethod as CheckoutPaymentMethod);
+    const resolvedOrderSource = isTableOrder ? "table_qr" : orderSource;
 
     const addr = {
       neighborhood: formValues.neighborhood.trim(),
@@ -276,13 +325,7 @@ export default function CartCheckoutModal({
       block: formValues.block.trim(),
     };
 
-    const lines: LocalOrderLine[] = cartLines.map(({ product: p, qty, removedIngredients }) => ({
-      productId: p.id,
-      name: p.name,
-      qty,
-      unitPrice: getProductPriceForFulfillment(p, fulfillmentType),
-      removedIngredients: removedIngredients.length > 0 ? removedIngredients : undefined,
-    }));
+    const linesForPlace: LocalOrderLine[] = lines;
 
     setSubmitting(true);
 
@@ -292,9 +335,10 @@ export default function CartCheckoutModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subdomain,
-          orderSource,
-          fulfillmentType,
-          lines,
+          orderSource: isTableOrder ? "table_qr" : orderSource,
+          fulfillmentType: isTableOrder ? "dine_in" : fulfillmentType,
+          tableNumber: isTableOrder ? tableNumber : undefined,
+          lines: linesForPlace,
           total: cartTotal,
           firstName: formValues.firstName.trim(),
           lastName: formValues.lastName.trim(),
@@ -303,8 +347,9 @@ export default function CartCheckoutModal({
           address: addr,
           customerLatitude: fulfillmentType === "delivery" ? customerLatitude : null,
           customerLongitude: fulfillmentType === "delivery" ? customerLongitude : null,
-          paymentMethod: payMethod,
-          mealCardBrandId: payMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
+          paymentMethod: resolvedPayMethod,
+          mealCardBrandId:
+            resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
           orderNote: formValues.orderNote.trim(),
         }),
       });
@@ -322,18 +367,18 @@ export default function CartCheckoutModal({
 
       const order: LocalOrder = {
         id: result.orderCode,
-      subdomain: subdomain.toLowerCase(),
-      createdAt: new Date().toISOString(),
-      orderSource: "qr_menu",
-        lines,
+        subdomain: subdomain.toLowerCase(),
+        createdAt: new Date().toISOString(),
+        orderSource: resolvedOrderSource,
+        lines: linesForPlace,
         total: cartTotal,
         firstName: formValues.firstName.trim(),
         lastName: formValues.lastName.trim(),
         phone: formValues.phone.trim(),
         email: formValues.email.trim(),
         address: addr,
-        paymentMethod: payMethod,
-        mealCardBrandId: payMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
+        paymentMethod: resolvedPayMethod,
+        mealCardBrandId: resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
         orderNote: formValues.orderNote.trim(),
       };
 
@@ -344,22 +389,25 @@ export default function CartCheckoutModal({
         phone: order.phone,
         email: order.email,
         address: addr,
-        orderSource: "qr_menu",
-        lastPaymentMethod: payMethod,
-        lastMealCardBrandId: payMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
+        orderSource: resolvedOrderSource,
+        lastPaymentMethod: resolvedPayMethod,
+        lastMealCardBrandId:
+          resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
       });
       saveQrCheckoutSession(
         subdomain,
         formValues,
-        payMethod === "meal_card"
-          ? { method: payMethod, mealCardBrandId: mealBrand as MealCardBrandId }
-          : { method: payMethod },
+        resolvedPayMethod === "meal_card"
+          ? { method: resolvedPayMethod, mealCardBrandId: mealBrand as MealCardBrandId }
+          : { method: resolvedPayMethod },
       );
 
       setCart({});
       onClose();
       window.alert(
-        `Siparişiniz alındı.\nNo: ${order.id}\nÖdeme: ${paymentMethodLabel(payMethod, mealBrand || undefined)}`,
+        isTableOrder
+          ? `Siparişiniz masaya iletildi.\nNo: ${result.orderCode}\nÖdeme restoranda alınacaktır.`
+          : `Siparişiniz alındı.\nNo: ${result.orderCode}\nÖdeme: ${paymentMethodLabel(resolvedPayMethod, mealBrand || undefined)}`,
       );
     } catch {
       window.alert("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
@@ -540,11 +588,17 @@ export default function CartCheckoutModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setStep("checkout")}
-                    disabled={!orderingEnabled}
-                    className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98]"
+                    onClick={() => (isWaiterOrder ? void handleConfirmOrder() : setStep("checkout"))}
+                    disabled={!orderingEnabled || submitting}
+                    className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
                   >
-                    {orderingEnabled ? "Devam et" : "Restoran kapalı"}
+                    {submitting
+                      ? "Gönderiliyor…"
+                      : orderingEnabled
+                        ? isWaiterOrder
+                          ? "Masaya gönder"
+                          : "Devam et"
+                        : "Restoran kapalı"}
                   </button>
                   <button
                     type="button"
@@ -574,8 +628,9 @@ export default function CartCheckoutModal({
                 </p>
               ) : null}
               <p className="text-xs text-secondary">
-                Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir
-                sonraki siparişinizde hızlanır.
+                {isTableOrder
+                  ? "Adınızı girin; sipariş masanıza iletilecek. Ödeme kasada alınır."
+                  : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
               </p>
               <div className="mt-4 rounded-xl border border-surface-container-high bg-surface-container-low/50 px-3 py-2 text-xs">
                 <span className="font-semibold text-on-background">Ara toplam:</span>{" "}
@@ -583,7 +638,8 @@ export default function CartCheckoutModal({
               </div>
 
               <div className="mt-6">
-                {(showFulfillmentChoice || fulfillmentFlags.fulfillmentPickupEnabled || fulfillmentFlags.fulfillmentDeliveryEnabled) ? (
+                {!isTableOrder &&
+                (showFulfillmentChoice || fulfillmentFlags.fulfillmentPickupEnabled || fulfillmentFlags.fulfillmentDeliveryEnabled) ? (
                   <div className="mb-6">
                     <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sipariş tipi</p>
                     {showFulfillmentChoice ? (
@@ -615,6 +671,10 @@ export default function CartCheckoutModal({
                       </p>
                     ) : null}
                   </div>
+                ) : isTableOrder ? (
+                  <p className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary">
+                    Masa {tableNumber} · Ödeme kasada
+                  </p>
                 ) : null}
 
                 <CustomerIdentityAddressForm
@@ -623,14 +683,15 @@ export default function CartCheckoutModal({
                   onChange={setFormValues}
                   showPrefillNotice
                   showOrderNote
-                  hideAddress={fulfillmentType === "pickup"}
-                  showLocationButton={fulfillmentType === "delivery"}
+                  hideAddress={isTableOrder || fulfillmentType === "pickup"}
+                  showLocationButton={!isTableOrder && fulfillmentType === "delivery"}
                   locationLoading={locLoading}
                   locationMessage={locMsg}
                   onRequestLocation={handleRequestLocation}
                 />
               </div>
 
+              {!isTableOrder ? (
               <div className="mt-8">
                 <CheckoutPaymentSelector
                   options={paymentFlags}
@@ -643,6 +704,7 @@ export default function CartCheckoutModal({
                   onMealCardBrandChange={setMealBrand}
                 />
               </div>
+              ) : null}
             </div>
 
             <div className="shrink-0 border-t border-surface-container-high bg-surface-container-low/60 px-5 py-4">

@@ -146,7 +146,7 @@ export async function superadminSetOwnerAdminPin(
 
   if (error) return { error: error.message };
   revalidatePath("/superadmin");
-  revalidatePath("/dashboard/admin", "layout");
+  revalidatePath("/admin", "layout");
   return {};
 }
 

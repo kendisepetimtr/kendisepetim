@@ -15,9 +15,17 @@ import {
 } from "@/lib/orders-report";
 import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
-import { changeOwnerAdminPinAction, updateOwnerOrderStatusAction } from "@/app/dashboard/admin/actions";
+import { changeOwnerAdminPinAction, cancelAdminOrderAction } from "@/app/dashboard/admin/actions";
 import type { OwnerAdminPinActionState } from "@/app/dashboard/admin/actions";
 import type { OrderStatus } from "@/lib/supabase/order-types";
+import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
+import {
+  ACTIVITY_ACTION_LABELS,
+  ACTIVITY_ACTOR_LABELS,
+  formatActivityLogSummary,
+} from "@/lib/dashboard/activity-log-labels";
+import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 
 const PERIODS: { id: ReportPeriod; label: string }[] = [
   { id: "7d", label: "Son 7 gün" },
@@ -34,18 +42,13 @@ const STATUS_FILTERS: { id: "all" | OrderStatus; label: string }[] = [
   { id: "cancelled", label: "İptal" },
 ];
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  new: "Yeni",
-  confirmed: "Onaylandı",
-  preparing: "Hazırlanıyor",
-  completed: "Tamamlandı",
-  cancelled: "İptal",
-};
+const STATUS_LABELS = ORDER_STATUS_LABELS;
 
 const NAV_MAIN = [
   { id: "overview", label: "Özet", icon: "space_dashboard" },
   { id: "orders", label: "Siparişler", icon: "receipt_long" },
   { id: "reports", label: "Raporlar", icon: "bar_chart" },
+  { id: "logs", label: "Loglar", icon: "history" },
 ] as const;
 
 const NAV_SETTINGS = { id: "settings", label: "Ayarlar", icon: "settings" } as const;
@@ -133,7 +136,7 @@ function AdminSidebarBrand({
   logoUrl: string | null;
 }) {
   return (
-    <a href="/dashboard/admin" className="flex min-w-0 items-center gap-3">
+    <a href="/admin" className="flex min-w-0 items-center gap-3">
       <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-surface-container-highest bg-white shadow-sm">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -288,7 +291,7 @@ function OverviewSection({
               <h2 className="font-headline text-lg font-bold text-on-background">Anlık görünüm</h2>
               <p className="mt-1 text-sm text-secondary">Sahibin restoranda o anda olup biteni uzaktan izlemesi için.</p>
             </div>
-            <a href="/dashboard/admin" className="text-sm font-semibold text-primary hover:text-primary-container">
+            <a href="/admin" className="text-sm font-semibold text-primary hover:text-primary-container">
               Yenile
             </a>
           </div>
@@ -407,6 +410,95 @@ function OverviewSection({
   );
 }
 
+function channelRevenueSummary(orders: AdminOrder[]) {
+  const buckets = {
+    pickup: { count: 0, revenue: 0 },
+    delivery: { count: 0, revenue: 0 },
+    dine_in: { count: 0, revenue: 0 },
+  };
+  for (const order of orders) {
+    if (order.status === "cancelled") continue;
+    const bucket = buckets[order.fulfillmentType];
+    bucket.count += 1;
+    bucket.revenue += order.total;
+  }
+  return buckets;
+}
+
+function LogsSection({ logs }: { logs: ActivityLogRow[] }) {
+  const [actionFilter, setActionFilter] = useState<string>("all");
+
+  const actions = useMemo(() => {
+    const set = new Set(logs.map((l) => l.action));
+    return ["all", ...Array.from(set).sort()];
+  }, [logs]);
+
+  const filtered = useMemo(
+    () => (actionFilter === "all" ? logs : logs.filter((l) => l.action === actionFilter)),
+    [logs, actionFilter],
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">Loglar</h1>
+        <p className="mt-2 max-w-2xl text-sm text-secondary">
+          Garson, kasa, dashboard ve admin panelindeki operasyon kayıtları. Son {logs.length} kayıt gösterilir.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {actions.map((action) => (
+          <button
+            key={action}
+            type="button"
+            onClick={() => setActionFilter(action)}
+            className={[
+              "rounded-full px-3 py-1.5 text-xs font-semibold",
+              actionFilter === action
+                ? "bg-primary text-on-primary"
+                : "border border-surface-container-highest bg-white text-secondary",
+            ].join(" ")}
+          >
+            {action === "all" ? "Tümü" : ACTIVITY_ACTION_LABELS[action] ?? action}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/50 px-6 py-16 text-center text-sm text-secondary">
+          Henüz operasyon logu yok.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {filtered.map((log) => (
+            <li
+              key={log.id}
+              className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest px-4 py-3 shadow-sm"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-on-background">
+                    {ACTIVITY_ACTION_LABELS[log.action] ?? log.action}
+                  </p>
+                  <p className="mt-0.5 text-xs text-secondary">{formatActivityLogSummary(log)}</p>
+                </div>
+                <time className="text-xs text-secondary">
+                  {new Date(log.created_at).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}
+                </time>
+              </div>
+              <p className="mt-2 text-xs text-secondary">
+                {ACTIVITY_ACTOR_LABELS[log.actor_type] ?? log.actor_type}
+                {log.actor_label ? ` · ${log.actor_label}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function OwnerAdminPanel({
   businessName,
   subdomain,
@@ -416,6 +508,7 @@ export default function OwnerAdminPanel({
   openTime,
   closeTime,
   initialOrders,
+  initialLogs,
 }: {
   businessName: string;
   subdomain: string;
@@ -425,6 +518,7 @@ export default function OwnerAdminPanel({
   openTime: string;
   closeTime: string;
   initialOrders: AdminOrder[];
+  initialLogs: ActivityLogRow[];
 }) {
   const router = useRouter();
   const [activeNav, setActiveNav] = useState<AdminNavId>("overview");
@@ -467,10 +561,11 @@ export default function OwnerAdminPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
-  function setOrderStatus(orderId: string, status: OrderStatus) {
+  function cancelOrder(orderId: string) {
+    if (!window.confirm("Bu siparişi iptal etmek istediğinize emin misiniz?")) return;
     startTransition(async () => {
       setStatusError(null);
-      const result = await updateOwnerOrderStatusAction(orderId, status);
+      const result = await cancelAdminOrderAction(orderId);
       if (result.error) {
         setStatusError(result.error);
         return;
@@ -478,6 +573,8 @@ export default function OwnerAdminPanel({
       router.refresh();
     });
   }
+
+  const channelSummary = useMemo(() => channelRevenueSummary(filteredByPeriod), [filteredByPeriod]);
 
   const headerTitle = getNavLabel(activeNav);
   const headerSubtitle =
@@ -487,7 +584,9 @@ export default function OwnerAdminPanel({
         ? "Aktif ve geçmiş sipariş akışı"
         : activeNav === "reports"
           ? "Dönemsel analiz, ciro ve ürün performansı"
-          : "PIN güvenliği ve yönetici kısayolları";
+          : activeNav === "logs"
+            ? "Operasyon geçmişi ve denetim kayıtları"
+            : "PIN güvenliği ve yönetici kısayolları";
 
   return (
     <div className="min-h-screen bg-background">
@@ -660,6 +759,30 @@ export default function OwnerAdminPanel({
                   </div>
                 </div>
 
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Gel-al ciro</p>
+                    <p className="mt-2 font-headline text-2xl font-extrabold text-on-background">
+                      {formatTry(channelSummary.pickup.revenue)}
+                    </p>
+                    <p className="mt-1 text-xs text-secondary">{channelSummary.pickup.count} sipariş</p>
+                  </div>
+                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Paket ciro</p>
+                    <p className="mt-2 font-headline text-2xl font-extrabold text-on-background">
+                      {formatTry(channelSummary.delivery.revenue)}
+                    </p>
+                    <p className="mt-1 text-xs text-secondary">{channelSummary.delivery.count} sipariş</p>
+                  </div>
+                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Masa ciro</p>
+                    <p className="mt-2 font-headline text-2xl font-extrabold text-on-background">
+                      {formatTry(channelSummary.dine_in.revenue)}
+                    </p>
+                    <p className="mt-1 text-xs text-secondary">{channelSummary.dine_in.count} sipariş</p>
+                  </div>
+                </div>
+
                 <div className="grid gap-6 lg:grid-cols-2">
                   <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
                     <h2 className="font-headline text-lg font-bold text-on-background">Ödeme yöntemi dağılımı</h2>
@@ -762,8 +885,8 @@ export default function OwnerAdminPanel({
                       Siparişler
                     </h1>
                     <p className="mt-2 max-w-2xl text-sm text-secondary">
-                      Bu alan aktif sipariş takibi ve detay inceleme için admin görünümüdür. Sipariş sistemi
-                      geliştikçe daha fazla canlı metrik burada gösterilecek.
+                      Salt okunur sipariş görünümü. Admin panelinde yalnızca iptal yapılabilir; operasyon dashboard
+                      ve personel panellerinden yönetilir.
                     </p>
                   </div>
                   <div
@@ -795,7 +918,7 @@ export default function OwnerAdminPanel({
                       <h2 className="font-headline text-xl font-bold text-on-background">Sipariş listesi</h2>
                       <p className="mt-1 text-sm text-secondary">Filtreye uyan toplam {filteredOrders.length} kayıt</p>
                     </div>
-                    {pending ? <p className="text-xs font-semibold text-primary">Durum güncelleniyor…</p> : null}
+                    {pending ? <p className="text-xs font-semibold text-primary">İşlem yapılıyor…</p> : null}
                   </div>
                   {statusError ? (
                     <p className="mt-4 rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{statusError}</p>
@@ -823,6 +946,7 @@ export default function OwnerAdminPanel({
                                   {order.orderCode} · {order.firstName} {order.lastName}
                                 </p>
                                 <p className="mt-1 text-xs text-secondary">
+                                  {fulfillmentTypeLabel(order.fulfillmentType)} ·{" "}
                                   {new Date(order.createdAt).toLocaleString("tr-TR", {
                                     dateStyle: "short",
                                     timeStyle: "short",
@@ -839,23 +963,18 @@ export default function OwnerAdminPanel({
                             </button>
                             {expanded ? (
                               <div className="border-t border-surface-container-high bg-surface-container-low/40 px-4 py-4">
-                                <div className="mb-4 flex flex-wrap items-center gap-3">
-                                  <label className="text-xs font-semibold uppercase tracking-wide text-secondary">
-                                    Durum
-                                  </label>
-                                  <select
-                                    value={order.status}
-                                    disabled={pending}
-                                    onChange={(e) => setOrderStatus(order.id, e.target.value as OrderStatus)}
-                                    className="rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-primary"
-                                  >
-                                    {STATUS_FILTERS.filter((item) => item.id !== "all").map((item) => (
-                                      <option key={item.id} value={item.id}>
-                                        {item.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
+                                {order.status !== "cancelled" && order.status !== "completed" ? (
+                                  <div className="mb-4">
+                                    <button
+                                      type="button"
+                                      disabled={pending}
+                                      onClick={() => cancelOrder(order.id)}
+                                      className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+                                    >
+                                      Siparişi iptal et
+                                    </button>
+                                  </div>
+                                ) : null}
                                 <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Ürünler</p>
                                 <ul className="mt-2 space-y-2 text-sm text-secondary">
                                   {order.lines.map((line) => (
@@ -906,6 +1025,8 @@ export default function OwnerAdminPanel({
                 </section>
               </div>
             ) : null}
+
+            {activeNav === "logs" ? <LogsSection logs={initialLogs} /> : null}
 
             {activeNav === "settings" ? (
               <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

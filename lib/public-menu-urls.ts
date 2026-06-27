@@ -27,6 +27,79 @@ export function getPublicMenuPathUrl(
   return `${origin.replace(/\/$/, "")}/m/${encodeURIComponent(subdomain)}`;
 }
 
+/** Masa menusu URL — slug.kendisepetim.com/masa/5 */
+export function getTableMenuUrl(
+  subdomain: string,
+  tableNumber: number,
+  siteOrigin?: string,
+): string {
+  const path = `/masa/${tableNumber}`;
+  if (siteOrigin) {
+    try {
+      const origin = new URL(siteOrigin);
+      if (origin.hostname === "localhost" || origin.hostname === "127.0.0.1") {
+        const port = origin.port && origin.port !== "80" && origin.port !== "443" ? `:${origin.port}` : "";
+        return `${origin.protocol}//${subdomain}.localhost${port}${path}`;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return `https://${subdomain}.kendisepetim.com${path}`;
+}
+
+/** Path fallback — kendisepetim.com/m/slug/masa/N */
+export function getTableMenuPathUrl(
+  subdomain: string,
+  tableNumber: number,
+  origin: string = PRODUCTION_SITE_ORIGIN,
+): string {
+  return `${origin.replace(/\/$/, "")}/m/${encodeURIComponent(subdomain)}/masa/${tableNumber}`;
+}
+
+export function getTenantPanelQuickLinks(subdomain: string): PublicMenuConnectionLink[] {
+  return [
+    {
+      key: "panel-garson",
+      href: "/garson",
+      label: "Garson",
+      hint: "Garson paneli",
+      icon: "room_service",
+    },
+    {
+      key: "panel-kasa",
+      href: "/kasa",
+      label: "Kasa",
+      hint: "Kasa modu",
+      icon: "point_of_sale",
+    },
+    {
+      key: "panel-admin",
+      href: "/admin",
+      label: "Admin",
+      hint: "Patron görünümü",
+      icon: "admin_panel_settings",
+    },
+  ];
+}
+
+/** Panel sidebar: canli menu + personel panelleri. */
+export function getDashboardQuickLinks(subdomain: string): PublicMenuConnectionLink[] {
+  const menuLinks = getPublicMenuConnectionLinks(subdomain);
+  const primaryMenu = menuLinks.find((l) => l.key === "live-menu-prod") ?? menuLinks[0];
+  const menuPreview =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? menuLinks.find((l) => l.key === "live-menu-subdomain")
+      : null;
+
+  return [
+    ...(primaryMenu ? [primaryMenu] : []),
+    ...(menuPreview ? [menuPreview] : []),
+    ...getTenantPanelQuickLinks(subdomain),
+  ];
+}
+
 /**
  * Panelden gösterilecek müşteri menüsü adresleri (geliştirme + üretim).
  * İlk kayıt her zaman resmi subdomain adresidir.

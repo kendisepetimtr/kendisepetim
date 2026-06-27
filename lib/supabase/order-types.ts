@@ -1,5 +1,5 @@
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
-import type { FulfillmentType } from "@/lib/fulfillment";
+import type { DeliveryStatus, FulfillmentType, OrderSource } from "@/lib/fulfillment";
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "completed" | "cancelled";
 
@@ -9,7 +9,7 @@ export type OrderRow = {
   updated_at: string;
   tenant_id: string;
   order_code: string;
-  order_source: string;
+  order_source: OrderSource;
   status: OrderStatus;
   total: number;
   customer_first_name: string;
@@ -18,11 +18,16 @@ export type OrderRow = {
   customer_email: string;
   address_json: Record<string, unknown>;
   payment_method: CheckoutPaymentMethod;
+  payment_method_at_close: CheckoutPaymentMethod | null;
   meal_card_brand_id: MealCardBrandId | null;
   order_note: string;
   fulfillment_type: FulfillmentType;
   customer_latitude: number | null;
   customer_longitude: number | null;
+  table_number: number | null;
+  table_session_id: string | null;
+  courier_id: string | null;
+  delivery_status: DeliveryStatus | null;
 };
 
 export type OrderLineRow = {

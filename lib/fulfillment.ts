@@ -1,4 +1,4 @@
-export type FulfillmentType = "pickup" | "delivery";
+export type FulfillmentType = "pickup" | "delivery" | "dine_in";
 
 export const DEFAULT_DELIVERY_RADIUS_KM = 5;
 export const MIN_DELIVERY_RADIUS_KM = 1;
@@ -28,5 +28,28 @@ export function resolveDefaultFulfillmentType(flags: Pick<TenantFulfillmentFlags
 }
 
 export function fulfillmentTypeLabel(type: FulfillmentType): string {
-  return type === "pickup" ? "Gel-al" : "Teslimat";
+  if (type === "pickup") return "Gel-al";
+  if (type === "delivery") return "Paket";
+  return "Masa";
 }
+
+export const ORDER_SOURCES = [
+  "qr_menu",
+  "marketplace",
+  "table_qr",
+  "waiter",
+  "cashier",
+] as const;
+
+export type OrderSource = (typeof ORDER_SOURCES)[number];
+
+export const DELIVERY_STATUSES = [
+  "pending",
+  "preparing",
+  "ready_for_dispatch",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+] as const;
+
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];

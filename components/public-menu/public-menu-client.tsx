@@ -79,6 +79,10 @@ type PublicMenuClientProps = {
   paymentFlags: TenantPaymentFlags;
   fulfillmentFlags: TenantFulfillmentFlags;
   orderSource?: "qr_menu" | "marketplace";
+  /** Masa menusu — dine_in siparis akisi */
+  tableNumber?: number;
+  /** Garson paneli — siparis API /api/garson/orders */
+  waiterMode?: boolean;
   initialMenu: LocalMenuState;
 };
 
@@ -108,9 +112,12 @@ export default function PublicMenuClient({
   paymentFlags,
   fulfillmentFlags,
   orderSource = "qr_menu",
+  tableNumber,
+  waiterMode = false,
   initialMenu,
 }: PublicMenuClientProps) {
   const slug = rawSlug.toLowerCase();
+  const isTableMenu = tableNumber != null && tableNumber > 0;
   const [menu] = useState<LocalMenuState>(initialMenu);
   const [title] = useState<string>(businessName);
   const [search, setSearch] = useState("");
@@ -284,6 +291,12 @@ export default function PublicMenuClient({
             ) : null}
             <div className="min-w-0">
               <h1 className="font-headline text-3xl font-extrabold tracking-tighter text-primary">{title}</h1>
+              {isTableMenu && !waiterMode ? (
+                <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                  <span className="material-symbols-outlined text-[16px]">table_restaurant</span>
+                  Masa {tableNumber}
+                </p>
+              ) : null}
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {openStatus === null ? (
                   <>
@@ -559,7 +572,9 @@ export default function PublicMenuClient({
             </div>
           </section>
         ) : null}
+        {!waiterMode && !isTableMenu ? (
         <PublicMenuPwaCard businessName={title} controller={pwaInstall} showAction={false} />
+        ) : null}
         {!isOnline ? (
           <section className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
             <p className="text-sm font-semibold text-amber-900">Cevrimdisi gorunum</p>
@@ -630,7 +645,9 @@ export default function PublicMenuClient({
         visibleProducts={visibleProducts}
         paymentFlags={paymentFlags}
         fulfillmentFlags={fulfillmentFlags}
-        orderSource={orderSource}
+        orderSource={isTableMenu ? "table_qr" : orderSource}
+        tableNumber={tableNumber}
+        waiterMode={waiterMode}
         subdomain={slug}
         orderingEnabled={orderingEnabled}
         closedMessage={closedMessage}

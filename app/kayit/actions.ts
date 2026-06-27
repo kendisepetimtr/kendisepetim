@@ -5,6 +5,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { getRequestSiteUrl } from "@/lib/site-url";
 import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
+import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -78,7 +79,8 @@ export async function registerTenantAction(
       .eq("owner_user_id", existingUser.id)
       .maybeSingle();
     if (existingTenant) {
-      redirect("/dashboard");
+      const siteOrigin = await getRequestSiteUrl();
+      redirect(await resolveOwnerDashboardUrl(existingUser.id, siteOrigin));
     }
 
     const { error: insertError } = await service.from("tenants").insert({
@@ -101,7 +103,8 @@ export async function registerTenantAction(
       return { error: insertError.message || "İşletme kaydı oluşturulamadı." };
     }
 
-    redirect("/dashboard");
+    const siteOrigin = await getRequestSiteUrl();
+    redirect(await resolveOwnerDashboardUrl(existingUser.id, siteOrigin));
   }
 
   if (!emailFromForm) {
@@ -160,7 +163,8 @@ export async function registerTenantAction(
   }
 
   if (signUpData.session) {
-    redirect("/dashboard");
+    const siteOrigin = await getRequestSiteUrl();
+    redirect(await resolveOwnerDashboardUrl(userId, siteOrigin));
   }
 
   return { needsEmailConfirm: true, email: emailFromForm };

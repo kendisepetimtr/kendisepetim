@@ -15,7 +15,10 @@ export function getProductPriceForFulfillment(
   p: LocalMenuProduct,
   fulfillmentType: FulfillmentType,
 ): number {
-  return fulfillmentType === "pickup" ? getPickupProductPrice(p) : getDeliveryProductPrice(p);
+  if (fulfillmentType === "pickup" || fulfillmentType === "dine_in") {
+    return getPickupProductPrice(p);
+  }
+  return getDeliveryProductPrice(p);
 }
 
 /** Menü listesinde gösterilecek birincil fiyat. */

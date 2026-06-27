@@ -4,6 +4,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { buildAuthCallbackRedirectUrl } from "@/lib/oauth-redirect";
 import { AUTH_CALLBACK_PATH } from "@/lib/supabase/auth-urls";
 import { getCanonicalSiteUrl } from "@/lib/site-url";
+import { applyTenantSubdomainRewrite } from "@/lib/tenant-routing";
 
 function getCanonicalSiteUrlFromEnv(): string {
   return getCanonicalSiteUrl();
@@ -71,19 +72,16 @@ export async function middleware(request: NextRequest) {
   const oauthRedirect = redirectOAuthQueryErrorToLogin(request);
   if (oauthRedirect) return oauthRedirect;
 
-  const host = request.headers.get("host");
+  const host = request.nextUrl.host;
   const slug = parseMenuSubdomainFromHost(host);
   let rewrite: URL | undefined;
-  if (slug && request.nextUrl.pathname === "/") {
+  if (slug) {
     const u = request.nextUrl.clone();
-    u.pathname = `/m/${slug}`;
-    rewrite = u;
-  } else if (slug && request.nextUrl.pathname === "/favicon.ico") {
-    const u = request.nextUrl.clone();
-    u.pathname = `/m/${slug}/favicon`;
-    rewrite = u;
+    if (applyTenantSubdomainRewrite(slug, u)) {
+      rewrite = u;
+    }
   }
-  return updateSession(request, { rewrite });
+  return updateSession(request, { rewrite, tenantSlug: slug ?? undefined });
 }
 
 export const config = {
