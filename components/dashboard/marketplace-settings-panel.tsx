@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { MarketplaceSettingsPatch } from "@/app/dashboard/marketplace-settings-actions";
+import type { MarketplaceSettingsPatch } from "@/lib/dashboard/marketplace-settings";
 import MarketplaceProfileRing from "@/components/dashboard/marketplace-profile-ring";
 import {
   resolveAutoCoverImageUrl,

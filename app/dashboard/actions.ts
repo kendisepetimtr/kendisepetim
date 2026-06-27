@@ -1,18 +1,8 @@
 "use server";
 
-import { OWNER_ADMIN_COOKIE, ownerAdminCookieOptions } from "@/lib/owner-admin/session";
-import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { signOutDashboardSession } from "@/lib/dashboard/sign-out";
 
+/** @deprecated Panelde `/api/dashboard/sign-out` POST kullanın (RSC yenilemesi yok). */
 export async function signOutFromDashboard(): Promise<void> {
-  try {
-    const supabase = await tryCreateServerSupabaseClient();
-    if (supabase) {
-      await supabase.auth.signOut({ scope: "global" });
-    }
-    const jar = await cookies();
-    jar.set(OWNER_ADMIN_COOKIE, "", { ...ownerAdminCookieOptions(), maxAge: 0 });
-  } catch {
-    /* çıkışta sessizce devam */
-  }
+  return signOutDashboardSession();
 }

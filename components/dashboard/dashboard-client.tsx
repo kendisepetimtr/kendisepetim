@@ -7,7 +7,7 @@ import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain"
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
 import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-settings-panel";
 import MenuManager from "@/components/dashboard/menu-manager";
-import type { SyncDashboardTenantResult } from "@/app/dashboard/tenant-sync-actions";
+import type { DashboardTenantSyncResult } from "@/lib/dashboard/tenant-sync";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
 import { clearLocalCustomers, countLocalCustomers } from "@/lib/local-customers";
 import { clearLocalOrders } from "@/lib/local-orders";
@@ -15,7 +15,6 @@ import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/publ
 import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
-import { signOutFromDashboard } from "@/app/dashboard/actions";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -100,14 +99,14 @@ function getNavLabel(navId: string): string {
   return m?.label ?? "Panel";
 }
 
-async function fetchDashboardTenantProfile(): Promise<SyncDashboardTenantResult> {
+async function fetchDashboardTenantProfile(): Promise<DashboardTenantSyncResult> {
   try {
     const res = await fetch("/api/dashboard/tenant", {
       method: "GET",
       credentials: "include",
       cache: "no-store",
     });
-    const data = (await res.json()) as SyncDashboardTenantResult;
+    const data = (await res.json()) as DashboardTenantSyncResult;
     if (data && typeof data === "object" && "ok" in data) {
       return data;
     }
@@ -262,13 +261,12 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
     clearLocalTenant();
     if (remoteAuthEnabled) {
       try {
-        await signOutFromDashboard();
+        await fetch("/api/dashboard/sign-out", { method: "POST", credentials: "include" });
       } catch {
         /* sunucu oturumu kapanmazsa yine ana sayfaya yönlendir */
       }
     }
     router.push("/giris");
-    router.refresh();
   }
 
   if (tenant === undefined) {
