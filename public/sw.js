@@ -1,6 +1,6 @@
-const STATIC_CACHE = "ks-qr-static-v3";
-const PAGE_CACHE = "ks-qr-pages-v3";
-const DATA_CACHE = "ks-qr-data-v3";
+const STATIC_CACHE = "ks-qr-static-v4";
+const PAGE_CACHE = "ks-qr-pages-v4";
+const DATA_CACHE = "ks-qr-data-v4";
 const ACTIVE_CACHES = [STATIC_CACHE, PAGE_CACHE, DATA_CACHE];
 
 self.addEventListener("install", (event) => {
@@ -85,8 +85,11 @@ self.addEventListener("fetch", (event) => {
     request.destination === "script" ||
     request.destination === "font" ||
     request.destination === "image" ||
+    request.destination === "video" ||
     url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/brand/") ||
     url.pathname.endsWith(".webmanifest") ||
+    url.pathname.endsWith(".mp4") ||
     url.pathname.endsWith("/favicon") ||
     url.pathname.endsWith("/icon");
 

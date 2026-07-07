@@ -1,5 +1,6 @@
 "use client";
 
+import PwaInstallGuideVideo from "@/components/public-menu/pwa-install-guide-video";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 type BeforeInstallPromptEvent = Event & {
@@ -14,6 +15,8 @@ export type PublicMenuPwaInstallController = {
   statusText: string;
   buttonLabel: string;
   handleInstallClick: () => Promise<void>;
+  dismissIosHelp: () => void;
+  openIosHelp: () => void;
 };
 
 type PublicMenuPwaCardProps = {
@@ -87,13 +90,14 @@ export function usePublicMenuPwaInstall(): PublicMenuPwaInstallController {
       setInstallPrompt(null);
       setInstallAccepted(true);
       setShowIosHelp(false);
-      setStatusText("Menu telefonuna eklendi. Artik ana ekrandan acabilirsin.");
+      setStatusText("Menü telefonunuza eklendi. Artık ana ekrandan açabilirsiniz.");
     };
 
     const handleDisplayModeChange = (event: MediaQueryListEvent) => {
       if (event.matches) {
         setInstallAccepted(true);
         setInstallPrompt(null);
+        setShowIosHelp(false);
       }
     };
 
@@ -108,17 +112,28 @@ export function usePublicMenuPwaInstall(): PublicMenuPwaInstallController {
     };
   }, []);
 
+  function openIosHelp() {
+    setShowIosHelp(true);
+    setStatusText("");
+  }
+
+  function dismissIosHelp() {
+    setShowIosHelp(false);
+  }
+
   async function handleInstallClick() {
     if (isInstalled) return;
 
     if (isIos) {
-      setShowIosHelp((prev) => !prev);
+      setShowIosHelp(true);
       setStatusText("");
       return;
     }
 
     if (!installPrompt) {
-      setStatusText("Tarayiciniz otomatik yukleme acmadi. Tarayici menusunden ana ekrana ekleyebilirsiniz.");
+      setStatusText(
+        "Tarayıcınız otomatik yükleme açmadı. Aşağıdaki videodaki adımları izleyin veya tarayıcı menüsünden ana ekrana ekleyin.",
+      );
       return;
     }
 
@@ -128,14 +143,14 @@ export function usePublicMenuPwaInstall(): PublicMenuPwaInstallController {
     if (result.outcome === "accepted") {
       setInstallPrompt(null);
       setInstallAccepted(true);
-      setStatusText("Menu telefonuna eklendi. Artik ana ekrandan acabilirsin.");
+      setStatusText("Menü telefonunuza eklendi. Artık ana ekrandan açabilirsiniz.");
       return;
     }
 
-    setStatusText("Yukleme iptal edildi. Istedigin zaman tekrar deneyebilirsin.");
+    setStatusText("Yükleme iptal edildi. İstediğiniz zaman tekrar deneyebilirsiniz.");
   }
 
-  const buttonLabel = isInstalled ? "Ana ekranda hazir" : isIos ? "Ana ekrana ekle" : "Telefona ekle";
+  const buttonLabel = isInstalled ? "Ana ekranda hazır" : isIos ? "Nasıl eklenir?" : "Telefona ekle";
 
   return {
     isInstalled,
@@ -144,6 +159,8 @@ export function usePublicMenuPwaInstall(): PublicMenuPwaInstallController {
     statusText,
     buttonLabel,
     handleInstallClick,
+    dismissIosHelp,
+    openIosHelp,
   };
 }
 
@@ -152,7 +169,7 @@ export default function PublicMenuPwaCard({
   controller,
   showAction = true,
 }: PublicMenuPwaCardProps) {
-  const { isInstalled, showIosHelp, statusText, buttonLabel, handleInstallClick } = controller;
+  const { isInstalled, isIos, showIosHelp, statusText, buttonLabel, handleInstallClick } = controller;
 
   return (
     <section className="rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm">
@@ -160,8 +177,8 @@ export default function PublicMenuPwaCard({
         <div>
           <p className="text-sm font-semibold text-on-background">Telefona ekle</p>
           <p className="mt-1 text-xs leading-relaxed text-secondary">
-            {businessName} menusunu ana ekrana ekleyip uygulama gibi acabilirsiniz. Son gorulen menu ekranlari
-            cevirdisiyken de tekrar acilabilir.
+            {businessName} menüsünü ana ekrana ekleyip uygulama gibi açabilirsiniz. Son görülen menü ekranları
+            çevrimdışıyken de tekrar açılabilir.
           </p>
         </div>
         {showAction ? (
@@ -178,17 +195,30 @@ export default function PublicMenuPwaCard({
           >
             {buttonLabel}
             <span className="material-symbols-outlined text-[16px]">
-              {isInstalled ? "check_circle" : "download"}
+              {isInstalled ? "check_circle" : isIos ? "help" : "download"}
             </span>
           </button>
         ) : null}
       </div>
 
-      {showIosHelp ? (
-        <div className="mt-3 rounded-2xl bg-surface-container-low px-3 py-3 text-xs leading-relaxed text-secondary">
-          iPhone ve iPad cihazlarda butona bastiktan sonra Safari paylas menusunu acin, sonra
-          &quot;Ana Ekrana Ekle&quot; secenegini kullanin.
+      {!isInstalled && !isIos ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-surface-container-highest bg-black/5">
+          <p className="bg-surface-container-low px-3 py-2 text-[11px] font-semibold text-secondary">
+            Kurulum videosu — adımları takip edin
+          </p>
+          <PwaInstallGuideVideo className="max-h-48" />
         </div>
+      ) : null}
+
+      {isIos && !showIosHelp && !isInstalled ? (
+        <button
+          type="button"
+          onClick={() => void handleInstallClick()}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/25 bg-primary/5 px-3 py-3 text-xs font-semibold text-primary"
+        >
+          <span className="material-symbols-outlined text-[18px]">play_circle</span>
+          iPhone&apos;da nasıl eklenir? Videolu rehberi aç
+        </button>
       ) : null}
 
       {statusText ? (
@@ -197,7 +227,7 @@ export default function PublicMenuPwaCard({
 
       {!isInstalled ? (
         <p className="mt-3 text-[11px] leading-relaxed text-secondary">
-          Not: Cevrimdisi modda yalnizca son gorulen menu icerigi acilir; siparis gonderimi internet baglantisi
+          Not: Çevrimdışı modda yalnızca son görülen menü içeriği açılır; sipariş gönderimi internet bağlantısı
           gerektirir.
         </p>
       ) : null}

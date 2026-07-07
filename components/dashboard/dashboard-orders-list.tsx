@@ -11,6 +11,7 @@ import type { OrderStatus } from "@/lib/supabase/order-types";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
 
 const REFRESH_ON_ACTIONS = [
   "order_created",
@@ -61,9 +62,13 @@ function NoteWithMapLinks({ text }: { text: string }) {
 
 type DashboardOrdersListProps = {
   remoteAuthEnabled?: boolean;
+  businessName?: string;
 };
 
-export default function DashboardOrdersList({ remoteAuthEnabled = false }: DashboardOrdersListProps) {
+export default function DashboardOrdersList({
+  remoteAuthEnabled = false,
+  businessName = "",
+}: DashboardOrdersListProps) {
   const [channel, setChannel] = useState<OrderChannelFilter>("all");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -105,6 +110,8 @@ export default function DashboardOrdersList({ remoteAuthEnabled = false }: Dashb
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: load,
   });
+
+  const { printOrder } = useDashboardReceiptPrint(businessName);
 
   useEffect(() => {
     void load();
@@ -223,6 +230,14 @@ export default function DashboardOrdersList({ remoteAuthEnabled = false }: Dashb
                 {expanded ? (
                   <div className="border-t border-surface-container-high bg-surface-container-low/40 px-4 py-4 text-sm">
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void printOrder(o)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/15"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">print</span>
+                        Fiş yazdır
+                      </button>
                       {canUpdate
                         ? DASHBOARD_ORDER_STATUSES.filter((s) => s !== o.status).map((status) => (
                             <button

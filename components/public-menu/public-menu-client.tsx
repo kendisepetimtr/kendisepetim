@@ -17,6 +17,7 @@ import {
 } from "@/lib/business-hours";
 import CartCheckoutModal from "@/components/public-menu/cart-checkout-modal";
 import PublicMenuPwaCard, { usePublicMenuPwaInstall } from "@/components/public-menu/public-menu-pwa-card";
+import PwaIosInstallHelp from "@/components/public-menu/pwa-ios-install-help";
 import SiteLogo from "@/components/site-logo";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
@@ -131,6 +132,15 @@ export default function PublicMenuClient({
   const [previewProduct, setPreviewProduct] = useState<LocalMenuProduct | null>(null);
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getClientOnlineStatus, () => true);
   const pwaInstall = usePublicMenuPwaInstall();
+
+  useEffect(() => {
+    if (!pwaInstall.showIosHelp || pwaInstall.isInstalled) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [pwaInstall.showIosHelp, pwaInstall.isInstalled]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
@@ -363,7 +373,7 @@ export default function PublicMenuClient({
               title={pwaInstall.buttonLabel}
             >
               <span className="material-symbols-outlined text-[18px]">
-                {pwaInstall.isInstalled ? "check_circle" : "download"}
+                {pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
               </span>
             </button>
           </div>
@@ -680,6 +690,14 @@ export default function PublicMenuClient({
             requestAddToCart(previewProduct);
           }}
           orderingEnabled={orderingEnabled}
+        />
+      ) : null}
+
+      {pwaInstall.isIos && pwaInstall.showIosHelp && !pwaInstall.isInstalled ? (
+        <PwaIosInstallHelp
+          businessName={title}
+          variant="sheet"
+          onDismiss={pwaInstall.dismissIosHelp}
         />
       ) : null}
     </div>
