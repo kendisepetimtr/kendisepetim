@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
   const service = createServiceSupabaseClient();
   const ext = getMenuImageExtension(file.type);
-  const folder = kind === "cover" ? "covers" : "products";
+  const folder = kind === "cover" ? "covers" : kind === "logo" ? "logos" : "products";
   const objectPath = `${tenant.id}/${folder}/${randomUUID()}.${ext}`;
   const bytes = await file.arrayBuffer();
 

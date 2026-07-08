@@ -5,11 +5,7 @@ import type { MenuMutationBody } from "@/lib/dashboard/menu-mutations";
 import type { TenantSettingsPatch } from "@/lib/dashboard/tenant-settings";
 import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { isValidGoogleMapsUrl } from "@/lib/google-maps";
-import {
-  MAX_TENANT_LOGO_DATA_URL_LENGTH,
-  saveLocalTenant,
-  type LocalTenantProfile,
-} from "@/lib/local-tenant";
+import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
 import DashboardOperationsSettings from "@/components/dashboard/dashboard-operations-settings";
@@ -30,15 +26,6 @@ async function postMenuMutation(body: MenuMutationBody): Promise<MenuLoadResult>
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Menü güncellenemedi." };
   }
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(typeof r.result === "string" ? r.result : "");
-    r.onerror = () => reject(new Error("Dosya okunamadı"));
-    r.readAsDataURL(file);
-  });
 }
 
 type DashboardSettingsProps = {
@@ -64,6 +51,7 @@ export default function DashboardSettings({
   const [email, setEmail] = useState(tenant.email);
   const [phone, setPhone] = useState(tenant.phone);
   const [logoDataUrl, setLogoDataUrl] = useState(tenant.logoDataUrl);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [coverImageUrl, setCoverImageUrl] = useState(tenant.coverImageUrl);
   const [coverUploading, setCoverUploading] = useState(false);
   const [publicDescription, setPublicDescription] = useState(tenant.publicDescription);
@@ -112,6 +100,10 @@ export default function DashboardSettings({
     }
     if (!paymentCash && !paymentDoorCard && !paymentMealCard) {
       window.alert("QR sipariş için en az bir kapıda ödeme yöntemi seçmelisiniz.");
+      return;
+    }
+    if (logoUploading) {
+      window.alert("Logo yükleme tamamlanmadan kaydedemezsiniz.");
       return;
     }
     if (coverUploading) {
@@ -225,23 +217,34 @@ export default function DashboardSettings({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      window.alert("Lütfen bir görsel dosyası seçin.");
+    if (!isAllowedMenuImageType(file.type)) {
+      window.alert("Yalnızca JPG, PNG veya WebP görseller yüklenebilir.");
       return;
     }
     if (file.size > LOGO_MAX_FILE_BYTES) {
       window.alert(`Logo çok büyük (en fazla ~${Math.round(LOGO_MAX_FILE_BYTES / 1024)} KB).`);
       return;
     }
+
+    setLogoUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      if (dataUrl.length > MAX_TENANT_LOGO_DATA_URL_LENGTH) {
-        window.alert("Görsel sıkıştırıldıktan sonra bile çok büyük; daha küçük bir dosya deneyin.");
+      const payload = new FormData();
+      payload.set("file", file);
+      payload.set("kind", "logo");
+      const res = await fetch("/api/menu/upload-image", {
+        method: "POST",
+        body: payload,
+      });
+      const json = (await res.json()) as { imageUrl?: string; error?: string };
+      if (!res.ok || !json.imageUrl) {
+        window.alert(json.error ?? "Logo yüklenemedi.");
         return;
       }
-      setLogoDataUrl(dataUrl);
+      setLogoDataUrl(json.imageUrl);
     } catch {
-      window.alert("Görsel yüklenemedi.");
+      window.alert("Logo yüklenemedi.");
+    } finally {
+      setLogoUploading(false);
     }
   }
 
@@ -332,8 +335,9 @@ export default function DashboardSettings({
                   <input
                     id={`${baseId}-logo`}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleLogoChange}
+                    disabled={logoUploading}
                     className="block w-full max-w-sm text-sm text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-container"
                     aria-labelledby={`${baseId}-logo-label`}
                   />
@@ -341,7 +345,10 @@ export default function DashboardSettings({
                     Kare veya yatay logo önerilir. Yaklaşık {Math.round(LOGO_MAX_FILE_BYTES / 1024)} KB’a kadar.
                     {persistSettingsToSupabase ? " Bulutta saklanır." : " Tarayıcıda saklanır."}
                   </p>
-                  {logoDataUrl ? (
+                  {logoUploading ? (
+                    <p className="text-xs font-medium text-primary">Logo yükleniyor…</p>
+                  ) : null}
+                  {logoDataUrl && !logoUploading ? (
                     <button
                       type="button"
                       onClick={() => setLogoDataUrl("")}
@@ -636,7 +643,7 @@ export default function DashboardSettings({
             <div className="sm:col-span-2 flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
-                disabled={savePending || coverUploading}
+                disabled={savePending || logoUploading || coverUploading}
                 className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-primary-container disabled:opacity-60"
               >
                 {savePending ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
