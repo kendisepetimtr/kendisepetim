@@ -1,4 +1,5 @@
 import type { CustomerAddress } from "@/lib/customer-address";
+import { sanitizeSelectedVariations, type SelectedVariation } from "@/lib/menu-variations";
 import type { CheckoutPaymentMethod } from "@/lib/tenant-payment";
 import type { MealCardBrandId } from "@/lib/tenant-payment";
 
@@ -11,6 +12,7 @@ export type LocalOrderLine = {
   qty: number;
   unitPrice: number;
   removedIngredients?: string[];
+  selectedOptions?: SelectedVariation[];
 };
 
 export type LocalOrder = {
@@ -76,6 +78,7 @@ export function getLocalOrders(subdomain: string): LocalOrdersState {
       if (Array.isArray(row.lines)) {
         for (const ln of row.lines) {
           if (!isRecord(ln)) continue;
+          const selectedOptions = sanitizeSelectedVariations(ln.selectedOptions);
           lines.push({
             productId: typeof ln.productId === "string" ? ln.productId : "",
             name: typeof ln.name === "string" ? ln.name : "",
@@ -84,6 +87,7 @@ export function getLocalOrders(subdomain: string): LocalOrdersState {
             removedIngredients: Array.isArray(ln.removedIngredients)
               ? ln.removedIngredients.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
               : undefined,
+            selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
           });
         }
       }

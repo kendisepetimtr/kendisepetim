@@ -1,4 +1,5 @@
 import { emptyCustomerAddress, type CustomerAddress } from "@/lib/customer-address";
+import { sanitizeSelectedVariations } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 
@@ -58,6 +59,7 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
         qty: line.qty,
         unitPrice: line.unit_price,
         removedIngredients: Array.isArray(line.removed_ingredients) ? line.removed_ingredients : [],
+        selectedOptions: sanitizeSelectedVariations(line.selected_options),
       })),
   }));
 }

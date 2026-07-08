@@ -1,5 +1,6 @@
 import { formatAddressOneLine } from "@/lib/customer-address";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import type { ReceiptItemLine, ReceiptOrderData } from "@/lib/receipt-template";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
@@ -13,13 +14,19 @@ function fulfillmentReceiptLabel(order: AdminOrder): string {
 }
 
 function mapLines(order: AdminOrder): ReceiptItemLine[] {
-  return order.lines.map((line) => ({
-    qty: line.qty,
-    name: line.name,
-    unitPrice: line.unitPrice,
-    lineTotal: Math.round(line.unitPrice * line.qty * 100) / 100,
-    modifiers: line.removedIngredients.length > 0 ? line.removedIngredients.map((r) => `${r} çıkar`) : undefined,
-  }));
+  return order.lines.map((line) => {
+    const modifiers = [
+      ...formatSelectedVariationLabels(line.selectedOptions),
+      ...line.removedIngredients.map((r) => `${r} çıkar`),
+    ];
+    return {
+      qty: line.qty,
+      name: line.name,
+      unitPrice: line.unitPrice,
+      lineTotal: Math.round(line.unitPrice * line.qty * 100) / 100,
+      modifiers: modifiers.length > 0 ? modifiers : undefined,
+    };
+  });
 }
 
 export function adminOrderToReceiptData(

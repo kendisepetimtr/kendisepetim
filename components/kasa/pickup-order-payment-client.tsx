@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
+import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import {
@@ -117,6 +118,9 @@ export default function PickupOrderPaymentClient({
               <li key={line.id} className="flex justify-between gap-2 text-on-background">
                 <span>
                   {line.qty}× {line.name}
+                  {line.selectedOptions.length > 0
+                    ? ` – ${formatSelectedVariationLabels(line.selectedOptions).join(", ")}`
+                    : ""}
                   {line.removedIngredients.length > 0 ? ` (${line.removedIngredients.join(", ")} çıkar)` : ""}
                 </span>
                 <span className="shrink-0 tabular-nums text-secondary">

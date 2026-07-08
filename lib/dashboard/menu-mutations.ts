@@ -6,6 +6,7 @@ import type { LocalMenuState } from "@/lib/local-menu";
 import { buildLocalMenuState } from "@/lib/menu-map";
 import { slimMenuStateForClient } from "@/lib/menu-client-sync";
 import { sanitizeCustomMenuWarnings, sanitizeMenuWarningPresetKeys } from "@/lib/menu-product-warnings";
+import { sanitizeVariationGroups } from "@/lib/menu-variations";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
 import { createServerSupabaseClient, tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -233,6 +234,7 @@ async function upsertMenuProduct(fields: ProductFormFields, productId?: string):
     image_url: fields.imageDataUrl.trim() || null,
     warning_preset_keys: sanitizeMenuWarningPresetKeys(fields.warningPresetKeys),
     custom_warning_tags: sanitizeCustomMenuWarnings(fields.customWarnings),
+    variation_groups: sanitizeVariationGroups(fields.variationGroups),
   };
 
   if (payload.signature_dish) {

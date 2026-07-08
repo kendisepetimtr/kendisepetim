@@ -1,5 +1,6 @@
 import type { FulfillmentType } from "@/lib/fulfillment";
 import type { LocalMenuProduct } from "@/lib/local-menu";
+import { sumVariationDeltas } from "@/lib/menu-variations";
 
 /** Teslimat fiyatı — paket fiyat mantığı. */
 export function getDeliveryProductPrice(p: LocalMenuProduct): number {
@@ -28,4 +29,22 @@ export function getPrimaryMenuDisplayPrice(
 ): number {
   if (flags.fulfillmentDeliveryEnabled) return getDeliveryProductPrice(p);
   return getPickupProductPrice(p);
+}
+
+/** Birincil fiyat + seçilen varyasyon farkları. */
+export function getPrimaryMenuDisplayPriceWithVariations(
+  p: LocalMenuProduct,
+  flags: { fulfillmentPickupEnabled: boolean; fulfillmentDeliveryEnabled: boolean },
+  selected: readonly { priceDelta: number }[],
+): number {
+  return getPrimaryMenuDisplayPrice(p, flags) + sumVariationDeltas(selected);
+}
+
+/** Teslimat tipine göre fiyat + seçilen varyasyon farkları. */
+export function getProductPriceForFulfillmentWithVariations(
+  p: LocalMenuProduct,
+  fulfillmentType: FulfillmentType,
+  selected: readonly { priceDelta: number }[],
+): number {
+  return getProductPriceForFulfillment(p, fulfillmentType) + sumVariationDeltas(selected);
 }

@@ -7,13 +7,14 @@ import { isBusinessOpenNow } from "@/lib/business-hours";
 import { isWithinDeliveryRadius, asGeoPoint } from "@/lib/geo";
 import type { FulfillmentType } from "@/lib/fulfillment";
 import { clampDeliveryRadiusKm } from "@/lib/fulfillment";
-import { getProductPriceForFulfillment } from "@/lib/product-pricing";
+import {
+  buildOrderLineCatalog,
+  buildOrderLines,
+  extractOrderLineProductIds,
+  ORDER_LINE_PRODUCT_COLUMNS,
+} from "@/lib/order-lines-build";
 import { ensureTableSession } from "@/lib/table-sessions";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
-
-function isUuid(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-}
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -32,14 +33,6 @@ function sanitizeAddress(input: PublicOrderCreatePayload["address"]) {
     livesInSite: input?.livesInSite === true,
     siteName: typeof input?.siteName === "string" ? input.siteName.trim() : base.siteName,
     block: typeof input?.block === "string" ? input.block.trim() : base.block,
-  };
-}
-
-function menuRowToPricingProduct(row: MenuProductRow) {
-  return {
-    price: Number(row.price),
-    usePackagePrice: row.use_package_price,
-    packagePrice: Number(row.package_price),
   };
 }
 
@@ -177,68 +170,20 @@ export async function POST(request: Request) {
       }
     }
 
-    const productIds = rawLines
-      .map((line) => (typeof line.productId === "string" && isUuid(line.productId) ? line.productId : null))
-      .filter((id): id is string => id != null);
+    const productIds = extractOrderLineProductIds(rawLines);
 
-    const productPriceMap = new Map<string, ReturnType<typeof menuRowToPricingProduct>>();
+    let catalogRows: MenuProductRow[] = [];
     if (productIds.length > 0) {
       const { data: productRows } = await svc
         .from("menu_products")
-        .select("id, price, package_price, use_package_price")
+        .select(ORDER_LINE_PRODUCT_COLUMNS)
         .eq("tenant_id", tenant.id)
         .in("id", productIds);
-      for (const row of (productRows ?? []) as MenuProductRow[]) {
-        productPriceMap.set(row.id, menuRowToPricingProduct(row));
-      }
+      catalogRows = (productRows ?? []) as MenuProductRow[];
     }
 
-    const lines = rawLines
-      .map((line, index) => {
-        const name = typeof line.name === "string" ? line.name.trim() : "";
-        const qty =
-          typeof line.qty === "number" && Number.isFinite(line.qty) && line.qty > 0 ? Math.round(line.qty) : 0;
-        if (!name || qty <= 0) return null;
-
-        const productId = typeof line.productId === "string" && isUuid(line.productId) ? line.productId : null;
-        const catalog = productId ? productPriceMap.get(productId) : null;
-        const unitPrice = catalog
-          ? getProductPriceForFulfillment(
-              {
-                id: productId ?? "",
-                categoryId: "",
-                name,
-                description: "",
-                ingredients: "",
-                price: catalog.price,
-                usePackagePrice: catalog.usePackagePrice,
-                packagePrice: catalog.packagePrice,
-                hidden: false,
-                signatureDish: false,
-                checkoutUpsell: false,
-                imageDataUrl: "",
-                warningPresetKeys: [],
-                customWarnings: [],
-                warningBadges: [],
-              },
-              fulfillmentType,
-            )
-          : typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice) && line.unitPrice >= 0
-            ? Math.round(line.unitPrice * 100) / 100
-            : 0;
-
-        return {
-          product_id: productId,
-          name,
-          qty,
-          unit_price: unitPrice,
-          removed_ingredients: Array.isArray(line.removedIngredients)
-            ? line.removedIngredients.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-            : [],
-          sort_order: index,
-        };
-      })
-      .filter((line): line is NonNullable<typeof line> => line != null);
+    const catalogMap = buildOrderLineCatalog(catalogRows);
+    const lines = buildOrderLines(rawLines, catalogMap, fulfillmentType);
 
     if (lines.length === 0) {
       return NextResponse.json({ error: "Siparişte en az bir ürün olmalıdır." }, { status: 400 });

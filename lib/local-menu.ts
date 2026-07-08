@@ -1,4 +1,5 @@
 ﻿import type { MenuProductCustomWarning, MenuProductWarningBadge } from "@/lib/menu-product-warnings";
+import type { VariationGroup } from "@/lib/menu-variations";
 
 export const MAX_IMAGE_DATA_URL_LENGTH = 4_800_000;
 
@@ -26,6 +27,7 @@ export type LocalMenuProduct = {
   warningPresetKeys: string[];
   customWarnings: MenuProductCustomWarning[];
   warningBadges: MenuProductWarningBadge[];
+  variationGroups: VariationGroup[];
 };
 
 export type LocalMenuState = {

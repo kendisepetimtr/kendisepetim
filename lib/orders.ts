@@ -1,5 +1,6 @@
 import type { CustomerAddress } from "@/lib/customer-address";
 import type { DeliveryStatus, FulfillmentType } from "@/lib/fulfillment";
+import type { SelectedVariation } from "@/lib/menu-variations";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 
@@ -9,6 +10,7 @@ export type PublicOrderLineInput = {
   qty: number;
   unitPrice: number;
   removedIngredients?: string[];
+  selectedOptions?: SelectedVariation[];
 };
 
 export type PublicOrderCreatePayload = {
@@ -37,6 +39,7 @@ export type AdminOrderLine = {
   qty: number;
   unitPrice: number;
   removedIngredients: string[];
+  selectedOptions: SelectedVariation[];
 };
 
 export type AdminOrder = {

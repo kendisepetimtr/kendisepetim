@@ -8,7 +8,23 @@ import {
   type LocalMenuProduct,
   type LocalMenuState,
 } from "@/lib/local-menu";
-import { getPrimaryMenuDisplayPrice } from "@/lib/product-pricing";
+import {
+  getPrimaryMenuDisplayPrice,
+  getPrimaryMenuDisplayPriceWithVariations,
+} from "@/lib/product-pricing";
+import {
+  hasVariations,
+  sumVariationDeltas,
+  type SelectedVariation,
+  type VariationGroup,
+  type VariationOption,
+} from "@/lib/menu-variations";
+import {
+  buildCartKey,
+  buildCartLines,
+  type CartLine,
+  type CartState,
+} from "@/lib/public-cart";
 import type { TenantFulfillmentFlags } from "@/lib/fulfillment";
 import {
   getBusinessClosedMessage,
@@ -48,23 +64,24 @@ function ProductWarningIcons({
   );
 }
 
-type CartEntry = {
-  productId: string;
-  qty: number;
-  removedIngredients: string[];
-};
+function toSelectedVariation(group: VariationGroup, option: VariationOption): SelectedVariation {
+  return {
+    groupId: group.id,
+    groupName: group.name,
+    optionId: option.id,
+    optionLabel: option.label,
+    priceDelta: option.priceDelta,
+  };
+}
 
-type CartState = Record<string, CartEntry>;
-
-type CartLine = {
-  key: string;
-  product: LocalMenuProduct;
-  qty: number;
-  removedIngredients: string[];
-};
-
-function buildCartKey(productId: string, removedIngredients: string[]): string {
-  return `${productId}::${removedIngredients.join("|")}`;
+function seedDefaultSelections(product: LocalMenuProduct): SelectedVariation[] {
+  const seeded: SelectedVariation[] = [];
+  for (const group of product.variationGroups) {
+    if (group.type === "single" && group.required && group.options[0]) {
+      seeded.push(toSelectedVariation(group, group.options[0]));
+    }
+  }
+  return seeded;
 }
 
 type PublicMenuClientProps = {
@@ -129,6 +146,7 @@ export default function PublicMenuClient({
   const [clockTick, setClockTick] = useState(0);
   const [customizeProduct, setCustomizeProduct] = useState<LocalMenuProduct | null>(null);
   const [removedIngredientsDraft, setRemovedIngredientsDraft] = useState<string[]>([]);
+  const [selectedOptionsDraft, setSelectedOptionsDraft] = useState<SelectedVariation[]>([]);
   const [previewProduct, setPreviewProduct] = useState<LocalMenuProduct | null>(null);
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getClientOnlineStatus, () => true);
   const pwaInstall = usePublicMenuPwaInstall();
@@ -195,38 +213,31 @@ export default function PublicMenuClient({
     return visibleProducts.find((p) => p.signatureDish) ?? null;
   }, [visibleProducts]);
 
-  const cartLines: CartLine[] = useMemo(() => {
-    const lines: CartLine[] = [];
-    for (const [key, entry] of Object.entries(cart)) {
-      if (entry.qty <= 0) continue;
-      const product = visibleProducts.find((p) => p.id === entry.productId);
-      if (product) {
-        lines.push({
-          key,
-          product,
-          qty: entry.qty,
-          removedIngredients: entry.removedIngredients,
-        });
-      }
-    }
-    return lines;
-  }, [cart, visibleProducts]);
+  const cartLines: CartLine[] = useMemo(
+    () => buildCartLines(cart, visibleProducts),
+    [cart, visibleProducts],
+  );
 
   const cartCount = cartLines.reduce((s, l) => s + l.qty, 0);
   const cartTotal = cartLines.reduce(
-    (s, l) => s + getPrimaryMenuDisplayPrice(l.product, fulfillmentFlags) * l.qty,
+    (s, l) => s + getPrimaryMenuDisplayPriceWithVariations(l.product, fulfillmentFlags, l.selectedOptions) * l.qty,
     0,
   );
 
-  function addConfiguredProductToCart(productId: string, removedIngredients: string[] = []) {
+  function addConfiguredProductToCart(
+    productId: string,
+    removedIngredients: string[] = [],
+    selectedOptions: SelectedVariation[] = [],
+  ) {
     if (!orderingEnabled) return;
-    const key = buildCartKey(productId, removedIngredients);
+    const key = buildCartKey(productId, removedIngredients, selectedOptions);
     setCart((c) => ({
       ...c,
       [key]: {
         productId,
         qty: (c[key]?.qty ?? 0) + 1,
         removedIngredients,
+        selectedOptions,
       },
     }));
   }
@@ -237,12 +248,13 @@ export default function PublicMenuClient({
       return;
     }
     const removableIngredients = parseIngredientLines(product.ingredients);
-    if (removableIngredients.length === 0) {
-      addConfiguredProductToCart(product.id, []);
+    if (removableIngredients.length === 0 && !hasVariations(product.variationGroups)) {
+      addConfiguredProductToCart(product.id, [], []);
       return;
     }
     setCustomizeProduct(product);
     setRemovedIngredientsDraft([]);
+    setSelectedOptionsDraft(seedDefaultSelections(product));
   }
 
   function toggleFavorite(id: string) {
@@ -263,15 +275,42 @@ export default function PublicMenuClient({
     [customizeProduct],
   );
 
+  function selectSingleOption(group: VariationGroup, option: VariationOption) {
+    setSelectedOptionsDraft((prev) => [
+      ...prev.filter((o) => o.groupId !== group.id),
+      toSelectedVariation(group, option),
+    ]);
+  }
+
+  function toggleMultiOption(group: VariationGroup, option: VariationOption) {
+    setSelectedOptionsDraft((prev) => {
+      const exists = prev.some((o) => o.groupId === group.id && o.optionId === option.id);
+      if (exists) return prev.filter((o) => !(o.groupId === group.id && o.optionId === option.id));
+      return [...prev, toSelectedVariation(group, option)];
+    });
+  }
+
+  function closeCustomize() {
+    setCustomizeProduct(null);
+    setRemovedIngredientsDraft([]);
+    setSelectedOptionsDraft([]);
+  }
+
   function confirmCustomizationAndAdd() {
     if (!customizeProduct) return;
     if (!orderingEnabled) {
       window.alert(closedMessage);
       return;
     }
-    addConfiguredProductToCart(customizeProduct.id, removedIngredientsDraft);
-    setCustomizeProduct(null);
-    setRemovedIngredientsDraft([]);
+    const missingRequired = customizeProduct.variationGroups.find(
+      (g) => g.required && !selectedOptionsDraft.some((o) => o.groupId === g.id),
+    );
+    if (missingRequired) {
+      window.alert(`Lütfen "${missingRequired.name}" seçimini yapın.`);
+      return;
+    }
+    addConfiguredProductToCart(customizeProduct.id, removedIngredientsDraft, selectedOptionsDraft);
+    closeCustomize();
   }
 
   const activeCategory = effectiveTab !== "all" ? visibleCategories.find((c) => c.id === effectiveTab) : null;
@@ -667,15 +706,16 @@ export default function PublicMenuClient({
           product={customizeProduct}
           removableIngredients={customizationIngredients}
           removedIngredients={removedIngredientsDraft}
+          selectedOptions={selectedOptionsDraft}
+          basePrice={getPrimaryMenuDisplayPrice(customizeProduct, fulfillmentFlags)}
+          onSelectSingle={selectSingleOption}
+          onToggleMulti={toggleMultiOption}
           onToggleIngredient={(ingredient) =>
             setRemovedIngredientsDraft((prev) =>
               prev.includes(ingredient) ? prev.filter((x) => x !== ingredient) : [...prev, ingredient],
             )
           }
-          onClose={() => {
-            setCustomizeProduct(null);
-            setRemovedIngredientsDraft([]);
-          }}
+          onClose={closeCustomize}
           onConfirm={confirmCustomizationAndAdd}
           orderingEnabled={orderingEnabled}
         />
@@ -810,10 +850,20 @@ function ProductPreviewModal({
   );
 }
 
+function formatDelta(delta: number): string {
+  if (delta === 0) return "";
+  const rounded = Math.round(delta);
+  return rounded > 0 ? `+${rounded} ₺` : `${rounded} ₺`;
+}
+
 function ProductCustomizeModal({
   product,
   removableIngredients,
   removedIngredients,
+  selectedOptions,
+  basePrice,
+  onSelectSingle,
+  onToggleMulti,
   onToggleIngredient,
   onClose,
   onConfirm,
@@ -822,11 +872,20 @@ function ProductCustomizeModal({
   product: LocalMenuProduct;
   removableIngredients: string[];
   removedIngredients: string[];
+  selectedOptions: SelectedVariation[];
+  basePrice: number;
+  onSelectSingle: (group: VariationGroup, option: VariationOption) => void;
+  onToggleMulti: (group: VariationGroup, option: VariationOption) => void;
   onToggleIngredient: (ingredient: string) => void;
   onClose: () => void;
   onConfirm: () => void;
   orderingEnabled: boolean;
 }) {
+  const groups = product.variationGroups;
+  const livePrice = basePrice + sumVariationDeltas(selectedOptions);
+  const isOptionSelected = (groupId: string, optionId: string) =>
+    selectedOptions.some((o) => o.groupId === groupId && o.optionId === optionId);
+
   return (
     <div className="fixed inset-0 z-[185] flex items-end justify-center p-0 sm:items-center sm:p-6" role="presentation">
       <button
@@ -839,26 +898,85 @@ function ProductCustomizeModal({
         <div className="border-b border-surface-container-high px-5 py-4">
           <h2 className="font-headline text-lg font-bold text-on-background">{product.name}</h2>
           <p className="mt-1 text-sm text-secondary">
-            İstemediğiniz malzemeleri çıkarabilirsiniz. Hiçbir şey seçmezseniz ürün standart gelir.
+            {groups.length > 0
+              ? "Seçeneklerinizi belirleyin ve istemediğiniz malzemeleri çıkarın."
+              : "İstemediğiniz malzemeleri çıkarabilirsiniz. Hiçbir şey seçmezseniz ürün standart gelir."}
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="space-y-2">
-            {removableIngredients.map((ingredient) => (
-              <label
-                key={ingredient}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-high bg-white px-3 py-3"
-              >
-                <input
-                  type="checkbox"
-                  checked={removedIngredients.includes(ingredient)}
-                  onChange={() => onToggleIngredient(ingredient)}
-                  className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
-                />
-                <span className="text-sm text-on-background">{ingredient}</span>
-              </label>
-            ))}
-          </div>
+          {groups.map((group) => (
+            <div key={group.id} className="mb-5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="font-headline text-sm font-bold text-on-background">{group.name}</h3>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
+                  {group.type === "single"
+                    ? group.required
+                      ? "Zorunlu · tek seçim"
+                      : "Tek seçim"
+                    : "Çoklu seçim"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {group.options.map((option) => {
+                  const checked = isOptionSelected(group.id, option.id);
+                  const deltaLabel = formatDelta(option.priceDelta);
+                  return (
+                    <label
+                      key={option.id}
+                      className={[
+                        "flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-3 transition",
+                        checked
+                          ? "border-primary bg-primary/5"
+                          : "border-surface-container-high bg-white",
+                      ].join(" ")}
+                    >
+                      <span className="flex items-center gap-3">
+                        <input
+                          type={group.type === "single" ? "radio" : "checkbox"}
+                          name={`${group.id}`}
+                          checked={checked}
+                          onChange={() =>
+                            group.type === "single"
+                              ? onSelectSingle(group, option)
+                              : onToggleMulti(group, option)
+                          }
+                          className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+                        />
+                        <span className="text-sm text-on-background">{option.label}</span>
+                      </span>
+                      {deltaLabel ? (
+                        <span className="text-xs font-semibold text-primary">{deltaLabel}</span>
+                      ) : null}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {removableIngredients.length > 0 ? (
+            <div className={groups.length > 0 ? "border-t border-surface-container-high pt-4" : ""}>
+              {groups.length > 0 ? (
+                <h3 className="mb-2 font-headline text-sm font-bold text-on-background">Malzeme çıkar</h3>
+              ) : null}
+              <div className="space-y-2">
+                {removableIngredients.map((ingredient) => (
+                  <label
+                    key={ingredient}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-high bg-white px-3 py-3"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={removedIngredients.includes(ingredient)}
+                      onChange={() => onToggleIngredient(ingredient)}
+                      className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
+                    />
+                    <span className="text-sm text-on-background">{ingredient}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="border-t border-surface-container-high bg-surface-container-low/60 px-5 py-4">
           <button
@@ -866,13 +984,13 @@ function ProductCustomizeModal({
             onClick={onConfirm}
             disabled={!orderingEnabled}
             className={[
-              "w-full rounded-2xl py-3.5 text-sm font-bold shadow-lg transition",
+              "flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold shadow-lg transition",
               orderingEnabled
                 ? "bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white active:scale-[0.98]"
                 : "cursor-not-allowed bg-surface-container-high text-secondary shadow-none",
             ].join(" ")}
           >
-            {orderingEnabled ? "Sepete ekle" : "Restoran kapalı"}
+            {orderingEnabled ? `Sepete ekle · ${formatTry(livePrice)}` : "Restoran kapalı"}
           </button>
           <button
             type="button"

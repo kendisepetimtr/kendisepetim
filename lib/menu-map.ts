@@ -4,6 +4,7 @@ import {
   sanitizeCustomMenuWarnings,
   sanitizeMenuWarningPresetKeys,
 } from '@/lib/menu-product-warnings';
+import { sanitizeVariationGroups } from '@/lib/menu-variations';
 import type { MenuCategoryRow, MenuProductRow } from '@/lib/supabase/menu-types';
 
 export function menuCategoryRowToLocal(row: MenuCategoryRow): LocalMenuCategory {
@@ -35,6 +36,7 @@ export function menuProductRowToLocal(row: MenuProductRow): LocalMenuProduct {
     warningPresetKeys,
     customWarnings,
     warningBadges: buildMenuProductWarningBadges(warningPresetKeys, customWarnings),
+    variationGroups: sanitizeVariationGroups(row.variation_groups),
   };
 }
 

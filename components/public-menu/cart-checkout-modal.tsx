@@ -10,7 +10,17 @@ import {
 import { formatCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import type { LocalMenuProduct } from "@/lib/local-menu";
-import { getProductPriceForFulfillment } from "@/lib/product-pricing";
+import { formatSelectedVariationLabels } from "@/lib/menu-variations";
+import {
+  buildCartKey,
+  buildCartLines,
+  type CartLine,
+  type CartState,
+} from "@/lib/public-cart";
+import {
+  getProductPriceForFulfillment,
+  getProductPriceForFulfillmentWithVariations,
+} from "@/lib/product-pricing";
 import {
   fulfillmentTypeLabel,
   resolveDefaultFulfillmentType,
@@ -31,21 +41,6 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
 }
-
-type CartEntry = {
-  productId: string;
-  qty: number;
-  removedIngredients: string[];
-};
-
-type CartState = Record<string, CartEntry>;
-
-type CartLine = {
-  key: string;
-  product: LocalMenuProduct;
-  qty: number;
-  removedIngredients: string[];
-};
 
 type Step = "cart" | "checkout";
 
@@ -155,25 +150,13 @@ export default function CartCheckoutModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const cartLines: CartLine[] = useMemo(() => {
-    const lines: CartLine[] = [];
-    for (const [key, entry] of Object.entries(cart)) {
-      if (entry.qty <= 0) continue;
-      const product = visibleProducts.find((p) => p.id === entry.productId);
-      if (product) {
-        lines.push({
-          key,
-          product,
-          qty: entry.qty,
-          removedIngredients: entry.removedIngredients,
-        });
-      }
-    }
-    return lines;
-  }, [cart, visibleProducts]);
+  const cartLines: CartLine[] = useMemo(
+    () => buildCartLines(cart, visibleProducts),
+    [cart, visibleProducts],
+  );
 
   const cartTotal = cartLines.reduce(
-    (s, l) => s + getProductPriceForFulfillment(l.product, fulfillmentType) * l.qty,
+    (s, l) => s + getProductPriceForFulfillmentWithVariations(l.product, fulfillmentType, l.selectedOptions) * l.qty,
     0,
   );
 
@@ -205,12 +188,14 @@ export default function CartCheckoutModal({
       window.alert(closedMessage);
       return;
     }
+    const key = buildCartKey(productId, [], []);
     setCart((c) => ({
       ...c,
-      [productId]: {
+      [key]: {
         productId,
-        qty: (c[productId]?.qty ?? 0) + 1,
-        removedIngredients: c[productId]?.removedIngredients ?? [],
+        qty: (c[key]?.qty ?? 0) + 1,
+        removedIngredients: [],
+        selectedOptions: [],
       },
     }));
   }
@@ -254,12 +239,13 @@ export default function CartCheckoutModal({
       return;
     }
 
-    const lines: LocalOrderLine[] = cartLines.map(({ product: p, qty, removedIngredients }) => ({
+    const lines: LocalOrderLine[] = cartLines.map(({ product: p, qty, removedIngredients, selectedOptions }) => ({
       productId: p.id,
       name: p.name,
       qty,
-      unitPrice: getProductPriceForFulfillment(p, fulfillmentType),
+      unitPrice: getProductPriceForFulfillmentWithVariations(p, fulfillmentType, selectedOptions),
       removedIngredients: removedIngredients.length > 0 ? removedIngredients : undefined,
+      selectedOptions: selectedOptions.length > 0 ? selectedOptions : undefined,
     }));
 
     if (isWaiterOrder) {
@@ -477,7 +463,7 @@ export default function CartCheckoutModal({
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {cartLines.map(({ key, product: p, qty, removedIngredients }) => (
+                  {cartLines.map(({ key, product: p, qty, removedIngredients, selectedOptions }) => (
                     <li
                       key={key}
                       className="flex gap-3 rounded-2xl border border-surface-container-high bg-surface-container-lowest p-3"
@@ -495,8 +481,13 @@ export default function CartCheckoutModal({
                       <div className="min-w-0 flex-1">
                         <p className="font-headline text-sm font-bold text-on-background line-clamp-2">{p.name}</p>
                         <p className="mt-0.5 text-xs font-black text-primary">
-                          {formatTry(getProductPriceForFulfillment(p, fulfillmentType))}
+                          {formatTry(getProductPriceForFulfillmentWithVariations(p, fulfillmentType, selectedOptions))}
                         </p>
+                        {selectedOptions.length > 0 ? (
+                          <p className="mt-1 text-[11px] leading-relaxed text-secondary">
+                            {formatSelectedVariationLabels(selectedOptions).join(" · ")}
+                          </p>
+                        ) : null}
                         {removedIngredients.length > 0 ? (
                           <p className="mt-1 text-[11px] leading-relaxed text-secondary">
                             Çıkarılacak: {removedIngredients.join(", ")}

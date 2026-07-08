@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatAddressOneLine } from "@/lib/customer-address";
+import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import {
@@ -987,6 +988,11 @@ export default function OwnerAdminPanel({
                                           {formatTry(line.qty * line.unitPrice)}
                                         </span>
                                       </div>
+                                      {line.selectedOptions.length > 0 ? (
+                                        <p className="mt-1 text-xs text-secondary">
+                                          {formatSelectedVariationLabels(line.selectedOptions).join(" · ")}
+                                        </p>
+                                      ) : null}
                                       {line.removedIngredients.length > 0 ? (
                                         <p className="mt-1 text-xs text-secondary">
                                           Çıkarılacak: {line.removedIngredients.join(", ")}

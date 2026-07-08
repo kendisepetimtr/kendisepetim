@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
+import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { KasaSessionDetail } from "@/lib/kasa/sessions-service";
 import {
   pickDefaultPaymentMethod,
@@ -183,6 +184,9 @@ export default function SessionPaymentClient({
                       <li key={line.id} className="flex justify-between gap-2">
                         <span>
                           {line.qty}× {line.name}
+                          {line.selectedOptions.length > 0
+                            ? ` – ${formatSelectedVariationLabels(line.selectedOptions).join(", ")}`
+                            : ""}
                           {line.removedIngredients.length > 0
                             ? ` (${line.removedIngredients.join(", ")} çıkar)`
                             : ""}

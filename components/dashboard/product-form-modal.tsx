@@ -15,8 +15,27 @@ import {
   sanitizeMenuWarningPresetKeys,
   type MenuProductCustomWarning,
 } from "@/lib/menu-product-warnings";
+import {
+  MAX_OPTIONS_PER_GROUP,
+  MAX_VARIATION_GROUPS,
+  MAX_VARIATION_GROUP_NAME_LENGTH,
+  MAX_VARIATION_OPTION_LABEL_LENGTH,
+  makeVariationId,
+  sanitizeVariationGroups,
+  type VariationGroup,
+  type VariationSelectionType,
+} from "@/lib/menu-variations";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
 import { type FormEvent, useEffect, useId, useState } from "react";
+
+type OptionDraft = { id: string; label: string; priceDelta: string };
+type GroupDraft = {
+  id: string;
+  name: string;
+  type: VariationSelectionType;
+  required: boolean;
+  options: OptionDraft[];
+};
 
 export type ProductFormFields = {
   categoryId: string;
@@ -35,7 +54,36 @@ export type ProductFormFields = {
   imageDataUrl: string;
   warningPresetKeys: string[];
   customWarnings: MenuProductCustomWarning[];
+  variationGroups: VariationGroup[];
 };
+
+function variationGroupsToDrafts(groups: VariationGroup[]): GroupDraft[] {
+  return groups.map((group) => ({
+    id: group.id || makeVariationId(),
+    name: group.name,
+    type: group.type,
+    required: group.required,
+    options: group.options.map((option) => ({
+      id: option.id || makeVariationId(),
+      label: option.label,
+      priceDelta: option.priceDelta === 0 ? "" : String(option.priceDelta).replace(".", ","),
+    })),
+  }));
+}
+
+function emptyOptionDraft(): OptionDraft {
+  return { id: makeVariationId(), label: "", priceDelta: "" };
+}
+
+function emptyGroupDraft(): GroupDraft {
+  return {
+    id: makeVariationId(),
+    name: "",
+    type: "single",
+    required: true,
+    options: [emptyOptionDraft(), emptyOptionDraft()],
+  };
+}
 
 const MAX_PRODUCT_DESCRIPTION_LENGTH = 280;
 
@@ -81,6 +129,8 @@ export default function ProductFormModal({
   const [warningPresetKeys, setWarningPresetKeys] = useState<string[]>([]);
   const [customWarnings, setCustomWarnings] = useState<MenuProductCustomWarning[]>([]);
   const [warningsOpen, setWarningsOpen] = useState(false);
+  const [variationGroups, setVariationGroups] = useState<GroupDraft[]>([]);
+  const [variationsOpen, setVariationsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -109,6 +159,8 @@ export default function ProductFormModal({
       setWarningPresetKeys(editingProduct.warningPresetKeys);
       setCustomWarnings(editingProduct.customWarnings);
       setWarningsOpen(editingProduct.warningBadges.length > 0);
+      setVariationGroups(variationGroupsToDrafts(editingProduct.variationGroups));
+      setVariationsOpen(editingProduct.variationGroups.length > 0);
     } else {
       const def =
         categories.some((c) => c.id === defaultCategoryId) ? defaultCategoryId : categories[0]?.id ?? "";
@@ -126,6 +178,8 @@ export default function ProductFormModal({
       setWarningPresetKeys([]);
       setCustomWarnings([]);
       setWarningsOpen(false);
+      setVariationGroups([]);
+      setVariationsOpen(false);
     }
   }, [open, mode, editingProduct, defaultCategoryId, categories]);
 
@@ -148,6 +202,54 @@ export default function ProductFormModal({
 
   function removeCustomWarning(index: number) {
     setCustomWarnings((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function addVariationGroup() {
+    setVariationsOpen(true);
+    setVariationGroups((prev) => [...prev, emptyGroupDraft()]);
+  }
+
+  function updateVariationGroup(groupIndex: number, patch: Partial<Omit<GroupDraft, "options" | "id">>) {
+    setVariationGroups((prev) =>
+      prev.map((group, index) => (index === groupIndex ? { ...group, ...patch } : group)),
+    );
+  }
+
+  function removeVariationGroup(groupIndex: number) {
+    setVariationGroups((prev) => prev.filter((_, index) => index !== groupIndex));
+  }
+
+  function addVariationOption(groupIndex: number) {
+    setVariationGroups((prev) =>
+      prev.map((group, index) =>
+        index === groupIndex ? { ...group, options: [...group.options, emptyOptionDraft()] } : group,
+      ),
+    );
+  }
+
+  function updateVariationOption(groupIndex: number, optionIndex: number, patch: Partial<Omit<OptionDraft, "id">>) {
+    setVariationGroups((prev) =>
+      prev.map((group, index) =>
+        index === groupIndex
+          ? {
+              ...group,
+              options: group.options.map((option, oIndex) =>
+                oIndex === optionIndex ? { ...option, ...patch } : option,
+              ),
+            }
+          : group,
+      ),
+    );
+  }
+
+  function removeVariationOption(groupIndex: number, optionIndex: number) {
+    setVariationGroups((prev) =>
+      prev.map((group, index) =>
+        index === groupIndex
+          ? { ...group, options: group.options.filter((_, oIndex) => oIndex !== optionIndex) }
+          : group,
+      ),
+    );
   }
 
   useEffect(() => {
@@ -250,6 +352,7 @@ export default function ProductFormModal({
       imageDataUrl,
       warningPresetKeys: sanitizeMenuWarningPresetKeys(warningPresetKeys),
       customWarnings: sanitizeCustomMenuWarnings(customWarnings),
+      variationGroups: sanitizeVariationGroups(variationGroups),
     };
     try {
       await onSave(fields, mode === "edit" ? editingProduct?.id : undefined);
@@ -527,6 +630,165 @@ export default function ProductFormModal({
                         </div>
                       ) : null}
                     </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-surface-container-high bg-surface-container-low/50">
+                <button
+                  type="button"
+                  onClick={() => setVariationsOpen((prev) => !prev)}
+                  aria-expanded={variationsOpen}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
+                >
+                  <div>
+                    <h3 className="font-headline text-sm font-bold text-on-background">Seçenekler ve varyasyonlar</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      {variationGroups.length > 0
+                        ? `${variationGroups.length} seçenek grubu`
+                        : "Porsiyon, ilave malzeme gibi müşteri seçimleri"}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined text-secondary">
+                    {variationsOpen ? "expand_less" : "expand_more"}
+                  </span>
+                </button>
+
+                {variationsOpen ? (
+                  <div className="border-t border-surface-container-high px-4 pb-4 pt-4">
+                    <p className="text-xs leading-relaxed text-secondary">
+                      Her grup bir seçim başlığıdır (ör. “Porsiyon”). Seçeneklere fiyat farkı girin; standart seçenek
+                      için 0 bırakın. Fark negatif olabilir (ör. küçük boy -5).
+                    </p>
+
+                    {variationGroups.length > 0 ? (
+                      <div className="mt-4 space-y-4">
+                        {variationGroups.map((group, groupIndex) => (
+                          <div
+                            key={group.id}
+                            className="rounded-xl border border-surface-container-high bg-white p-3"
+                          >
+                            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                              <div>
+                                <label
+                                  className="block text-xs font-medium text-secondary"
+                                  htmlFor={`${baseId}-vg-name-${groupIndex}`}
+                                >
+                                  Grup adı
+                                </label>
+                                <input
+                                  id={`${baseId}-vg-name-${groupIndex}`}
+                                  value={group.name}
+                                  maxLength={MAX_VARIATION_GROUP_NAME_LENGTH}
+                                  placeholder="Örn. Porsiyon"
+                                  onChange={(e) => updateVariationGroup(groupIndex, { name: e.target.value })}
+                                  className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariationGroup(groupIndex)}
+                                  className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-xs font-semibold text-error hover:bg-error/10"
+                                >
+                                  Grubu sil
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-4">
+                              <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
+                                  Seçim tipi
+                                </p>
+                                <div className="mt-1 flex gap-1 rounded-lg border border-surface-container-highest p-1">
+                                  {(["single", "multi"] as VariationSelectionType[]).map((type) => (
+                                    <button
+                                      key={type}
+                                      type="button"
+                                      onClick={() => updateVariationGroup(groupIndex, { type })}
+                                      className={[
+                                        "rounded-md px-3 py-1.5 text-xs font-semibold transition",
+                                        group.type === type
+                                          ? "bg-primary text-white"
+                                          : "text-secondary hover:bg-surface-container-low",
+                                      ].join(" ")}
+                                    >
+                                      {type === "single" ? "Tek seçim" : "Çoklu seçim"}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <label className="flex cursor-pointer items-center gap-2 pt-4 text-sm text-on-background">
+                                <input
+                                  type="checkbox"
+                                  checked={group.required}
+                                  onChange={(e) => updateVariationGroup(groupIndex, { required: e.target.checked })}
+                                  className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
+                                />
+                                Zorunlu
+                              </label>
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                              {group.options.map((option, optionIndex) => (
+                                <div key={option.id} className="flex items-center gap-2">
+                                  <input
+                                    value={option.label}
+                                    maxLength={MAX_VARIATION_OPTION_LABEL_LENGTH}
+                                    placeholder="Seçenek (ör. Duble)"
+                                    onChange={(e) =>
+                                      updateVariationOption(groupIndex, optionIndex, { label: e.target.value })
+                                    }
+                                    className="min-w-0 flex-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                  />
+                                  <div className="relative w-24 shrink-0">
+                                    <input
+                                      value={option.priceDelta}
+                                      inputMode="decimal"
+                                      placeholder="0"
+                                      onChange={(e) =>
+                                        updateVariationOption(groupIndex, optionIndex, { priceDelta: e.target.value })
+                                      }
+                                      className="w-full rounded-xl border border-surface-container-highest bg-white py-2 pl-3 pr-6 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-secondary">
+                                      ₺
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVariationOption(groupIndex, optionIndex)}
+                                    disabled={group.options.length <= 1}
+                                    className="rounded-lg border border-surface-container-highest bg-white p-2 text-secondary hover:bg-surface-container-low disabled:opacity-40"
+                                    aria-label="Seçeneği sil"
+                                  >
+                                    <span className="material-symbols-outlined text-[18px]">close</span>
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addVariationOption(groupIndex)}
+                                disabled={group.options.length >= MAX_OPTIONS_PER_GROUP}
+                                className="mt-1 rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-40"
+                              >
+                                Seçenek ekle
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={addVariationGroup}
+                      disabled={variationGroups.length >= MAX_VARIATION_GROUPS}
+                      className="mt-4 rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-40"
+                    >
+                      Seçenek grubu ekle
+                    </button>
                   </div>
                 ) : null}
               </div>

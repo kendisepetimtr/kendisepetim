@@ -1,5 +1,6 @@
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 import type { DeliveryStatus, FulfillmentType, OrderSource } from "@/lib/fulfillment";
+import type { SelectedVariation } from "@/lib/menu-variations";
 
 export type OrderStatus = "new" | "confirmed" | "preparing" | "completed" | "cancelled";
 
@@ -40,6 +41,7 @@ export type OrderLineRow = {
   qty: number;
   unit_price: number;
   removed_ingredients: string[];
+  selected_options: SelectedVariation[];
   sort_order: number;
 };
 

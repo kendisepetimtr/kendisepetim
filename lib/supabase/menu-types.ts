@@ -1,4 +1,5 @@
 ﻿import type { MenuProductCustomWarning } from "@/lib/menu-product-warnings";
+import type { VariationGroup } from "@/lib/menu-variations";
 
 /**
  * Menü katalog tabloları — supabase/migrations ile uyumlu.
@@ -41,6 +42,7 @@ export type MenuProductRow = {
   image_url: string | null;
   warning_preset_keys: string[];
   custom_warning_tags: MenuProductCustomWarning[];
+  variation_groups: VariationGroup[];
   sort_order: number;
 };
 
