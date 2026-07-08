@@ -35,9 +35,38 @@ export default function OAuthErrorRecovery() {
       }
     }
 
+    if (canonical && urlHasAuthCallbackParams(search, hash)) {
+      try {
+        const canonicalHost = new URL(canonical).hostname.toLowerCase();
+        const onTenantSubdomain =
+          hostname.endsWith(".kendisepetim.com") &&
+          hostname !== canonicalHost &&
+          hostname !== "www.kendisepetim.com";
+        if (onTenantSubdomain) {
+          window.location.replace(`${canonical}${path}${search}${hash}`);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    const oauthOrigin = (() => {
+      if (isLocalHost(hostname)) return origin;
+      try {
+        const canonicalHost = new URL(getCanonicalSiteUrl()).hostname.toLowerCase();
+        if (hostname.endsWith(".kendisepetim.com") && hostname !== canonicalHost) {
+          return getCanonicalSiteUrl();
+        }
+      } catch {
+        /* fall through */
+      }
+      return origin;
+    })();
+
     const code = readAuthCode(search);
     if (code && path !== AUTH_CALLBACK_PATH) {
-      router.replace(buildAuthCallbackRedirectUrl(origin, search));
+      router.replace(buildAuthCallbackRedirectUrl(oauthOrigin, search));
       return;
     }
 
@@ -46,7 +75,7 @@ export default function OAuthErrorRecovery() {
     const error = readOAuthErrorMessage(search, hash);
     if (!error) return;
 
-    const target = new URL("/giris", origin);
+    const target = new URL("/giris", oauthOrigin);
     target.searchParams.set("durum", "oauth-hata");
     target.searchParams.set("mesaj", error);
 

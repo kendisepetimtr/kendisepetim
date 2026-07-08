@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { buildAuthCallbackUrl, DEFAULT_POST_LOGIN_PATH } from "@/lib/supabase/auth-urls";
-import { getBrowserSiteUrl } from "@/lib/site-url";
+import { getOAuthSiteBase } from "@/lib/site-url";
 
 type Props = {
   nextPath: string;
@@ -19,7 +19,7 @@ export default function GoogleAuthButton({ nextPath, label = "Google ile devam e
     setError(null);
 
     try {
-      const siteBase = getBrowserSiteUrl();
+      const siteBase = getOAuthSiteBase();
       if (!siteBase) {
         setError("Site adresi belirlenemedi.");
         setPending(false);

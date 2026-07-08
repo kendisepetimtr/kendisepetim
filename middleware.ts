@@ -2,12 +2,48 @@ import { type NextRequest, NextResponse } from "next/server";
 import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { updateSession } from "@/lib/supabase/middleware";
 import { buildAuthCallbackRedirectUrl } from "@/lib/oauth-redirect";
-import { AUTH_CALLBACK_PATH } from "@/lib/supabase/auth-urls";
-import { getCanonicalSiteUrl } from "@/lib/site-url";
+import { AUTH_CALLBACK_PATH, isCentralAuthPath } from "@/lib/supabase/auth-urls";
+import { getCanonicalSiteUrl, isLocalHost } from "@/lib/site-url";
 import { applyTenantSubdomainRewrite } from "@/lib/tenant-routing";
 
 function getCanonicalSiteUrlFromEnv(): string {
   return getCanonicalSiteUrl();
+}
+
+function getOAuthOrigin(request: NextRequest): string {
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  if (isLocalHost(hostname)) return request.nextUrl.origin;
+
+  const slug = parseMenuSubdomainFromHost(request.headers.get("host"));
+  if (slug && hostname.endsWith(".kendisepetim.com")) {
+    const canonical = getCanonicalSiteUrlFromEnv();
+    if (canonical) return canonical;
+  }
+
+  return request.nextUrl.origin;
+}
+
+/** Tenant subdomain'deki /giris vb. → apex (OAuth PKCE + redirect URL tutarlılığı). */
+function redirectTenantAuthToCanonical(request: NextRequest): NextResponse | null {
+  const slug = parseMenuSubdomainFromHost(request.headers.get("host"));
+  if (!slug) return null;
+
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  if (!hostname.endsWith(".kendisepetim.com")) return null;
+  if (!isCentralAuthPath(request.nextUrl.pathname)) return null;
+
+  const canonical = getCanonicalSiteUrlFromEnv();
+  if (!canonical) return null;
+
+  try {
+    if (hostname === new URL(canonical).hostname.toLowerCase()) return null;
+  } catch {
+    return null;
+  }
+
+  const url = new URL(request.nextUrl.pathname, canonical);
+  url.search = request.nextUrl.search;
+  return NextResponse.redirect(url);
 }
 
 /** Supabase Site URL localhost ise OAuth kodu/hatasi canli adrese tasinir. */
@@ -40,7 +76,7 @@ function redirectAuthCodeToCallback(request: NextRequest): NextResponse | null {
   }
 
   const target = buildAuthCallbackRedirectUrl(
-    request.nextUrl.origin,
+    getOAuthOrigin(request),
     request.nextUrl.search,
   );
   return NextResponse.redirect(new URL(target, request.url));
@@ -50,8 +86,7 @@ function redirectOAuthQueryErrorToLogin(request: NextRequest): NextResponse | nu
   const error = request.nextUrl.searchParams.get("error");
   if (!error) return null;
 
-  const url = request.nextUrl.clone();
-  url.pathname = "/giris";
+  const url = new URL("/giris", getOAuthOrigin(request));
   url.search = "";
   url.searchParams.set("durum", "oauth-hata");
   const desc =
@@ -63,6 +98,9 @@ function redirectOAuthQueryErrorToLogin(request: NextRequest): NextResponse | nu
 }
 
 export async function middleware(request: NextRequest) {
+  const tenantAuthRedirect = redirectTenantAuthToCanonical(request);
+  if (tenantAuthRedirect) return tenantAuthRedirect;
+
   const localhostBounce = redirectLocalhostAuthParamsToCanonical(request);
   if (localhostBounce) return localhostBounce;
 

@@ -22,6 +22,32 @@ export function isLocalHost(hostname: string): boolean {
 }
 
 /**
+ * OAuth / auth callback tek kökten — PKCE çerezi ve Supabase redirect URL tutarlılığı.
+ * Canlıda apex (kendisepetim.com), geliştirmede o anki origin (slug.localhost dahil).
+ */
+export function getOAuthSiteBase(): string {
+  if (typeof window !== "undefined" && isLocalHost(window.location.hostname)) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return getCanonicalSiteUrl();
+}
+
+/** Sunucu action / route: auth callback hedefi. */
+export async function getOAuthSiteUrl(): Promise<string> {
+  const requestUrl = await getRequestSiteUrl();
+  if (requestUrl) {
+    try {
+      if (isLocalHost(new URL(requestUrl).hostname)) {
+        return requestUrl.replace(/\/$/, "");
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return getCanonicalSiteUrl();
+}
+
+/**
  * Tarayicida o an acik olan domain — OAuth redirect icin env yerine bunu kullanin.
  * Boylece canlida localhost env olsa bile dogru adrese donulur.
  */

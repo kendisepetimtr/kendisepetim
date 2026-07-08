@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { getSupabaseEnv } from "@/lib/supabase/env";
-import { getRequestSiteUrl } from "@/lib/site-url";
+import { getOAuthSiteUrl, getRequestSiteUrl } from "@/lib/site-url";
 import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { redirect } from "next/navigation";
@@ -113,7 +113,7 @@ export async function registerTenantAction(
   if (password.length < 8) return { error: "Şifre en az 8 karakter olmalıdır." };
   if (password !== passwordAgain) return { error: "Şifreler eşleşmiyor." };
 
-  const siteBase = await getRequestSiteUrl();
+  const siteBase = await getOAuthSiteUrl();
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
     email: emailFromForm,
