@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { withSharedAuthCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
 
   const redirectUrl = new URL(nextPath, request.nextUrl.origin);
   const response = NextResponse.redirect(redirectUrl);
+  const hostname = request.nextUrl.hostname;
 
   const supabase = createServerClient(env.url, env.anonKey, {
     cookies: {
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
+          response.cookies.set(name, value, withSharedAuthCookieOptions(options, hostname));
         });
       },
     },

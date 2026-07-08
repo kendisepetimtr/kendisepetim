@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { withSharedAuthCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+
+async function getRequestHostname(): Promise<string> {
+  const h = await headers();
+  const host =
+    h.get("x-forwarded-host")?.split(",")[0]?.trim() ?? h.get("host")?.trim() ?? "";
+  return host.split(":")[0]?.toLowerCase() ?? "";
+}
 
 /**
  * Sunucu tarafı: Server Component, Server Action, Route Handler.
@@ -15,6 +23,7 @@ export async function createServerSupabaseClient() {
   }
 
   const cookieStore = await cookies();
+  const hostname = await getRequestHostname();
 
   return createServerClient(env.url, env.anonKey, {
     cookies: {
@@ -24,7 +33,7 @@ export async function createServerSupabaseClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, withSharedAuthCookieOptions(options, hostname));
           });
         } catch {
           /* Server Component içinde set bazen yasaktır; oturum yenilemeyi middleware üstlenir */

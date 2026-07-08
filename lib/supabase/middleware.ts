@@ -2,6 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { getOwnerTenantByUserId } from "@/lib/owner-tenant";
+import {
+  type AuthCookieSetOptions,
+  withSharedAuthCookieOptions,
+} from "@/lib/supabase/cookie-options";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
   buildTenantPanelUrl,
@@ -20,9 +24,21 @@ const LOGIN_PATH = "/giris";
 const FORGOT_PASSWORD_PATH = "/sifremi-unuttum";
 const RESET_PASSWORD_PATH = "/sifre-yenile";
 
-function copyCookies(from: NextResponse, to: NextResponse) {
+function copyCookies(
+  from: NextResponse,
+  to: NextResponse,
+  hostname: string,
+  refreshedCookies: { name: string; value: string; options?: AuthCookieSetOptions }[],
+) {
+  if (refreshedCookies.length > 0) {
+    refreshedCookies.forEach(({ name, value, options }) => {
+      to.cookies.set(name, value, withSharedAuthCookieOptions(options, hostname));
+    });
+    return;
+  }
+
   from.cookies.getAll().forEach(({ name, value }) => {
-    to.cookies.set(name, value);
+    to.cookies.set(name, value, withSharedAuthCookieOptions(undefined, hostname));
   });
 }
 
@@ -50,6 +66,7 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
   const rewrite = options?.rewrite;
   const env = getSupabaseEnv();
   const pathname = request.nextUrl.pathname;
+  const hostname = request.nextUrl.hostname;
   const hostSlug = options?.tenantSlug ?? parseMenuSubdomainFromHost(request.headers.get("host"));
 
   if (!env) {
@@ -57,6 +74,7 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
   }
 
   let supabaseResponse = createBaseResponse(request, rewrite);
+  let refreshedCookies: { name: string; value: string; options?: AuthCookieSetOptions }[] = [];
 
   const supabase = createServerClient(env.url, env.anonKey, {
     cookies: {
@@ -64,12 +82,17 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        refreshedCookies = cookiesToSet.map(({ name, value, options }) => ({
+          name,
+          value,
+          options: withSharedAuthCookieOptions(options, hostname),
+        }));
         cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
         supabaseResponse = createBaseResponse(request, rewrite);
-        cookiesToSet.forEach(({ name, value, options: o }) => {
-          supabaseResponse.cookies.set(name, value, o);
+        refreshedCookies.forEach(({ name, value, options }) => {
+          supabaseResponse.cookies.set(name, value, options);
         });
       },
     },
@@ -85,14 +108,14 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     url.pathname = LOGIN_PATH;
     url.searchParams.set("next", pathname + request.nextUrl.search);
     const redirectRes = NextResponse.redirect(url);
-    copyCookies(supabaseResponse, redirectRes);
+    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
     return redirectRes;
   }
 
   if (user && !hostSlug && isCentralDashboardPath(pathname)) {
     const tenantRedirect = await resolveTenantDashboardRedirect(request, user.id);
     if (tenantRedirect) {
-      copyCookies(supabaseResponse, tenantRedirect);
+      copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
       return tenantRedirect;
     }
   }
@@ -108,13 +131,13 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     if (target === "/dashboard" || target.startsWith("/dashboard/")) {
       const tenantRedirect = await resolveTenantDashboardRedirect(request, user.id);
       if (tenantRedirect) {
-        copyCookies(supabaseResponse, tenantRedirect);
+        copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
         return tenantRedirect;
       }
     }
 
     const redirectRes = NextResponse.redirect(new URL(target, request.url));
-    copyCookies(supabaseResponse, redirectRes);
+    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
     return redirectRes;
   }
 
@@ -124,11 +147,11 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     }
     const tenantRedirect = await resolveTenantDashboardRedirect(request, user.id);
     if (tenantRedirect) {
-      copyCookies(supabaseResponse, tenantRedirect);
+      copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
       return tenantRedirect;
     }
     const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
-    copyCookies(supabaseResponse, redirectRes);
+    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
     return redirectRes;
   }
 
@@ -138,11 +161,11 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
   ) {
     const tenantRedirect = await resolveTenantDashboardRedirect(request, user.id);
     if (tenantRedirect) {
-      copyCookies(supabaseResponse, tenantRedirect);
+      copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
       return tenantRedirect;
     }
     const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
-    copyCookies(supabaseResponse, redirectRes);
+    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
     return redirectRes;
   }
 
