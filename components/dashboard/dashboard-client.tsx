@@ -16,6 +16,9 @@ import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/publ
 import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { getDashboardQuickLinks, getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
+import { useDashboardOrderNotifications } from "@/lib/hooks/use-dashboard-order-notifications";
+import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -40,25 +43,28 @@ function SidebarNavButton({
   active,
   onSelect,
   railMode,
+  alertActive = false,
 }: {
   item: SidebarNavItem;
   active: boolean;
   onSelect: () => void;
   /** Masaüstü dar sidebar: yalnızca ikon; etiket sr-only + title */
   railMode: boolean;
+  alertActive?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      title={item.label}
-      aria-label={item.label}
+      title={alertActive ? `${item.label} — yeni sipariş` : item.label}
+      aria-label={alertActive ? `${item.label}, yeni sipariş bildirimi` : item.label}
       aria-current={active ? "page" : undefined}
       className={[
-        "group flex w-full items-center gap-3 rounded-xl py-3 text-sm font-medium transition-[transform,color,background-color] duration-300 ease-out motion-reduce:transition-none motion-reduce:hover:translate-x-0",
+        "group relative flex w-full items-center gap-3 rounded-xl py-3 text-sm font-medium transition-[transform,color,background-color] duration-300 ease-out motion-reduce:transition-none motion-reduce:hover:translate-x-0",
         railMode
           ? "max-lg:px-3 max-lg:text-left lg:justify-center lg:gap-0 lg:px-2 lg:hover:translate-x-0 lg:transition-[transform,color,background-color] lg:duration-200 lg:hover:bg-surface-container-low lg:active:bg-surface-container-high/80"
           : "justify-start px-3 text-left",
+        alertActive && !active ? "animate-pulse bg-amber-500/10 text-amber-900" : "",
         active
           ? "bg-primary/10 text-primary " +
             (railMode
@@ -73,7 +79,7 @@ function SidebarNavButton({
       <span
         className={[
           "material-symbols-outlined shrink-0 text-[22px] transition-transform duration-200 ease-out motion-reduce:transition-none",
-          active ? "text-primary" : "text-secondary",
+          active ? "text-primary" : alertActive ? "text-amber-700" : "text-secondary",
           railMode
             ? "lg:group-hover:scale-110 lg:group-hover:-rotate-3 lg:group-active:scale-95 motion-reduce:lg:group-hover:scale-100 motion-reduce:lg:group-hover:rotate-0"
             : "",
@@ -83,6 +89,15 @@ function SidebarNavButton({
         {item.icon}
       </span>
       <span className={railMode ? "lg:sr-only" : ""}>{item.label}</span>
+      {alertActive ? (
+        <span
+          className={[
+            "absolute top-2 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white",
+            railMode ? "right-2 max-lg:right-3 lg:right-1.5" : "right-3",
+          ].join(" ")}
+          aria-hidden
+        />
+      ) : null}
     </button>
   );
 }
@@ -156,6 +171,35 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   const [activeNav, setActiveNav] = useState<string>("overview");
   const [menuProductCount, setMenuProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
+
+  const { printOrderIfAutoOnCreate } = useDashboardReceiptPrint(
+    tenant?.businessName ?? "",
+    tenant?.subdomain ?? "",
+  );
+
+  const handleOrderCreated = useCallback(
+    (log: ActivityLogRow) => {
+      if (!log.entity_id || !tenant) return;
+      void printOrderIfAutoOnCreate(log.entity_id);
+    },
+    [printOrderIfAutoOnCreate, tenant],
+  );
+
+  const {
+    pendingOrderAlert,
+    ordersRefreshKey,
+    toasts,
+    dismissToast,
+    connected,
+    formatToastTitle,
+    formatActivityLogSummary,
+    activityLogs,
+    setActivityLogs,
+  } = useDashboardOrderNotifications({
+    enabled: remoteAuthEnabled,
+    ordersTabActive: activeNav === "orders",
+    onOrderCreated: handleOrderCreated,
+  });
 
   useEffect(() => {
     try {
@@ -403,6 +447,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 item={item}
                 active={activeNav === item.id}
                 railMode={sidebarCollapsed}
+                alertActive={item.id === "orders" && pendingOrderAlert}
                 onSelect={() => {
                   setActiveNav(item.id);
                   setSidebarOpen(false);
@@ -502,7 +547,16 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           </div>
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <DashboardNotificationsBell enabled={remoteAuthEnabled} />
+            <DashboardNotificationsBell
+              enabled={remoteAuthEnabled}
+              connected={connected}
+              toasts={toasts}
+              dismissToast={dismissToast}
+              formatToastTitle={formatToastTitle}
+              formatActivityLogSummary={formatActivityLogSummary}
+              activityLogs={activityLogs}
+              setActivityLogs={setActivityLogs}
+            />
             <div
               className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-white sm:h-10 sm:w-10"
               title={tenant.ownerName}
@@ -524,7 +578,12 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
             {activeNav === "menu" ? (
               <MenuManager subdomain={tenant.subdomain} businessName={tenant.businessName} />
             ) : activeNav === "orders" ? (
-              <DashboardOrdersList remoteAuthEnabled={remoteAuthEnabled} />
+              <DashboardOrdersList
+                remoteAuthEnabled={remoteAuthEnabled}
+                businessName={tenant.businessName}
+                subdomain={tenant.subdomain}
+                refreshKey={ordersRefreshKey}
+              />
             ) : activeNav === "customers" ? (
               <CustomersManager subdomain={tenant.subdomain} />
             ) : activeNav === "qr" ? (

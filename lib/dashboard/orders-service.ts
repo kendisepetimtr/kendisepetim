@@ -15,6 +15,41 @@ export type DashboardOrdersResult =
 const ORDER_COLUMNS =
   "id, created_at, updated_at, tenant_id, order_code, order_source, status, total, customer_first_name, customer_last_name, customer_phone, customer_email, address_json, payment_method, payment_method_at_close, meal_card_brand_id, order_note, fulfillment_type, customer_latitude, customer_longitude, table_number, table_session_id, courier_id, delivery_status";
 
+export async function loadDashboardOrderById(orderId: string): Promise<DashboardOrdersResult> {
+  if (!orderId) return { ok: false, error: "Geçersiz sipariş." };
+
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data: row, error } = await svc
+      .from("orders")
+      .select(ORDER_COLUMNS)
+      .eq("id", orderId)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+
+    if (error) return { ok: false, error: error.message };
+    if (!row) return { ok: false, error: "Sipariş bulunamadı." };
+
+    const { data: lineRows, error: lineErr } = await svc
+      .from("order_lines")
+      .select("*")
+      .eq("order_id", orderId);
+
+    if (lineErr) return { ok: false, error: lineErr.message };
+
+    const orders = buildAdminOrders([row], lineRows ?? []);
+    return { ok: true, orders };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Sipariş yüklenemedi.",
+    };
+  }
+}
+
 export async function loadDashboardOrders(channel: OrderChannelFilter): Promise<DashboardOrdersResult> {
   const tenant = await getAuthenticatedOwnerTenant();
   if (!tenant) return { ok: false, error: "Oturum bulunamadı." };

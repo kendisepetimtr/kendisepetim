@@ -5,10 +5,10 @@ import {
   ACTIVITY_ACTOR_LABELS,
   formatActivityLogSummary,
 } from "@/lib/dashboard/activity-log-labels";
-import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import type { NotificationToast } from "@/lib/hooks/use-notification-stream";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 function formatTime(iso: string): string {
   try {
@@ -25,11 +25,26 @@ function formatTime(iso: string): string {
 
 type DashboardNotificationsBellProps = {
   enabled: boolean;
+  connected: boolean;
+  toasts: NotificationToast[];
+  dismissToast: (id: string) => void;
+  formatToastTitle: (log: ActivityLogRow) => string;
+  formatActivityLogSummary: (log: ActivityLogRow) => string;
+  activityLogs: ActivityLogRow[];
+  setActivityLogs: Dispatch<SetStateAction<ActivityLogRow[]>>;
 };
 
-export default function DashboardNotificationsBell({ enabled }: DashboardNotificationsBellProps) {
+export default function DashboardNotificationsBell({
+  enabled,
+  connected,
+  toasts,
+  dismissToast,
+  formatToastTitle,
+  formatActivityLogSummary: fmtSummary,
+  activityLogs,
+  setActivityLogs,
+}: DashboardNotificationsBellProps) {
   const [open, setOpen] = useState(false);
-  const [logs, setLogs] = useState<ActivityLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -40,32 +55,18 @@ export default function DashboardNotificationsBell({ enabled }: DashboardNotific
       const res = await fetch("/api/dashboard/activity-logs", { credentials: "include", cache: "no-store" });
       const data = (await res.json()) as { ok?: boolean; logs?: ActivityLogRow[] };
       if (res.ok && data.ok && data.logs) {
-        setLogs(data.logs.slice(0, 30));
+        setActivityLogs(data.logs.slice(0, 30));
       }
     } catch {
       /* ignore */
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, setActivityLogs]);
 
   useEffect(() => {
     void loadLogs();
   }, [loadLogs]);
-
-  const handleActivity = useCallback((log: ActivityLogRow) => {
-    setLogs((prev) => {
-      if (prev.some((l) => l.id === log.id)) return prev;
-      return [log, ...prev].slice(0, 30);
-    });
-  }, []);
-
-  const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary: fmtSummary, connected } =
-    useNotificationStream({
-      streamUrl: "/api/dashboard/notifications/stream",
-      enabled,
-      onActivity: handleActivity,
-    });
 
   useEffect(() => {
     if (!open) return;
@@ -108,12 +109,12 @@ export default function DashboardNotificationsBell({ enabled }: DashboardNotific
               <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">{statusHint}</span>
             </div>
             <ul className="max-h-80 overflow-y-auto">
-              {loading && logs.length === 0 ? (
+              {loading && activityLogs.length === 0 ? (
                 <li className="px-4 py-6 text-center text-xs text-secondary">Yükleniyor…</li>
-              ) : logs.length === 0 ? (
+              ) : activityLogs.length === 0 ? (
                 <li className="px-4 py-6 text-center text-xs text-secondary">Henüz aktivite yok.</li>
               ) : (
-                logs.map((log) => (
+                activityLogs.map((log) => (
                   <li
                     key={log.id}
                     className="border-b border-surface-container-highest/60 px-4 py-2.5 last:border-0"

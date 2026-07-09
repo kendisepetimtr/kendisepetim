@@ -2,6 +2,7 @@ import { formatAddressOneLine } from "@/lib/customer-address";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
+import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import type { ReceiptItemLine, ReceiptOrderData } from "@/lib/receipt-template";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
@@ -32,6 +33,7 @@ function mapLines(order: AdminOrder): ReceiptItemLine[] {
 export function adminOrderToReceiptData(
   order: AdminOrder,
   businessName: string,
+  subdomain: string,
   paymentAtClose?: { method: CheckoutPaymentMethod; mealCardBrandId?: MealCardBrandId },
 ): ReceiptOrderData {
   const items = mapLines(order);
@@ -44,13 +46,18 @@ export function adminOrderToReceiptData(
 
   return {
     businessName,
+    subdomain,
+    menuUrl: getPrimaryPublicMenuUrl(subdomain),
     orderCode: order.orderCode,
     createdAt: order.createdAt,
+    fulfillmentType: order.fulfillmentType,
     fulfillmentLabel: fulfillmentReceiptLabel(order),
     customerName: `${order.firstName} ${order.lastName}`.trim() || undefined,
     customerPhone: order.phone || undefined,
     customerAddress:
       order.fulfillmentType === "delivery" ? formatAddressOneLine(order.address) : undefined,
+    customerLatitude: order.customerLatitude,
+    customerLongitude: order.customerLongitude,
     items,
     subtotal: Math.round(subtotal * 100) / 100,
     total: order.total,
@@ -65,6 +72,7 @@ export function sessionOrdersToReceiptData(
   orders: AdminOrder[],
   tableNumber: number,
   businessName: string,
+  subdomain: string,
   sessionTotal: number,
   paymentAtClose: { method: CheckoutPaymentMethod; mealCardBrandId?: MealCardBrandId },
 ): ReceiptOrderData {
@@ -75,8 +83,11 @@ export function sessionOrdersToReceiptData(
 
   return {
     businessName,
+    subdomain,
+    menuUrl: getPrimaryPublicMenuUrl(subdomain),
     orderCode: orderCodes || `MASA-${tableNumber}`,
     createdAt: first?.createdAt ?? new Date().toISOString(),
+    fulfillmentType: "dine_in",
     fulfillmentLabel: `Masa ${tableNumber}`,
     customerName: first ? `${first.firstName} ${first.lastName}`.trim() || undefined : undefined,
     customerPhone: first?.phone || undefined,

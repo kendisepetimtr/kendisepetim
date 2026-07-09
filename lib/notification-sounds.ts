@@ -55,3 +55,32 @@ export async function playNotificationSound(soundId: NotificationSoundId): Promi
   playTone(880, 0.2, 0.18, 0.14);
   playTone(1100, 0.4, 0.22, 0.12);
 }
+
+const DEFAULT_REPEAT_INTERVAL_MS = 5000;
+
+let repeatTimer: number | null = null;
+let repeatSoundId: NotificationSoundId = "classic";
+
+/** Sipariş görülene kadar periyodik ses çalar. */
+export function startRepeatingNotificationSound(
+  soundId: NotificationSoundId,
+  intervalMs = DEFAULT_REPEAT_INTERVAL_MS,
+): void {
+  stopRepeatingNotificationSound();
+  repeatSoundId = soundId;
+  void playNotificationSound(soundId);
+  repeatTimer = window.setInterval(() => {
+    void playNotificationSound(repeatSoundId);
+  }, intervalMs);
+}
+
+export function stopRepeatingNotificationSound(): void {
+  if (repeatTimer !== null) {
+    window.clearInterval(repeatTimer);
+    repeatTimer = null;
+  }
+}
+
+export function isRepeatingNotificationSound(): boolean {
+  return repeatTimer !== null;
+}

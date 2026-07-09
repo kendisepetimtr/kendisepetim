@@ -1,11 +1,11 @@
 /**
- * Standart 80 mm termal fiş şablonu (Yemeksepeti / Getir tarzı ESC-POS düzeni).
- *
- * Kağıt: 80 mm ≈ 48 karakter (Font A, 12 cpi) · 58 mm ≈ 32 karakter
- * Yazdırma entegrasyonu bu satır listesini ESC/POS komutlarına dönüştürecek.
+ * Termal fiş şablonları — müşteri, mutfak, kurye (80/58 mm).
  */
 
+import type { FulfillmentType } from "@/lib/fulfillment";
+import { googleMapsPlaceUrl } from "@/lib/maps-links";
 import type { TenantReceiptSettings } from "@/lib/receipt-settings";
+import { DEFAULT_RECEIPT_SETTINGS } from "@/lib/receipt-settings";
 
 export type ReceiptPaperWidth = 58 | 80;
 
@@ -20,12 +20,17 @@ export type ReceiptItemLine = {
 
 export type ReceiptOrderData = {
   businessName: string;
+  subdomain: string;
+  menuUrl: string;
   orderCode: string;
   createdAt: string;
+  fulfillmentType: FulfillmentType;
   fulfillmentLabel: string;
   customerName?: string;
   customerPhone?: string;
   customerAddress?: string;
+  customerLatitude?: number | null;
+  customerLongitude?: number | null;
   items: ReceiptItemLine[];
   subtotal: number;
   deliveryFee?: number;
@@ -33,6 +38,20 @@ export type ReceiptOrderData = {
   paymentMethodLabel: string;
   paymentAtCloseLabel?: string;
   orderNote?: string;
+};
+
+export type ReceiptQrBlock = {
+  url: string;
+  label?: string;
+};
+
+export type ReceiptSlip = {
+  kind: "customer" | "kitchen" | "courier";
+  title: string;
+  lines: string[];
+  logoUrl?: string | null;
+  useKendisepetimLogo?: boolean;
+  qrBlocks?: ReceiptQrBlock[];
 };
 
 export function receiptCharWidth(paperWidthMm: ReceiptPaperWidth): number {
@@ -77,237 +96,299 @@ function formatDateTime(isoOrDisplay: string): string {
   }
 }
 
-export type ThermalReceiptBlock =
-  | { kind: "blank" }
-  | { kind: "rule"; style: "single" | "double" }
-  | { kind: "center"; text: string; emphasis?: "normal" | "bold" | "large" }
-  | { kind: "line"; text: string; emphasis?: "normal" | "bold" }
-  | { kind: "pair"; left: string; right: string; emphasis?: "normal" | "bold" }
-  | { kind: "indent"; text: string };
-
-export function buildThermalReceiptBlocks(
-  order: ReceiptOrderData,
-  settings: TenantReceiptSettings,
-): ThermalReceiptBlock[] {
-  const blocks: ThermalReceiptBlock[] = [];
-  const w = receiptCharWidth(settings.paperWidthMm);
-
-  if (settings.showLogo) {
-    blocks.push({ kind: "center", text: "[ LOGO ]", emphasis: "normal" });
-    blocks.push({ kind: "blank" });
-  }
-
-  if (settings.showBusinessName) {
-    blocks.push({ kind: "center", text: order.businessName || "İşletme", emphasis: "large" });
-  }
-
-  if (settings.headerText.trim()) {
-    blocks.push({ kind: "center", text: settings.headerText.trim() });
-  }
-
-  blocks.push({ kind: "rule", style: "double" });
-
-  if (settings.showOrderCode) {
-    blocks.push({ kind: "line", text: `SİPARİŞ NO: ${order.orderCode}`, emphasis: "bold" });
-  }
-
-  if (settings.showDateTime) {
-    blocks.push({ kind: "line", text: `Tarih: ${formatDateTime(order.createdAt)}` });
-  }
-
-  if (settings.showTableNumber && order.fulfillmentLabel) {
-    blocks.push({ kind: "line", text: `Tip: ${order.fulfillmentLabel.toUpperCase()}`, emphasis: "bold" });
-  }
-
-  blocks.push({ kind: "rule", style: "single" });
-
-  if (settings.showCustomerInfo) {
-    if (order.customerName) {
-      blocks.push({ kind: "line", text: `Müşteri: ${order.customerName}` });
-    }
-    if (order.customerPhone) {
-      blocks.push({ kind: "line", text: `Tel: ${order.customerPhone}` });
-    }
-    if (order.customerAddress?.trim()) {
-      blocks.push({ kind: "line", text: "Adres:" });
-      const addr = order.customerAddress.trim();
-      for (let i = 0; i < addr.length; i += w) {
-        blocks.push({ kind: "indent", text: addr.slice(i, i + w) });
-      }
-    }
-    if (order.customerName || order.customerPhone || order.customerAddress) {
-      blocks.push({ kind: "rule", style: "single" });
-    }
-  }
-
-  for (const item of order.items) {
-    const left = `${item.qty}x ${item.name}`;
-    const right = settings.showItemUnitPrices ? formatMoney(item.lineTotal) : "";
-    blocks.push({
-      kind: "pair",
-      left,
-      right: right || " ",
-      emphasis: "normal",
+function formatTimeOnly(isoOrDisplay: string): string {
+  try {
+    return new Date(isoOrDisplay).toLocaleTimeString("tr-TR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
-
-    for (const mod of item.modifiers ?? []) {
-      blocks.push({ kind: "indent", text: `- ${mod}` });
-    }
-    if (item.note?.trim()) {
-      blocks.push({ kind: "indent", text: `Not: ${item.note.trim()}` });
-    }
+  } catch {
+    return isoOrDisplay;
   }
-
-  blocks.push({ kind: "rule", style: "single" });
-
-  blocks.push({
-    kind: "pair",
-    left: "Ara Toplam",
-    right: formatMoney(order.subtotal),
-  });
-
-  if (order.deliveryFee != null && order.deliveryFee > 0) {
-    blocks.push({
-      kind: "pair",
-      left: "Teslimat",
-      right: formatMoney(order.deliveryFee),
-    });
-  }
-
-  blocks.push({ kind: "rule", style: "double" });
-  blocks.push({
-    kind: "pair",
-    left: "TOPLAM",
-    right: formatMoney(order.total),
-    emphasis: "bold",
-  });
-  blocks.push({ kind: "rule", style: "double" });
-
-  if (settings.showPaymentMethod) {
-    blocks.push({ kind: "line", text: `Ödeme: ${order.paymentMethodLabel}`, emphasis: "bold" });
-    if (order.paymentAtCloseLabel && order.paymentAtCloseLabel !== order.paymentMethodLabel) {
-      blocks.push({ kind: "line", text: `Tahsil: ${order.paymentAtCloseLabel}` });
-    }
-  }
-
-  if (settings.showOrderNote && order.orderNote?.trim()) {
-    blocks.push({ kind: "rule", style: "single" });
-    blocks.push({ kind: "line", text: "Sipariş Notu:" });
-    const note = order.orderNote.trim();
-    for (let i = 0; i < note.length; i += w) {
-      blocks.push({ kind: "indent", text: note.slice(i, i + w) });
-    }
-  }
-
-  blocks.push({ kind: "rule", style: "single" });
-
-  if (settings.footerText.trim()) {
-    blocks.push({ kind: "center", text: settings.footerText.trim() });
-  }
-
-  blocks.push({ kind: "blank" });
-  blocks.push({ kind: "center", text: "KendiSepetim", emphasis: "normal" });
-
-  return blocks;
 }
 
-export function renderThermalReceiptText(
+function pushWrapped(lines: string[], text: string, width: number, indent = "") {
+  const chunk = Math.max(1, width - indent.length);
+  for (let i = 0; i < text.length; i += chunk) {
+    lines.push(`${indent}${text.slice(i, i + chunk)}`.slice(0, width));
+  }
+}
+
+function pushItems(
+  lines: string[],
+  items: ReceiptItemLine[],
+  width: number,
+  showPrices: boolean,
+) {
+  for (const item of items) {
+    const left = `${item.qty}x ${item.name}`;
+    const right = showPrices ? formatMoney(item.lineTotal) : "";
+    lines.push(alignLeftRight(left, right || " ", width));
+    for (const mod of item.modifiers ?? []) {
+      lines.push(`  · ${mod}`.slice(0, width));
+    }
+    if (item.note?.trim()) {
+      lines.push(`  Not: ${item.note.trim()}`.slice(0, width));
+    }
+  }
+}
+
+export function renderCustomerReceiptText(
   order: ReceiptOrderData,
   settings: TenantReceiptSettings,
 ): string[] {
   const w = receiptCharWidth(settings.paperWidthMm);
-  const blocks = buildThermalReceiptBlocks(order, settings);
   const lines: string[] = [];
 
-  for (const block of blocks) {
-    if (block.kind === "blank") {
-      lines.push("");
-      continue;
-    }
-    if (block.kind === "rule") {
-      lines.push(repeatChar(block.style === "double" ? "=" : "-", w));
-      continue;
-    }
-    if (block.kind === "center") {
-      lines.push(center(block.text, w));
-      continue;
-    }
-    if (block.kind === "line") {
-      lines.push(block.text.slice(0, w));
-      continue;
-    }
-    if (block.kind === "pair") {
-      lines.push(alignLeftRight(block.left, block.right, w));
-      continue;
-    }
-    if (block.kind === "indent") {
-      lines.push(`  ${block.text}`.slice(0, w));
-    }
+  if (settings.showBusinessName) {
+    lines.push(center(order.businessName || "İşletme", w));
   }
 
+  if (settings.headerText.trim()) {
+    lines.push(center(settings.headerText.trim(), w));
+  }
+
+  if (settings.showOrderCode || settings.showDateTime) {
+    lines.push(repeatChar("-", w));
+    const meta: string[] = [];
+    if (settings.showOrderCode) meta.push(order.orderCode);
+    if (settings.showDateTime) meta.push(formatDateTime(order.createdAt));
+    lines.push(center(meta.join(" · "), w));
+  }
+
+  lines.push(repeatChar("=", w));
+  pushItems(lines, order.items, w, settings.showItemUnitPrices);
+  lines.push(repeatChar("-", w));
+
+  if (settings.showItemUnitPrices) {
+    lines.push(alignLeftRight("Ara Toplam", formatMoney(order.subtotal), w));
+    if (order.deliveryFee != null && order.deliveryFee > 0) {
+      lines.push(alignLeftRight("Teslimat", formatMoney(order.deliveryFee), w));
+    }
+    lines.push(repeatChar("=", w));
+    lines.push(alignLeftRight("TOPLAM", formatMoney(order.total), w));
+    lines.push(repeatChar("=", w));
+  }
+
+  if (settings.showPaymentMethod) {
+    lines.push(`Ödeme: ${order.paymentMethodLabel}`.slice(0, w));
+    if (order.paymentAtCloseLabel && order.paymentAtCloseLabel !== order.paymentMethodLabel) {
+      lines.push(`Tahsil: ${order.paymentAtCloseLabel}`.slice(0, w));
+    }
+    lines.push(repeatChar("-", w));
+  }
+
+  if (settings.showKendisepetimBranding) {
+    lines.push(center("Daha fazlası için", w));
+    lines.push(center("kendisepetim.com", w));
+  }
+
+  if (settings.showMenuQr) {
+    lines.push(center("[ QR MENÜ ]", w));
+    lines.push(center(order.menuUrl.replace(/^https?:\/\//, ""), w));
+  }
+
+  if (settings.footerText.trim()) {
+    lines.push("");
+    lines.push(center(settings.footerText.trim(), w));
+  }
+
+  lines.push(repeatChar("=", w));
   return lines;
 }
 
-/** Dashboard önizlemesi için örnek paket siparişi */
-export function sampleReceiptOrder(businessName: string): ReceiptOrderData {
+export function renderKitchenReceiptText(
+  order: Pick<ReceiptOrderData, "orderCode" | "createdAt" | "fulfillmentLabel" | "items" | "orderNote">,
+  settings: TenantReceiptSettings,
+): string[] {
+  const w = receiptCharWidth(settings.paperWidthMm);
+  const lines: string[] = [
+    center("MUTFAK", w),
+    repeatChar("=", w),
+  ];
+
+  if (settings.kitchenShowOrderMeta) {
+    lines.push(center(`${order.orderCode} · ${formatTimeOnly(order.createdAt)}`, w));
+    lines.push(center(order.fulfillmentLabel.toUpperCase(), w));
+    lines.push(repeatChar("-", w));
+  }
+
+  pushItems(lines, order.items, w, false);
+
+  if (settings.kitchenShowOrderNote && order.orderNote?.trim()) {
+    lines.push(repeatChar("-", w));
+    lines.push("SİPARİŞ NOTU:");
+    pushWrapped(lines, order.orderNote.trim(), w);
+  }
+
+  lines.push(repeatChar("=", w));
+  return lines;
+}
+
+export function renderCourierReceiptText(
+  order: ReceiptOrderData,
+  settings: TenantReceiptSettings,
+): string[] {
+  const w = receiptCharWidth(settings.paperWidthMm);
+  const lines: string[] = [
+    center("KURYE FİŞİ", w),
+    center(`${order.orderCode} · ${formatTimeOnly(order.createdAt)}`, w),
+    repeatChar("=", w),
+  ];
+
+  pushItems(lines, order.items, w, settings.courierShowPrices);
+
+  if (settings.courierShowPrices) {
+    lines.push(repeatChar("-", w));
+    lines.push(alignLeftRight("TOPLAM", formatMoney(order.total), w));
+  }
+
+  if (settings.courierShowPayment) {
+    lines.push(`Ödeme: ${order.paymentMethodLabel}`.slice(0, w));
+  }
+
+  if (settings.courierShowCustomer) {
+    lines.push(repeatChar("-", w));
+    if (order.customerName) lines.push(`Müşteri: ${order.customerName}`.slice(0, w));
+    if (order.customerPhone) lines.push(`Tel: ${order.customerPhone}`.slice(0, w));
+  }
+
+  if (settings.courierShowAddress && order.customerAddress?.trim()) {
+    lines.push(repeatChar("-", w));
+    lines.push("ADRES:");
+    pushWrapped(lines, order.customerAddress.trim(), w);
+  }
+
+  const hasGps =
+    settings.courierShowLocationQr &&
+    order.customerLatitude != null &&
+    order.customerLongitude != null &&
+    Number.isFinite(order.customerLatitude) &&
+    Number.isFinite(order.customerLongitude);
+
+  if (hasGps) {
+    lines.push(repeatChar("-", w));
+    lines.push(center("[ QR KONUM ]", w));
+    lines.push(center("Google Maps", w));
+  }
+
+  if (settings.courierShowOrderNote && order.orderNote?.trim()) {
+    lines.push(repeatChar("-", w));
+    lines.push("SİPARİŞ NOTU:");
+    pushWrapped(lines, order.orderNote.trim(), w);
+  }
+
+  lines.push(repeatChar("=", w));
+  return lines;
+}
+
+export function buildReceiptSlips(
+  order: ReceiptOrderData,
+  settings: TenantReceiptSettings,
+): ReceiptSlip[] {
+  const slips: ReceiptSlip[] = [];
+
+  if (settings.customerReceiptEnabled) {
+    const copies = Math.min(3, Math.max(1, settings.customerCopies));
+    const menuQr: ReceiptQrBlock[] =
+      settings.showMenuQr && order.menuUrl
+        ? [{ url: order.menuUrl, label: order.menuUrl.replace(/^https?:\/\//, "") }]
+        : [];
+
+    for (let i = 0; i < copies; i++) {
+      slips.push({
+        kind: "customer",
+        title: copies > 1 ? `Müşteri fişi (${i + 1}/${copies})` : "Müşteri fişi",
+        lines: renderCustomerReceiptText(order, settings),
+        qrBlocks: menuQr.length > 0 ? menuQr : undefined,
+      });
+    }
+  }
+
+  if (settings.kitchenReceiptEnabled) {
+    slips.push({
+      kind: "kitchen",
+      title: "Mutfak fişi",
+      lines: renderKitchenReceiptText(order, settings),
+    });
+  }
+
+  if (settings.courierReceiptEnabled && order.fulfillmentType === "delivery") {
+    const hasGps =
+      order.customerLatitude != null &&
+      order.customerLongitude != null &&
+      Number.isFinite(order.customerLatitude) &&
+      Number.isFinite(order.customerLongitude);
+
+    const qrBlocks: ReceiptQrBlock[] = [];
+    if (settings.courierShowLocationQr && hasGps) {
+      qrBlocks.push({
+        url: googleMapsPlaceUrl(order.customerLatitude!, order.customerLongitude!),
+        label: "Konum — Google Maps",
+      });
+    }
+
+    slips.push({
+      kind: "courier",
+      title: "Kurye fişi",
+      lines: renderCourierReceiptText(order, settings),
+      useKendisepetimLogo: true,
+      qrBlocks,
+    });
+  }
+
+  return slips;
+}
+
+/** @deprecated Eski tek fiş API — buildReceiptSlips kullanın */
+export function renderThermalReceiptText(
+  order: ReceiptOrderData,
+  settings: TenantReceiptSettings,
+): string[] {
+  return renderCustomerReceiptText(order, settings);
+}
+
+/** @deprecated Eski mutfak API */
+export function renderKitchenTicketText(
+  order: Pick<ReceiptOrderData, "orderCode" | "createdAt" | "fulfillmentLabel" | "items" | "orderNote">,
+  paperWidthMm: ReceiptPaperWidth,
+): string[] {
+  return renderKitchenReceiptText(order, {
+    ...DEFAULT_RECEIPT_SETTINGS,
+    paperWidthMm,
+    kitchenReceiptEnabled: true,
+  });
+}
+
+export function sampleReceiptOrder(businessName: string, subdomain = "ornek-restoran"): ReceiptOrderData {
+  const menuUrl = `https://${subdomain}.kendisepetim.com`;
   return {
     businessName: businessName || "Örnek Restoran",
+    subdomain,
+    menuUrl,
     orderCode: "KS-1042",
     createdAt: "2026-06-27T14:32:00",
+    fulfillmentType: "delivery",
     fulfillmentLabel: "Paket",
     customerName: "Ayşe Yılmaz",
     customerPhone: "0532 000 00 00",
     customerAddress: "Caferağa Mah. Moda Cad. No:12 D:3 Kadıköy / İstanbul",
+    customerLatitude: 40.9876,
+    customerLongitude: 29.0234,
     items: [
       {
         qty: 2,
         name: "Karışık Izgara",
         unitPrice: 320,
         lineTotal: 640,
-        modifiers: ["Soğansız"],
+        modifiers: ["1,5 Porsiyon", "Soğansız"],
       },
       { qty: 1, name: "Ayran", unitPrice: 35, lineTotal: 35 },
     ],
     subtotal: 675,
     deliveryFee: 0,
     total: 675,
-    paymentMethodLabel: "Nakit",
+    paymentMethodLabel: "Kapıda nakit",
     orderNote: "Kapı zili çalışmıyor, lütfen arayın.",
   };
-}
-
-/** Mutfak fişi — fiyat yok, YS mutfak çıktısı tarzı */
-export function renderKitchenTicketText(
-  order: Pick<ReceiptOrderData, "orderCode" | "createdAt" | "fulfillmentLabel" | "items" | "orderNote">,
-  paperWidthMm: ReceiptPaperWidth,
-): string[] {
-  const w = receiptCharWidth(paperWidthMm);
-  const lines: string[] = [
-    center("MUTFAK", w),
-    center("***", w),
-    repeatChar("=", w),
-    `NO: ${order.orderCode}`,
-    formatDateTime(order.createdAt),
-    order.fulfillmentLabel.toUpperCase(),
-    repeatChar("-", w),
-  ];
-
-  for (const item of order.items) {
-    lines.push(`${item.qty}x ${item.name}`.slice(0, w));
-    for (const mod of item.modifiers ?? []) {
-      lines.push(`  - ${mod}`.slice(0, w));
-    }
-  }
-
-  if (order.orderNote?.trim()) {
-    lines.push(repeatChar("-", w));
-    lines.push("NOT:");
-    const note = order.orderNote.trim();
-    for (let i = 0; i < note.length; i += w) {
-      lines.push(note.slice(i, i + w));
-    }
-  }
-
-  lines.push(repeatChar("=", w));
-  return lines;
 }

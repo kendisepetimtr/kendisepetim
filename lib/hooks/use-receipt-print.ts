@@ -16,7 +16,21 @@ type PaymentClose = {
   mealCardBrandId?: MealCardBrandId;
 };
 
-export function useKasaReceiptPrint(businessName: string) {
+async function fetchDashboardOrderById(orderId: string): Promise<AdminOrder | null> {
+  try {
+    const res = await fetch(`/api/dashboard/orders?orderId=${encodeURIComponent(orderId)}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as { ok?: boolean; order?: AdminOrder };
+    if (!res.ok || !data.ok || !data.order) return null;
+    return data.order;
+  } catch {
+    return null;
+  }
+}
+
+export function useKasaReceiptPrint(businessName: string, subdomain: string) {
   const optionsRef = useRef<ReceiptPrintOptions | null>(null);
 
   const loadOptions = useCallback(async () => {
@@ -30,10 +44,10 @@ export function useKasaReceiptPrint(businessName: string) {
     async (order: AdminOrder, paymentAtClose?: PaymentClose) => {
       const options = await loadOptions();
       if (!options) return false;
-      const data = adminOrderToReceiptData(order, businessName, paymentAtClose);
+      const data = adminOrderToReceiptData(order, businessName, subdomain, paymentAtClose);
       return printThermalReceipt(data, options);
     },
-    [businessName, loadOptions],
+    [businessName, subdomain, loadOptions],
   );
 
   const printOrderIfAuto = useCallback(
@@ -58,12 +72,13 @@ export function useKasaReceiptPrint(businessName: string) {
         orders,
         tableNumber,
         businessName,
+        subdomain,
         sessionTotal,
         paymentAtClose,
       );
       return printThermalReceipt(data, options);
     },
-    [businessName, loadOptions],
+    [businessName, subdomain, loadOptions],
   );
 
   const printSessionIfAuto = useCallback(
@@ -83,11 +98,12 @@ export function useKasaReceiptPrint(businessName: string) {
   return { printOrder, printOrderIfAuto, printSession, printSessionIfAuto };
 }
 
-export function useDashboardReceiptPrint(businessName: string) {
+export function useDashboardReceiptPrint(businessName: string, subdomain: string) {
   const optionsRef = useRef<ReceiptPrintOptions | null>(null);
+  const printedOrderIdsRef = useRef<Set<string>>(new Set());
 
-  const loadOptions = useCallback(async () => {
-    if (!optionsRef.current) {
+  const loadOptions = useCallback(async (force = false) => {
+    if (!optionsRef.current || force) {
       optionsRef.current = await fetchDashboardReceiptPrintOptions();
     }
     return optionsRef.current;
@@ -104,11 +120,27 @@ export function useDashboardReceiptPrint(businessName: string) {
         window.alert("Fiş yazdırma kapalı. Dashboard → Operasyonlar → Fiş ayarlarından açın.");
         return false;
       }
-      const data = adminOrderToReceiptData(order, businessName);
+      const data = adminOrderToReceiptData(order, businessName, subdomain);
       return printThermalReceipt(data, options);
     },
-    [businessName, loadOptions],
+    [businessName, subdomain, loadOptions],
   );
 
-  return { printOrder };
+  const printOrderIfAutoOnCreate = useCallback(
+    async (orderId: string) => {
+      if (printedOrderIdsRef.current.has(orderId)) return false;
+      const options = await loadOptions(true);
+      if (!options?.settings.enabled || !options.settings.autoPrintOnNewOrder) return false;
+
+      const order = await fetchDashboardOrderById(orderId);
+      if (!order) return false;
+
+      printedOrderIdsRef.current.add(orderId);
+      const data = adminOrderToReceiptData(order, businessName, subdomain);
+      return printThermalReceipt(data, options);
+    },
+    [businessName, subdomain, loadOptions],
+  );
+
+  return { printOrder, printOrderIfAutoOnCreate };
 }

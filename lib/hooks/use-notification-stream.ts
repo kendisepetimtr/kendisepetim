@@ -26,6 +26,8 @@ type UseNotificationStreamOptions = {
   refreshOnActions?: string[];
   onRefresh?: () => void;
   onActivity?: (log: ActivityLogRow) => void;
+  /** true dönerse varsayılan tek seferlik ses atlanır */
+  onSoundAlert?: (log: ActivityLogRow, settings: TenantNotificationSettings) => boolean | void;
 };
 
 function formatToastTitle(log: ActivityLogRow): string {
@@ -38,16 +40,19 @@ export function useNotificationStream({
   refreshOnActions = [],
   onRefresh,
   onActivity,
+  onSoundAlert,
 }: UseNotificationStreamOptions) {
   const settingsRef = useRef<TenantNotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const onRefreshRef = useRef(onRefresh);
   const onActivityRef = useRef(onActivity);
+  const onSoundAlertRef = useRef(onSoundAlert);
   const refreshActionsRef = useRef(refreshOnActions);
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
   const [connected, setConnected] = useState(false);
 
   onRefreshRef.current = onRefresh;
   onActivityRef.current = onActivity;
+  onSoundAlertRef.current = onSoundAlert;
   refreshActionsRef.current = refreshOnActions;
 
   const dismissToast = useCallback((id: string) => {
@@ -81,7 +86,10 @@ export function useNotificationStream({
       const settings = settingsRef.current;
       if (shouldAlertForAction(log.action, settings)) {
         if (settings.soundEnabled) {
-          void playNotificationSound(settings.soundId);
+          const skipDefaultSound = onSoundAlertRef.current?.(log, settings) === true;
+          if (!skipDefaultSound) {
+            void playNotificationSound(settings.soundId);
+          }
         }
         if (settings.toastEnabled) {
           setToasts((prev) => {

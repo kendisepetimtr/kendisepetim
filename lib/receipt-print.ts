@@ -1,57 +1,19 @@
 /**
- * Tarayıcı üzerinden termal fiş yazdırma (burger34x Admin paneli ile aynı yaklaşım).
- * Windows'ta varsayılan termal yazıcı seçiliyken doğrudan 80 mm kağıda basılır.
+ * Tarayıcı üzerinden termal fiş yazdırma — müşteri, mutfak, kurye fişleri.
  */
 
 import type { TenantReceiptSettings } from "@/lib/receipt-settings";
-import {
-  renderKitchenTicketText,
-  renderThermalReceiptText,
-  type ReceiptOrderData,
-} from "@/lib/receipt-template";
+import { buildReceiptSlips, type ReceiptOrderData, type ReceiptSlip } from "@/lib/receipt-template";
+import { qrCodeApiUrl } from "@/lib/qr-with-logo";
 
 export type ReceiptPrintOptions = {
   settings: TenantReceiptSettings;
   logoUrl?: string | null;
+  kendisepetimLogoUrl?: string;
 };
 
 function paperCssWidth(mm: 58 | 80): string {
   return mm === 58 ? "58mm" : "80mm";
-}
-
-function buildPrintHtml(
-  lines: string[],
-  kitchenLines: string[],
-  options: ReceiptPrintOptions,
-): string {
-  const { settings, logoUrl } = options;
-  const width = paperCssWidth(settings.paperWidthMm);
-  const body = lines.map((l) => escapeHtml(l)).join("\n");
-  const kitchen =
-    kitchenLines.length > 0
-      ? `<div style="page-break-before:always;margin-top:8px;">${kitchenLines.map((l) => escapeHtml(l)).join("\n")}</div>`
-      : "";
-
-  const logoBlock =
-    settings.showLogo && logoUrl
-      ? `<div style="text-align:center;margin-bottom:8px;"><img src="${escapeAttr(logoUrl)}" alt="" style="max-height:48px;max-width:70%;" /></div>`
-      : settings.showLogo
-        ? `<div style="text-align:center;font-size:10px;color:#888;margin-bottom:6px;">[ LOGO ]</div>`
-        : "";
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8" />
-<title>Fiş</title>
-<style>
-  @page { margin: 2mm; size: ${width} auto; }
-  body { width: ${width}; margin: 0 auto; padding: 2mm 3mm; font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.35; color: #000; background: #fff; }
-  pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-family: inherit; font-size: inherit; }
-</style>
-</head><body>
-${logoBlock}
-<pre>${body}</pre>
-${kitchen ? `<pre>${kitchen}</pre>` : ""}
-</body></html>`;
 }
 
 function escapeHtml(s: string): string {
@@ -66,6 +28,67 @@ function escapeAttr(s: string): string {
   return escapeHtml(s).replace(/'/g, "&#39;");
 }
 
+function renderLogoBlock(src: string | null | undefined, alt: string): string {
+  if (!src) {
+    return `<div style="text-align:center;font-size:10px;color:#888;margin-bottom:6px;">[ LOGO ]</div>`;
+  }
+  return `<div style="text-align:center;margin-bottom:8px;"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" style="max-height:52px;max-width:72%;" /></div>`;
+}
+
+function renderQrBlocks(blocks: ReceiptSlip["qrBlocks"]): string {
+  if (!blocks?.length) return "";
+  return blocks
+    .map((block) => {
+      const qrSrc = qrCodeApiUrl(block.url, 140);
+      const label = block.label ? `<div style="margin-top:4px;font-size:10px;">${escapeHtml(block.label)}</div>` : "";
+      return `<div style="text-align:center;margin:10px 0 4px;">
+        <img src="${escapeAttr(qrSrc)}" alt="" width="110" height="110" style="image-rendering:pixelated;" />
+        ${label}
+      </div>`;
+    })
+    .join("");
+}
+
+function renderSlipHtml(slip: ReceiptSlip, options: ReceiptPrintOptions, isFirst: boolean): string {
+  const { settings, logoUrl, kendisepetimLogoUrl } = options;
+  const body = slip.lines.map((l) => escapeHtml(l)).join("\n");
+
+  let logoBlock = "";
+  if (slip.kind === "customer" && settings.showLogo) {
+    logoBlock = renderLogoBlock(logoUrl, "İşletme logosu");
+  } else if (slip.useKendisepetimLogo) {
+    logoBlock = renderLogoBlock(kendisepetimLogoUrl ?? "/ks-logo.png", "KendiSepetim");
+  }
+
+  const pageBreak = isFirst ? "" : "page-break-before:always;";
+
+  return `<section style="${pageBreak}margin-top:8px;padding-top:4px;">
+${logoBlock}
+<pre style="white-space:pre-wrap;word-break:break-word;margin:0;">${body}</pre>
+${renderQrBlocks(slip.qrBlocks)}
+</section>`;
+}
+
+function buildPrintHtml(slips: ReceiptSlip[], options: ReceiptPrintOptions): string {
+  const { settings } = options;
+  const width = paperCssWidth(settings.paperWidthMm);
+  const sections = slips
+    .map((slip, index) => renderSlipHtml(slip, options, index === 0))
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8" />
+<title>Fiş</title>
+<style>
+  @page { margin: 2mm; size: ${width} auto; }
+  body { width: ${width}; margin: 0 auto; padding: 2mm 3mm; font-family: "Courier New", Courier, monospace; font-size: 11px; line-height: 1.35; color: #000; background: #fff; }
+  pre { font-family: inherit; font-size: inherit; }
+</style>
+</head><body>
+${sections}
+</body></html>`;
+}
+
 export function printThermalReceipt(
   order: ReceiptOrderData,
   options: ReceiptPrintOptions,
@@ -74,29 +97,20 @@ export function printThermalReceipt(
   const { settings } = options;
   if (!settings.enabled) return false;
 
-  const lines = renderThermalReceiptText(order, settings);
-  const kitchenLines = settings.kitchenTicketEnabled
-    ? renderKitchenTicketText(order, settings.paperWidthMm)
-    : [];
+  const slips = buildReceiptSlips(order, settings);
+  if (slips.length === 0) return false;
 
-  const html = buildPrintHtml(lines, kitchenLines, options);
-  const copies = Math.min(3, Math.max(1, settings.copies));
-
-  for (let c = 0; c < copies; c++) {
-    const popup = window.open("", "_blank", "width=400,height=720");
-    if (!popup) {
-      window.alert("Yazdırma penceresi açılamadı. Tarayıcı açılır pencereyi engelliyor olabilir.");
-      return false;
-    }
-    popup.document.write(html);
-    popup.document.close();
-    popup.focus();
-    popup.print();
-    if (c < copies - 1) {
-      popup.close();
-    }
+  const html = buildPrintHtml(slips, options);
+  const popup = window.open("", "_blank", "width=420,height=900");
+  if (!popup) {
+    window.alert("Yazdırma penceresi açılamadı. Tarayıcı açılır pencereyi engelliyor olabilir.");
+    return false;
   }
 
+  popup.document.write(html);
+  popup.document.close();
+  popup.focus();
+  popup.print();
   return true;
 }
 
@@ -105,11 +119,17 @@ export async function fetchKasaReceiptPrintOptions(): Promise<ReceiptPrintOption
     const res = await fetch("/api/kasa/receipt-settings", { cache: "no-store" });
     const data = (await res.json()) as {
       ok?: boolean;
-      settings?: TenantReceiptSettings;
+      settings?: ReceiptPrintOptions["settings"];
       logoUrl?: string | null;
+      subdomain?: string;
     };
     if (!res.ok || !data.ok || !data.settings) return null;
-    return { settings: data.settings, logoUrl: data.logoUrl ?? null };
+    return {
+      settings: data.settings,
+      logoUrl: data.logoUrl ?? null,
+      kendisepetimLogoUrl:
+        typeof window !== "undefined" ? `${window.location.origin}/ks-logo.png` : "/ks-logo.png",
+    };
   } catch {
     return null;
   }
@@ -123,11 +143,17 @@ export async function fetchDashboardReceiptPrintOptions(): Promise<ReceiptPrintO
     });
     const data = (await res.json()) as {
       ok?: boolean;
-      settings?: TenantReceiptSettings;
+      settings?: ReceiptPrintOptions["settings"];
       logoUrl?: string | null;
+      subdomain?: string;
     };
     if (!res.ok || !data.ok || !data.settings) return null;
-    return { settings: data.settings, logoUrl: data.logoUrl ?? null };
+    return {
+      settings: data.settings,
+      logoUrl: data.logoUrl ?? null,
+      kendisepetimLogoUrl:
+        typeof window !== "undefined" ? `${window.location.origin}/ks-logo.png` : "/ks-logo.png",
+    };
   } catch {
     return null;
   }

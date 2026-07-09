@@ -9,18 +9,8 @@ import { formatTry } from "@/lib/orders-report";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import NotificationToastStack from "@/components/notifications/notification-toast-stack";
-import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
 import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
 
-const REFRESH_ON_ACTIONS = [
-  "order_created",
-  "bill_requested",
-  "payment_closed",
-  "order_status_updated",
-  "delivery_status_updated",
-  "courier_assigned",
-];
 
 const CHANNEL_TABS: { id: OrderChannelFilter; label: string }[] = [
   { id: "all", label: "Tümü" },
@@ -63,11 +53,15 @@ function NoteWithMapLinks({ text }: { text: string }) {
 type DashboardOrdersListProps = {
   remoteAuthEnabled?: boolean;
   businessName?: string;
+  subdomain?: string;
+  refreshKey?: number;
 };
 
 export default function DashboardOrdersList({
   remoteAuthEnabled = false,
   businessName = "",
+  subdomain = "",
+  refreshKey = 0,
 }: DashboardOrdersListProps) {
   const [channel, setChannel] = useState<OrderChannelFilter>("all");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -104,18 +98,11 @@ export default function DashboardOrdersList({
     }
   }, [channel, remoteAuthEnabled]);
 
-  const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
-    streamUrl: "/api/dashboard/notifications/stream",
-    enabled: remoteAuthEnabled,
-    refreshOnActions: REFRESH_ON_ACTIONS,
-    onRefresh: load,
-  });
-
-  const { printOrder } = useDashboardReceiptPrint(businessName);
+  const { printOrder } = useDashboardReceiptPrint(businessName, subdomain);
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   function handleStatusChange(orderId: string, status: OrderStatus) {
     startTransition(async () => {
@@ -296,13 +283,6 @@ export default function DashboardOrdersList({
           })}
         </ul>
       )}
-
-      <NotificationToastStack
-        toasts={toasts}
-        onDismiss={dismissToast}
-        formatTitle={formatToastTitle}
-        formatSummary={formatActivityLogSummary}
-      />
     </div>
   );
 }

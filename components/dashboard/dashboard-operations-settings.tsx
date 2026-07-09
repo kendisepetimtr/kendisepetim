@@ -50,6 +50,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
   );
   const [receiptSettings, setReceiptSettings] = useState<TenantReceiptSettings>(DEFAULT_RECEIPT_SETTINGS);
   const [businessName, setBusinessName] = useState("");
+  const [subdomain, setSubdomain] = useState("");
   const [notifSavedFlash, setNotifSavedFlash] = useState(false);
   const [receiptSavedFlash, setReceiptSavedFlash] = useState(false);
 
@@ -70,6 +71,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       setNotificationSettings(data.settings.notificationSettings);
       setReceiptSettings(data.settings.receiptSettings);
       setBusinessName(data.settings.businessName);
+      setSubdomain(data.settings.subdomain);
     } catch {
       setLoadError("Operasyon ayarları yüklenemedi.");
     }
@@ -592,8 +594,8 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       >
         <h3 className="font-headline text-base font-bold text-on-background">Fiş ayarları</h3>
         <p className="mt-1 text-xs leading-relaxed text-secondary">
-          Standart 80 mm termal yazıcı (ESC/POS) — Yemeksepeti / Getir tarzı sipariş fişi. Kasa ödemesinde
-          otomatik basılacak; yazıcı bağlantısı sonraki adımda eklenecek.
+          Her siparişte müşteri, mutfak ve (paket siparişlerde) kurye fişi basılır. Yeni sipariş geldiğinde veya ödeme
+          alındığında otomatik yazdırılabilir.
         </p>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -607,8 +609,17 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
               />
               <span>
                 <span className="block text-sm font-medium text-on-background">Fiş yazdırmayı etkinleştir</span>
-                <span className="mt-0.5 block text-xs text-secondary">Kasa kapanışında fiş üretilir (yakında).</span>
               </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={receiptSettings.autoPrintOnNewOrder}
+                onChange={(e) => patchReceipt("autoPrintOnNewOrder", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+              />
+              <span className="text-sm text-on-background">Yeni sipariş geldiğinde otomatik yazdır</span>
             </label>
 
             <label className="flex cursor-pointer items-start gap-3">
@@ -620,21 +631,6 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
               />
               <span className="text-sm text-on-background">Ödeme alındığında otomatik yazdır</span>
             </label>
-
-            <div>
-              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-copies`}>
-                Kopya sayısı
-              </label>
-              <input
-                id={`${baseId}-copies`}
-                type="number"
-                min={1}
-                max={3}
-                value={receiptSettings.copies}
-                onChange={(e) => patchReceipt("copies", Number(e.target.value))}
-                className="mt-1 w-24 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
-              />
-            </div>
 
             <div>
               <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-paper`}>
@@ -651,22 +647,57 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
               </select>
             </div>
 
+            <fieldset className="rounded-xl border border-surface-container-highest p-3">
+              <legend className="px-1 text-xs font-semibold text-secondary">Fiş tipleri</legend>
+              <div className="mt-2 space-y-2">
+                <label className="flex items-center gap-2 text-sm text-on-background">
+                  <input
+                    type="checkbox"
+                    checked={receiptSettings.customerReceiptEnabled}
+                    onChange={(e) => patchReceipt("customerReceiptEnabled", e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                  />
+                  Müşteri fişi
+                </label>
+                <label className="flex items-center gap-2 text-sm text-on-background">
+                  <input
+                    type="checkbox"
+                    checked={receiptSettings.kitchenReceiptEnabled}
+                    onChange={(e) => patchReceipt("kitchenReceiptEnabled", e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                  />
+                  Mutfak fişi
+                </label>
+                <label className="flex items-center gap-2 text-sm text-on-background">
+                  <input
+                    type="checkbox"
+                    checked={receiptSettings.courierReceiptEnabled}
+                    onChange={(e) => patchReceipt("courierReceiptEnabled", e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                  />
+                  Kurye fişi (yalnızca paket)
+                </label>
+              </div>
+            </fieldset>
+
             <div>
-              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-header`}>
-                Üst metin (opsiyonel)
+              <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-copies`}>
+                Müşteri fişi kopya sayısı
               </label>
               <input
-                id={`${baseId}-header`}
-                value={receiptSettings.headerText}
-                onChange={(e) => patchReceipt("headerText", e.target.value)}
-                placeholder="Örn. Hoş geldiniz"
-                className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
+                id={`${baseId}-copies`}
+                type="number"
+                min={1}
+                max={3}
+                value={receiptSettings.customerCopies}
+                onChange={(e) => patchReceipt("customerCopies", Number(e.target.value))}
+                className="mt-1 w-24 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-footer`}>
-                Alt metin
+                Müşteri fişi alt metni
               </label>
               <textarea
                 id={`${baseId}-footer`}
@@ -678,7 +709,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
             </div>
 
             <fieldset className="rounded-xl border border-surface-container-highest p-3">
-              <legend className="px-1 text-xs font-semibold text-secondary">Fişte göster</legend>
+              <legend className="px-1 text-xs font-semibold text-secondary">Müşteri fişi</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {(
                   [
@@ -686,11 +717,10 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                     ["showBusinessName", "İşletme adı"],
                     ["showOrderCode", "Sipariş no"],
                     ["showDateTime", "Tarih / saat"],
-                    ["showTableNumber", "Sipariş tipi (Gel-Al / Paket / Masa)"],
-                    ["showCustomerInfo", "Müşteri ve adres"],
-                    ["showItemUnitPrices", "Kalem tutarları (sağda)"],
+                    ["showItemUnitPrices", "Kalem tutarları"],
                     ["showPaymentMethod", "Ödeme yöntemi"],
-                    ["showOrderNote", "Sipariş notu"],
+                    ["showMenuQr", "Menü QR kodu"],
+                    ["showKendisepetimBranding", "kendisepetim.com satırı"],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-sm text-on-background">
@@ -706,23 +736,58 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
               </div>
             </fieldset>
 
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={receiptSettings.kitchenTicketEnabled}
-                onChange={(e) => patchReceipt("kitchenTicketEnabled", e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
-              />
-              <span>
-                <span className="block text-sm font-medium text-on-background">Mutfak fişi</span>
-                <span className="mt-0.5 block text-xs text-secondary">
-                  Sipariş kalemleri için ayrı mutfak çıktısı (yazıcı entegrasyonu ile).
-                </span>
-              </span>
-            </label>
+            <fieldset className="rounded-xl border border-surface-container-highest p-3">
+              <legend className="px-1 text-xs font-semibold text-secondary">Mutfak fişi</legend>
+              <div className="mt-2 grid gap-2">
+                <label className="flex items-center gap-2 text-sm text-on-background">
+                  <input
+                    type="checkbox"
+                    checked={receiptSettings.kitchenShowOrderMeta}
+                    onChange={(e) => patchReceipt("kitchenShowOrderMeta", e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                  />
+                  Sipariş no ve saat
+                </label>
+                <label className="flex items-center gap-2 text-sm text-on-background">
+                  <input
+                    type="checkbox"
+                    checked={receiptSettings.kitchenShowOrderNote}
+                    onChange={(e) => patchReceipt("kitchenShowOrderNote", e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                  />
+                  Sipariş notu
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="rounded-xl border border-surface-container-highest p-3">
+              <legend className="px-1 text-xs font-semibold text-secondary">Kurye fişi</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    ["courierShowPrices", "Ürün fiyatları"],
+                    ["courierShowPayment", "Ödeme şekli"],
+                    ["courierShowCustomer", "Müşteri adı ve telefon"],
+                    ["courierShowAddress", "Adres"],
+                    ["courierShowLocationQr", "Konum QR (GPS)"],
+                    ["courierShowOrderNote", "Sipariş notu"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 text-sm text-on-background">
+                    <input
+                      type="checkbox"
+                      checked={receiptSettings[key]}
+                      onChange={(e) => patchReceipt(key, e.target.checked)}
+                      className="h-4 w-4 rounded border-surface-container-highest text-primary"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </div>
 
-          <ReceiptSettingsPreview businessName={businessName} settings={receiptSettings} />
+          <ReceiptSettingsPreview businessName={businessName} subdomain={subdomain} settings={receiptSettings} />
         </div>
 
         <div className="mt-4 flex items-center gap-3">

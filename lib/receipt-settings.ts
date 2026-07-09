@@ -1,72 +1,118 @@
 /**
- * Fiş şablonu ayarları — standart 80 mm termal (Yemeksepeti / Getir tarzı).
- *
- * Düzen: ortalanmış işletme adı → çift çizgi → sipariş no / tarih / tip →
- * müşteri bloğu → kalemler (adet×ürün + sağda tutar) → ara toplam →
- * teslimat (varsa) → TOPLAM → ödeme → sipariş notu → alt metin.
- *
- * Yazdırma: lib/receipt-template.ts satır listesi → ESC/POS (sonraki faz).
+ * Fiş şablonu ayarları — 3 ayrı fiş tipi (müşteri, mutfak, kurye).
  */
 
 export type TenantReceiptSettings = {
   enabled: boolean;
+  autoPrintOnNewOrder: boolean;
   autoPrintOnPayment: boolean;
-  copies: number;
+  paperWidthMm: 58 | 80;
+
+  customerReceiptEnabled: boolean;
+  customerCopies: number;
   headerText: string;
   footerText: string;
   showLogo: boolean;
   showBusinessName: boolean;
   showOrderCode: boolean;
   showDateTime: boolean;
-  showCustomerInfo: boolean;
   showPaymentMethod: boolean;
-  showTableNumber: boolean;
-  showOrderNote: boolean;
   showItemUnitPrices: boolean;
-  kitchenTicketEnabled: boolean;
-  paperWidthMm: 58 | 80;
+  showMenuQr: boolean;
+  showKendisepetimBranding: boolean;
+
+  kitchenReceiptEnabled: boolean;
+  kitchenShowOrderMeta: boolean;
+  kitchenShowOrderNote: boolean;
+
+  courierReceiptEnabled: boolean;
+  courierShowPrices: boolean;
+  courierShowPayment: boolean;
+  courierShowCustomer: boolean;
+  courierShowAddress: boolean;
+  courierShowLocationQr: boolean;
+  courierShowOrderNote: boolean;
 };
 
 export const DEFAULT_RECEIPT_SETTINGS: TenantReceiptSettings = {
   enabled: false,
+  autoPrintOnNewOrder: true,
   autoPrintOnPayment: true,
-  copies: 1,
+  paperWidthMm: 80,
+
+  customerReceiptEnabled: true,
+  customerCopies: 1,
   headerText: "",
   footerText: "Afiyet olsun!",
   showLogo: true,
   showBusinessName: true,
   showOrderCode: true,
   showDateTime: true,
-  showCustomerInfo: true,
   showPaymentMethod: true,
-  showTableNumber: true,
-  showOrderNote: true,
   showItemUnitPrices: true,
-  kitchenTicketEnabled: false,
-  paperWidthMm: 80,
+  showMenuQr: true,
+  showKendisepetimBranding: true,
+
+  kitchenReceiptEnabled: true,
+  kitchenShowOrderMeta: true,
+  kitchenShowOrderNote: true,
+
+  courierReceiptEnabled: true,
+  courierShowPrices: true,
+  courierShowPayment: true,
+  courierShowCustomer: true,
+  courierShowAddress: true,
+  courierShowLocationQr: true,
+  courierShowOrderNote: true,
 };
+
+function readBool(o: Record<string, unknown>, key: string, fallback: boolean): boolean {
+  return typeof o[key] === "boolean" ? (o[key] as boolean) : fallback;
+}
 
 export function parseReceiptSettings(raw: unknown): TenantReceiptSettings {
   const base = DEFAULT_RECEIPT_SETTINGS;
   if (!raw || typeof raw !== "object") return base;
   const o = raw as Record<string, unknown>;
   const width = Number(o.paperWidthMm);
+  const copiesRaw = typeof o.customerCopies === "number" ? o.customerCopies : o.copies;
+  const copies =
+    typeof copiesRaw === "number" && copiesRaw >= 1 && copiesRaw <= 3 ? Math.round(copiesRaw) : base.customerCopies;
+
+  const kitchenEnabled =
+    typeof o.kitchenReceiptEnabled === "boolean"
+      ? o.kitchenReceiptEnabled
+      : o.kitchenTicketEnabled === true;
+
   return {
     enabled: o.enabled === true,
+    autoPrintOnNewOrder: o.autoPrintOnNewOrder !== false,
     autoPrintOnPayment: o.autoPrintOnPayment !== false,
-    copies: typeof o.copies === "number" && o.copies >= 1 && o.copies <= 3 ? Math.round(o.copies) : base.copies,
+    paperWidthMm: width === 58 ? 58 : 80,
+
+    customerReceiptEnabled: o.customerReceiptEnabled !== false,
+    customerCopies: copies,
     headerText: typeof o.headerText === "string" ? o.headerText : base.headerText,
     footerText: typeof o.footerText === "string" ? o.footerText : base.footerText,
-    showLogo: o.showLogo !== false,
-    showBusinessName: o.showBusinessName !== false,
-    showOrderCode: o.showOrderCode !== false,
-    showDateTime: o.showDateTime !== false,
-    showCustomerInfo: o.showCustomerInfo !== false,
-    showPaymentMethod: o.showPaymentMethod !== false,
-    showTableNumber: o.showTableNumber !== false,
-    showOrderNote: o.showOrderNote !== false,
-    showItemUnitPrices: o.showItemUnitPrices !== false,
-    kitchenTicketEnabled: o.kitchenTicketEnabled === true,
-    paperWidthMm: width === 58 ? 58 : 80,
+    showLogo: readBool(o, "showLogo", base.showLogo),
+    showBusinessName: readBool(o, "showBusinessName", base.showBusinessName),
+    showOrderCode: readBool(o, "showOrderCode", base.showOrderCode),
+    showDateTime: readBool(o, "showDateTime", base.showDateTime),
+    showPaymentMethod: readBool(o, "showPaymentMethod", base.showPaymentMethod),
+    showItemUnitPrices: readBool(o, "showItemUnitPrices", base.showItemUnitPrices),
+    showMenuQr: o.showMenuQr !== false,
+    showKendisepetimBranding: o.showKendisepetimBranding !== false,
+
+    kitchenReceiptEnabled: kitchenEnabled,
+    kitchenShowOrderMeta: o.kitchenShowOrderMeta !== false,
+    kitchenShowOrderNote: readBool(o, "kitchenShowOrderNote", o.showOrderNote !== false),
+
+    courierReceiptEnabled: o.courierReceiptEnabled !== false,
+    courierShowPrices: o.courierShowPrices !== false,
+    courierShowPayment: o.courierShowPayment !== false,
+    courierShowCustomer: o.courierShowCustomer !== false,
+    courierShowAddress: o.courierShowAddress !== false,
+    courierShowLocationQr: o.courierShowLocationQr !== false,
+    courierShowOrderNote: o.courierShowOrderNote !== false,
   };
 }

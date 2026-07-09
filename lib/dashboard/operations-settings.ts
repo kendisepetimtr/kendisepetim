@@ -21,6 +21,7 @@ export type OperationsSettingsState = {
   notificationSettings: TenantNotificationSettings;
   receiptSettings: TenantReceiptSettings;
   businessName: string;
+  subdomain: string;
 };
 
 export type OperationsSettingsResult =
@@ -94,6 +95,7 @@ export async function loadOperationsSettings(): Promise<OperationsSettingsResult
         notificationSettings: parseNotificationSettings(row.notification_settings),
         receiptSettings: parseReceiptSettings(row.receipt_settings),
         businessName: tenant.business_name ?? tenant.subdomain,
+        subdomain: tenant.subdomain,
       },
     };
   } catch (error) {

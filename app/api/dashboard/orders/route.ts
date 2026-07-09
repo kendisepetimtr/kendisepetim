@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  loadDashboardOrderById,
   loadDashboardOrders,
   updateDashboardOrderStatus,
   type OrderChannelFilter,
@@ -16,6 +17,16 @@ function parseChannel(raw: string | null): OrderChannelFilter {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const orderId = searchParams.get("orderId")?.trim();
+  if (orderId) {
+    const result = await loadDashboardOrderById(orderId);
+    if (!result.ok) {
+      const status = result.error === "Oturum bulunamadı." ? 401 : 400;
+      return NextResponse.json(result, { status });
+    }
+    return NextResponse.json({ ok: true, order: result.orders[0] ?? null });
+  }
+
   const channel = parseChannel(searchParams.get("channel"));
   const result = await loadDashboardOrders(channel);
   if (!result.ok) {
