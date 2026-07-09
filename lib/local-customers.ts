@@ -109,6 +109,7 @@ export function customerToFormValues(c: LocalCustomer): CustomerFormValues {
     siteName: a.siteName,
     block: a.block,
     orderNote: "",
+    courierNote: "",
   };
 }
 

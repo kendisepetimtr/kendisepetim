@@ -31,6 +31,7 @@ export type LocalOrder = {
   mealCardBrandId?: MealCardBrandId;
   /** Müşteri notu + isteğe bağlı konum satırı */
   orderNote: string;
+  courierNote?: string;
 };
 
 export type LocalOrdersState = { orders: LocalOrder[] };
@@ -106,6 +107,7 @@ export function getLocalOrders(subdomain: string): LocalOrdersState {
         paymentMethod,
         mealCardBrandId: paymentMethod === "meal_card" ? mealCardBrandId : undefined,
         orderNote: typeof row.orderNote === "string" ? row.orderNote : "",
+        courierNote: typeof row.courierNote === "string" ? row.courierNote : "",
       });
     }
     orders.sort((a, b) => b.createdAt.localeCompare(a.createdAt));

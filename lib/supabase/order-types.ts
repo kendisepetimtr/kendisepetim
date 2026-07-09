@@ -22,6 +22,7 @@ export type OrderRow = {
   payment_method_at_close: CheckoutPaymentMethod | null;
   meal_card_brand_id: MealCardBrandId | null;
   order_note: string;
+  courier_note: string;
   fulfillment_type: FulfillmentType;
   customer_latitude: number | null;
   customer_longitude: number | null;

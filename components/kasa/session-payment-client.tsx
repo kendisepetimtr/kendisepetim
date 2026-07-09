@@ -198,7 +198,10 @@ export default function SessionPaymentClient({
                     ))}
                   </ul>
                   {order.orderNote.trim() ? (
-                    <p className="mt-2 text-xs text-secondary">Not: {order.orderNote}</p>
+                    <p className="mt-2 text-xs text-secondary">Mutfak notu: {order.orderNote}</p>
+                  ) : null}
+                  {order.courierNote.trim() ? (
+                    <p className="mt-2 text-xs text-secondary">Kurye notu: {order.courierNote}</p>
                   ) : null}
                 </li>
               ))}

@@ -113,6 +113,7 @@ export default function CartCheckoutModal({
       siteName: session.siteName ?? "",
       block: session.block ?? "",
       orderNote: "",
+      courierNote: "",
     });
     const picked = pickDefaultPaymentMethod(paymentFlags, session.lastPaymentMethod ?? "");
     setPayMethod(picked);
@@ -220,7 +221,7 @@ export default function CartCheckoutModal({
         const line = formatCourierLocationNoteLine(latitude, longitude);
         setFormValues((v) => ({
           ...v,
-          orderNote: v.orderNote.trim() ? `${v.orderNote.trim()}\n\n${line}` : line,
+          courierNote: v.courierNote.trim() ? `${v.courierNote.trim()}\n\n${line}` : line,
         }));
         setLocMsg("Konum alındı. Teslimat mesafesi siparişte doğrulanır.");
         setLocLoading(false);
@@ -337,6 +338,7 @@ export default function CartCheckoutModal({
           mealCardBrandId:
             resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
           orderNote: formValues.orderNote.trim(),
+          courierNote: fulfillmentType === "delivery" ? formValues.courierNote.trim() : "",
         }),
       });
 
@@ -366,6 +368,7 @@ export default function CartCheckoutModal({
         paymentMethod: resolvedPayMethod,
         mealCardBrandId: resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
         orderNote: formValues.orderNote.trim(),
+        courierNote: fulfillmentType === "delivery" ? formValues.courierNote.trim() : "",
       };
 
       appendLocalOrder(subdomain, order);
@@ -674,6 +677,7 @@ export default function CartCheckoutModal({
                   onChange={setFormValues}
                   showPrefillNotice
                   showOrderNote
+                  showCourierNote={!isTableOrder && fulfillmentType === "delivery"}
                   hideAddress={isTableOrder || fulfillmentType === "pickup"}
                   showLocationButton={!isTableOrder && fulfillmentType === "delivery"}
                   locationLoading={locLoading}

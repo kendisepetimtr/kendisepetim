@@ -66,6 +66,7 @@ export async function POST(request: Request) {
   const phone = typeof payload.phone === "string" ? payload.phone.trim() : "";
   const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
   const orderNote = typeof payload.orderNote === "string" ? payload.orderNote.trim() : "";
+  const courierNote = typeof payload.courierNote === "string" ? payload.courierNote.trim() : "";
   const paymentMethod =
     payload.paymentMethod === "cash" || payload.paymentMethod === "door_card" || payload.paymentMethod === "meal_card"
       ? payload.paymentMethod
@@ -228,6 +229,7 @@ export async function POST(request: Request) {
         payment_method: paymentMethod ?? "cash",
         meal_card_brand_id: paymentMethod === "meal_card" ? mealCardBrandId ?? null : null,
         order_note: orderNote,
+        courier_note: fulfillmentType === "delivery" ? courierNote : "",
         delivery_status: fulfillmentType === "delivery" ? "pending" : null,
       })
       .select("id, order_code")

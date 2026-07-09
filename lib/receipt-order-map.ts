@@ -64,6 +64,7 @@ export function adminOrderToReceiptData(
     paymentMethodLabel: paymentMethodLabel(order.paymentMethod, order.mealCardBrandId),
     paymentAtCloseLabel: closeLabel,
     orderNote: order.orderNote || undefined,
+    courierNote: order.courierNote || undefined,
   };
 }
 
@@ -78,7 +79,8 @@ export function sessionOrdersToReceiptData(
 ): ReceiptOrderData {
   const items = orders.flatMap(mapLines);
   const orderCodes = orders.map((o) => o.orderCode).join(", ");
-  const notes = orders.map((o) => o.orderNote.trim()).filter(Boolean);
+  const kitchenNotes = orders.map((o) => o.orderNote.trim()).filter(Boolean);
+  const courierNotes = orders.map((o) => o.courierNote.trim()).filter(Boolean);
   const first = orders[0];
 
   return {
@@ -98,6 +100,7 @@ export function sessionOrdersToReceiptData(
       ? paymentMethodLabel(first.paymentMethod, first.mealCardBrandId)
       : paymentMethodLabel(paymentAtClose.method, paymentAtClose.mealCardBrandId),
     paymentAtCloseLabel: paymentMethodLabel(paymentAtClose.method, paymentAtClose.mealCardBrandId),
-    orderNote: notes.length > 0 ? notes.join(" · ") : undefined,
+    orderNote: kitchenNotes.length > 0 ? kitchenNotes.join(" · ") : undefined,
+    courierNote: courierNotes.length > 0 ? courierNotes.join(" · ") : undefined,
   };
 }

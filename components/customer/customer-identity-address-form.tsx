@@ -10,6 +10,7 @@ type CustomerIdentityAddressFormProps = {
   /** QR: bilgilerin cihazda saklandığına dair kısa not */
   showPrefillNotice?: boolean;
   showOrderNote?: boolean;
+  showCourierNote?: boolean;
   showLocationButton?: boolean;
   hideAddress?: boolean;
   locationLoading?: boolean;
@@ -27,6 +28,7 @@ export default function CustomerIdentityAddressForm({
   onChange,
   showPrefillNotice = false,
   showOrderNote = false,
+  showCourierNote = false,
   showLocationButton = false,
   hideAddress = false,
   locationLoading = false,
@@ -257,20 +259,35 @@ export default function CustomerIdentityAddressForm({
       {showOrderNote ? (
         <div>
           <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-note`}>
-            Sipariş notu
+            Sipariş notu <span className="font-normal text-secondary/80">(mutfak)</span>
           </label>
           <textarea
             id={`${base}-note`}
             value={values.orderNote}
             onChange={(e) => onChange(patch(values, { orderNote: e.target.value }))}
             rows={3}
-            placeholder="Örn. zil çalışmıyor, kapıcıya bırakın…"
+            placeholder="Örn. az acılı, soğansız, ekstra sos…"
+            className={`${inputCls} resize-y`}
+          />
+        </div>
+      ) : null}
+
+      {showCourierNote ? (
+        <div>
+          <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-courier-note`}>
+            Kurye notu
+          </label>
+          <textarea
+            id={`${base}-courier-note`}
+            value={values.courierNote}
+            onChange={(e) => onChange(patch(values, { courierNote: e.target.value }))}
+            rows={3}
+            placeholder="Örn. zil çalışmıyor, kapıcıya bırakın, arayın…"
             className={`${inputCls} resize-y`}
           />
           {showLocationButton ? (
             <p className="mt-1 text-[11px] text-secondary">
-              Konum alırsanız tam nokta, notunuza harita bağlantısı olarak eklenir; kurye adresi daha kolay bulsun
-              diye — zorunlu değildir.
+              «Konum al» ile paylaştığınız tam nokta bu nota eklenir; kurye adresi daha kolay bulsun diye.
             </p>
           ) : null}
         </div>

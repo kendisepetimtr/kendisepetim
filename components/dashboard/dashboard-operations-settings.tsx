@@ -755,7 +755,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                     onChange={(e) => patchReceipt("kitchenShowOrderNote", e.target.checked)}
                     className="h-4 w-4 rounded border-surface-container-highest text-primary"
                   />
-                  Sipariş notu
+                  Sipariş notu (mutfak)
                 </label>
               </div>
             </fieldset>
@@ -770,7 +770,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                     ["courierShowCustomer", "Müşteri adı ve telefon"],
                     ["courierShowAddress", "Adres"],
                     ["courierShowLocationQr", "Konum QR (GPS)"],
-                    ["courierShowOrderNote", "Sipariş notu"],
+                    ["courierShowOrderNote", "Kurye notu"],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 text-sm text-on-background">

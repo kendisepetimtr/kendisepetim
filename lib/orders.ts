@@ -30,6 +30,7 @@ export type PublicOrderCreatePayload = {
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   orderNote: string;
+  courierNote?: string;
 };
 
 export type AdminOrderLine = {
@@ -65,4 +66,5 @@ export type AdminOrder = {
   paymentMethodAtClose: CheckoutPaymentMethod | null;
   mealCardBrandId?: MealCardBrandId;
   orderNote: string;
+  courierNote: string;
 };

@@ -1014,12 +1014,26 @@ export default function OwnerAdminPanel({
                                     <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Adres</p>
                                     <p className="mt-1 text-secondary">{formatAddressOneLine(order.address)}</p>
                                   </div>
-                                  <div className="sm:col-span-2">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Not</p>
-                                    <div className="mt-1">
-                                      <NoteWithMapLinks text={order.orderNote} />
+                                  {order.orderNote.trim() ? (
+                                    <div className="sm:col-span-2">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                                        Sipariş notu (mutfak)
+                                      </p>
+                                      <div className="mt-1">
+                                        <NoteWithMapLinks text={order.orderNote} />
+                                      </div>
                                     </div>
-                                  </div>
+                                  ) : null}
+                                  {order.courierNote.trim() ? (
+                                    <div className="sm:col-span-2">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                                        Kurye notu
+                                      </p>
+                                      <div className="mt-1">
+                                        <NoteWithMapLinks text={order.courierNote} />
+                                      </div>
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
                             ) : null}

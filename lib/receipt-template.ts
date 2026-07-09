@@ -38,6 +38,7 @@ export type ReceiptOrderData = {
   paymentMethodLabel: string;
   paymentAtCloseLabel?: string;
   orderNote?: string;
+  courierNote?: string;
 };
 
 export type ReceiptQrBlock = {
@@ -217,7 +218,7 @@ export function renderKitchenReceiptText(
 
   if (settings.kitchenShowOrderNote && order.orderNote?.trim()) {
     lines.push(repeatChar("-", w));
-    lines.push("SİPARİŞ NOTU:");
+    lines.push("SİPARİŞ NOTU (MUTFAK):");
     pushWrapped(lines, order.orderNote.trim(), w);
   }
 
@@ -272,10 +273,10 @@ export function renderCourierReceiptText(
     lines.push(center("Google Maps", w));
   }
 
-  if (settings.courierShowOrderNote && order.orderNote?.trim()) {
+  if (settings.courierShowOrderNote && order.courierNote?.trim()) {
     lines.push(repeatChar("-", w));
-    lines.push("SİPARİŞ NOTU:");
-    pushWrapped(lines, order.orderNote.trim(), w);
+    lines.push("KURYE NOTU:");
+    pushWrapped(lines, order.courierNote.trim(), w);
   }
 
   lines.push(repeatChar("=", w));
@@ -389,6 +390,7 @@ export function sampleReceiptOrder(businessName: string, subdomain = "ornek-rest
     deliveryFee: 0,
     total: 675,
     paymentMethodLabel: "Kapıda nakit",
-    orderNote: "Kapı zili çalışmıyor, lütfen arayın.",
+    orderNote: "Az acılı olsun.",
+    courierNote: "Kapı zili çalışmıyor, lütfen arayın.",
   };
 }

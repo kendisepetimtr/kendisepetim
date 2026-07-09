@@ -131,7 +131,7 @@ export default function PickupOrderPaymentClient({
           </ul>
           {order.orderNote.trim() ? (
             <p className="mt-4 rounded-xl bg-surface-container-low px-3 py-2 text-xs text-secondary">
-              Not: {order.orderNote}
+              Mutfak notu: {order.orderNote}
             </p>
           ) : null}
         </section>

@@ -41,6 +41,7 @@ export type CustomerFormValues = {
   siteName: string;
   block: string;
   orderNote: string;
+  courierNote: string;
 };
 
 export function emptyCustomerFormValues(): CustomerFormValues {
@@ -59,6 +60,7 @@ export function emptyCustomerFormValues(): CustomerFormValues {
     siteName: "",
     block: "",
     orderNote: "",
+    courierNote: "",
   };
 }
 

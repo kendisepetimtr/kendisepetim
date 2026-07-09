@@ -272,10 +272,26 @@ export default function DashboardOrdersList({
                     <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">Telefon</p>
                     <p className="mt-1 text-on-background">{o.phone || "—"}</p>
 
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">Not</p>
-                    <div className="mt-1">
-                      <NoteWithMapLinks text={o.orderNote} />
-                    </div>
+                    {o.orderNote.trim() ? (
+                      <>
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">
+                          Sipariş notu (mutfak)
+                        </p>
+                        <div className="mt-1">
+                          <NoteWithMapLinks text={o.orderNote} />
+                        </div>
+                      </>
+                    ) : null}
+                    {o.courierNote.trim() ? (
+                      <>
+                        <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">
+                          Kurye notu
+                        </p>
+                        <div className="mt-1">
+                          <NoteWithMapLinks text={o.courierNote} />
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
               </li>

@@ -49,6 +49,7 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
     paymentMethodAtClose: row.payment_method_at_close,
     mealCardBrandId: row.meal_card_brand_id ?? undefined,
     orderNote: row.order_note,
+    courierNote: row.courier_note ?? "",
     lines: (linesByOrderId.get(row.id) ?? [])
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)
