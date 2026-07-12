@@ -130,6 +130,7 @@ export default function KasaOrderModal({
         try {
           const res = await fetch(`/api/kasa/customers/search?q=${encodeURIComponent(phone)}`, {
             cache: "no-store",
+            credentials: "include",
           });
           const data = (await res.json()) as { ok?: boolean; matches?: CashierCustomerMatch[] };
           if (res.ok && data.ok && data.matches) {
@@ -305,6 +306,7 @@ export default function KasaOrderModal({
       const response = await fetch("/api/kasa/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           fulfillmentType: channel,
           tableNumber: channel === "dine_in" ? tableNumber : undefined,

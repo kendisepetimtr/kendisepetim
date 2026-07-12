@@ -77,7 +77,7 @@ export default function KasaPanelClient({
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/kasa/tables", { cache: "no-store" });
+      const res = await fetch("/api/kasa/tables", { cache: "no-store", credentials: "include" });
       const data = (await res.json()) as {
         ok?: boolean;
         tables?: GarsonTableCell[];

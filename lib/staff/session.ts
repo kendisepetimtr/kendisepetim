@@ -205,4 +205,15 @@ export function cashierSessionCookieOptions() {
   };
 }
 
+/** Eski Path=/kasa ve Path=/garson cookie'lerini sil (API'ye gitmiyordu). */
+export function legacyStaffCookieClearOptions(legacyPath: "/kasa" | "/garson") {
+  return {
+    httpOnly: true as const,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: legacyPath,
+    maxAge: 0,
+  };
+}
+
 

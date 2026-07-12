@@ -8,6 +8,7 @@ import { getTenantBySubdomain } from "@/lib/staff/tenant-by-slug";
 import {
   cashierSessionCookieOptions,
   CASHIER_SESSION_COOKIE,
+  legacyStaffCookieClearOptions,
   mintStaffSessionToken,
 } from "@/lib/staff/session";
 
@@ -16,6 +17,12 @@ export type CashierPinActionState = { error?: string } | null;
 function normalizeKasaNextPath(nextRaw: string): string {
   if (nextRaw.startsWith("/kasa")) return nextRaw;
   return "/kasa";
+}
+
+async function clearCashierCookies() {
+  const jar = await cookies();
+  jar.set(CASHIER_SESSION_COOKIE, "", { ...cashierSessionCookieOptions(), maxAge: 0 });
+  jar.set(CASHIER_SESSION_COOKIE, "", legacyStaffCookieClearOptions("/kasa"));
 }
 
 export async function verifyCashierPinAction(
@@ -57,12 +64,13 @@ export async function verifyCashierPinAction(
   }
 
   const jar = await cookies();
+  // Eski Path=/kasa cookie API'ye gitmiyordu — önce sil, sonra kök path ile yaz
+  jar.set(CASHIER_SESSION_COOKIE, "", legacyStaffCookieClearOptions("/kasa"));
   jar.set(CASHIER_SESSION_COOKIE, token, cashierSessionCookieOptions());
   redirect(next);
 }
 
 export async function signOutCashierAction(): Promise<void> {
-  const jar = await cookies();
-  jar.set(CASHIER_SESSION_COOKIE, "", { ...cashierSessionCookieOptions(), maxAge: 0 });
+  await clearCashierCookies();
   redirect("/kasa/pin");
 }
