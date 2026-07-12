@@ -302,6 +302,7 @@ export default function DeliveryOrderDetailClient({
               if (m !== "meal_card") setMealBrand("");
             }}
             onMealCardBrandChange={setMealBrand}
+            labelVariant="counter"
           />
         </section>
       </main>

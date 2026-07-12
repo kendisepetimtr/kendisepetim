@@ -8,6 +8,7 @@ import { isValidGoogleMapsUrl } from "@/lib/google-maps";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
+import { MEAL_CARD_BRANDS, type MealCardBrandId } from "@/lib/tenant-payment";
 import DashboardOperationsSettings from "@/components/dashboard/dashboard-operations-settings";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
 
@@ -63,6 +64,9 @@ export default function DashboardSettings({
   const [paymentCash, setPaymentCash] = useState(tenant.paymentCash);
   const [paymentDoorCard, setPaymentDoorCard] = useState(tenant.paymentDoorCard);
   const [paymentMealCard, setPaymentMealCard] = useState(tenant.paymentMealCard);
+  const [paymentMealCardBrands, setPaymentMealCardBrands] = useState<MealCardBrandId[]>(
+    tenant.paymentMealCardBrands ?? [],
+  );
   const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
@@ -81,7 +85,14 @@ export default function DashboardSettings({
     setPaymentCash(tenant.paymentCash);
     setPaymentDoorCard(tenant.paymentDoorCard);
     setPaymentMealCard(tenant.paymentMealCard);
+    setPaymentMealCardBrands(tenant.paymentMealCardBrands ?? []);
   }, [tenant]);
+
+  function toggleMealBrand(id: MealCardBrandId) {
+    setPaymentMealCardBrands((prev) =>
+      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id],
+    );
+  }
 
   function handleSaveProfile(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +111,10 @@ export default function DashboardSettings({
     }
     if (!paymentCash && !paymentDoorCard && !paymentMealCard) {
       window.alert("QR sipariş için en az bir kapıda ödeme yöntemi seçmelisiniz.");
+      return;
+    }
+    if (paymentMealCard && paymentMealCardBrands.length === 0) {
+      window.alert("Yemek kartı açıksa en az bir kart markası seçmelisiniz.");
       return;
     }
     if (logoUploading) {
@@ -128,6 +143,7 @@ export default function DashboardSettings({
       paymentCash,
       paymentDoorCard,
       paymentMealCard,
+      paymentMealCardBrands: paymentMealCard ? paymentMealCardBrands : [],
     };
 
     if (persistSettingsToSupabase) {
@@ -147,6 +163,7 @@ export default function DashboardSettings({
         paymentCash,
         paymentDoorCard,
         paymentMealCard,
+        paymentMealCardBrands: paymentMealCard ? paymentMealCardBrands : [],
       };
 
       startSaveTransition(async () => {
@@ -590,10 +607,10 @@ export default function DashboardSettings({
             </div>
 
             <div className="sm:col-span-2 mt-2 rounded-xl border border-surface-container-high bg-surface-container-low/50 p-4">
-              <h3 className="font-headline text-sm font-bold text-on-background">QR sipariş — kapıda ödeme</h3>
+              <h3 className="font-headline text-sm font-bold text-on-background">Ödeme yöntemleri</h3>
               <p className="mt-1 text-xs leading-relaxed text-secondary">
-                Çevrimiçi ödeme yok. Müşteri siparişi onaylarken yalnızca burada işaretlediğiniz yöntemleri görür.
-                Yemek kartı açıksa Multinet, Sodexo ve Edenred (Ticket Restaurant) seçenekleri sunulur.
+                Kasa ve QR siparişte müşteri / kasiyer yalnızca burada işaretlediğiniz yöntemleri görür. Yemek kartı
+                açıksa hangi markaların kabul edildiğini aşağıdan seçin.
               </p>
               <div className="mt-4 space-y-3">
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-2 hover:bg-white/60">
@@ -604,7 +621,7 @@ export default function DashboardSettings({
                     className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-on-background">Kapıda nakit</span>
+                    <span className="block text-sm font-medium text-on-background">Nakit</span>
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-2 hover:bg-white/60">
@@ -615,24 +632,56 @@ export default function DashboardSettings({
                     className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-on-background">Kapıda kredi kartı</span>
+                    <span className="block text-sm font-medium text-on-background">Kredi Kartı</span>
                   </span>
                 </label>
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-2 hover:bg-white/60">
                   <input
                     type="checkbox"
                     checked={paymentMealCard}
-                    onChange={(e) => setPaymentMealCard(e.target.checked)}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      setPaymentMealCard(on);
+                      if (on && paymentMealCardBrands.length === 0) {
+                        setPaymentMealCardBrands(["multinet", "sodexo", "ticket"]);
+                      }
+                    }}
                     className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-on-background">Yemek kartı</span>
+                    <span className="block text-sm font-medium text-on-background">Yemek Kartı</span>
                     <span className="mt-0.5 block text-xs text-secondary">
-                      Açıkken müşteri kart türünü (Multinet / Sodexo / Edenred) seçer.
+                      Açıkken yalnızca seçtiğiniz markalar kasada ve QR’da ödenebilir.
                     </span>
                   </span>
                 </label>
               </div>
+              {paymentMealCard ? (
+                <div className="mt-4 rounded-xl border border-surface-container-high bg-white/70 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-secondary">Kabul edilen yemek kartları</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {MEAL_CARD_BRANDS.map((b) => (
+                      <label
+                        key={b.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-container-low"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={paymentMealCardBrands.includes(b.id)}
+                          onChange={() => toggleMealBrand(b.id)}
+                          className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
+                        />
+                        <span className="text-sm text-on-background">{b.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {paymentMealCardBrands.length === 0 ? (
+                    <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-950">
+                      En az bir yemek kartı markası seçin.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {!paymentCash && !paymentDoorCard && !paymentMealCard ? (
                 <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-950">
                   Hiçbir yöntem seçili değil; QR menüde müşteri siparişi tamamlayamaz. En az birini işaretleyin.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { closeSessionWithPayment, loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +32,7 @@ export async function GET(request: Request) {
         ok: true,
         empty: true,
         session: null,
-        paymentFlags: {
-          paymentCash: auth.tenant.payment_cash === true,
-          paymentDoorCard: auth.tenant.payment_door_card === true,
-          paymentMealCard: auth.tenant.payment_meal_card === true,
-        },
+        paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
       });
     }
     return NextResponse.json(result, { status: 400 });
@@ -45,11 +42,7 @@ export async function GET(request: Request) {
     ok: true,
     empty: false,
     session: result.session,
-    paymentFlags: {
-      paymentCash: auth.tenant.payment_cash === true,
-      paymentDoorCard: auth.tenant.payment_door_card === true,
-      paymentMealCard: auth.tenant.payment_meal_card === true,
-    },
+    paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
   });
 }
 
@@ -95,11 +88,7 @@ export async function POST(request: Request) {
     tableNumber,
     paymentMethod,
     mealCardBrandId: body.mealCardBrandId,
-    paymentFlags: {
-      paymentCash: auth.tenant.payment_cash === true,
-      paymentDoorCard: auth.tenant.payment_door_card === true,
-      paymentMealCard: auth.tenant.payment_meal_card === true,
-    },
+    paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
   });
 
   if (!result.ok) {

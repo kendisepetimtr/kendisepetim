@@ -10,6 +10,7 @@ import {
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,7 @@ export async function GET(request: Request) {
       ok: true,
       order: detail.order,
       couriers: detail.couriers,
-      paymentFlags: {
-        paymentCash: auth.tenant.payment_cash === true,
-        paymentDoorCard: auth.tenant.payment_door_card === true,
-        paymentMealCard: auth.tenant.payment_meal_card === true,
-      },
+      paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
     });
   }
 
@@ -84,11 +81,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Paket siparişi kapalı." }, { status: 409 });
   }
 
-  const paymentFlags = {
-    paymentCash: auth.tenant.payment_cash === true,
-    paymentDoorCard: auth.tenant.payment_door_card === true,
-    paymentMealCard: auth.tenant.payment_meal_card === true,
-  };
+  const paymentFlags = tenantPaymentFlagsFromRow(auth.tenant);
 
   if (body.action === "assign-courier") {
     if (!body.courierId) {

@@ -330,6 +330,7 @@ export default function KasaPosClient({
               if (m !== "meal_card") setMealBrand("");
             }}
             onMealCardBrandChange={setMealBrand}
+            labelVariant="counter"
           />
           <button
             type="button"

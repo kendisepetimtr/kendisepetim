@@ -15,6 +15,11 @@ import {
 } from "@/lib/order-lines-build";
 import { ensureTableSession } from "@/lib/table-sessions";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
+import {
+  isMealCardBrandAllowed,
+  isMealCardBrandId,
+  tenantPaymentFlagsFromRow,
+} from "@/lib/tenant-payment";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -73,12 +78,7 @@ export async function POST(request: Request) {
       : isTableOrder
         ? "cash"
         : null;
-  const mealCardBrandId =
-    payload.mealCardBrandId === "multinet" ||
-    payload.mealCardBrandId === "sodexo" ||
-    payload.mealCardBrandId === "edenred"
-      ? payload.mealCardBrandId
-      : undefined;
+  const mealCardBrandId = isMealCardBrandId(payload.mealCardBrandId) ? payload.mealCardBrandId : undefined;
 
   const customerLatitude =
     typeof payload.customerLatitude === "number" && Number.isFinite(payload.customerLatitude)
@@ -111,13 +111,31 @@ export async function POST(request: Request) {
     const { data: tenant, error: tenantError } = await svc
       .from("tenants")
       .select(
-        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count",
+        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands",
       )
       .eq("subdomain", subdomain)
       .maybeSingle();
 
     if (tenantError || !tenant || tenant.public_menu_enabled !== true) {
       return NextResponse.json({ error: "Sipariş alınamıyor." }, { status: 404 });
+    }
+
+    const paymentFlags = tenantPaymentFlagsFromRow(tenant);
+    if (!isTableOrder && paymentMethod) {
+      if (paymentMethod === "cash" && !paymentFlags.paymentCash) {
+        return NextResponse.json({ error: "Nakit ödeme bu işletmede aktif değil." }, { status: 400 });
+      }
+      if (paymentMethod === "door_card" && !paymentFlags.paymentDoorCard) {
+        return NextResponse.json({ error: "Kredi kartı ödeme bu işletmede aktif değil." }, { status: 400 });
+      }
+      if (paymentMethod === "meal_card") {
+        if (!paymentFlags.paymentMealCard || !isMealCardBrandAllowed(paymentFlags, mealCardBrandId)) {
+          return NextResponse.json(
+            { error: "Bu yemek kartı markası bu işletmede aktif değil." },
+            { status: 400 },
+          );
+        }
+      }
     }
 
     if (!isBusinessOpenNow(tenant.open_time, tenant.close_time)) {

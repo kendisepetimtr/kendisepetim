@@ -6,7 +6,7 @@ import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadKasaDeliveryOrderDetail } from "@/lib/kasa/delivery-orders-service";
 import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
-import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 type Props = { params: Promise<{ slug: string; orderId: string }> };
 
@@ -26,11 +26,7 @@ export default async function KasaDeliveryOrderPage({ params }: Props) {
   }
 
   const row = auth.tenant;
-  const paymentFlags: TenantPaymentFlags = {
-    paymentCash: row.payment_cash === true,
-    paymentDoorCard: row.payment_door_card === true,
-    paymentMealCard: row.payment_meal_card === true,
-  };
+  const paymentFlags = tenantPaymentFlagsFromRow(row);
   const fulfillmentFlags: TenantFulfillmentFlags = {
     fulfillmentPickupEnabled: false,
     fulfillmentDeliveryEnabled: true,

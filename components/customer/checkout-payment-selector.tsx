@@ -3,12 +3,13 @@
 import {
   countEnabledPaymentMethods,
   MEAL_CARD_BRANDS,
+  tenantPaymentFlagsFromProfile,
   type CheckoutPaymentMethod,
   type MealCardBrandId,
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
 import type { PublicCheckoutMirror } from "@/lib/public-checkout-mirror";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 
 type CheckoutPaymentSelectorProps = {
   options: TenantPaymentFlags;
@@ -16,6 +17,8 @@ type CheckoutPaymentSelectorProps = {
   mealCardBrandId: MealCardBrandId | "";
   onMethodChange: (m: CheckoutPaymentMethod | "") => void;
   onMealCardBrandChange: (id: MealCardBrandId | "") => void;
+  /** door: QR kapıda ödeme metinleri; counter: kasa (Nakit / Kredi Kartı / Yemek Kartı) */
+  labelVariant?: "door" | "counter";
 };
 
 export default function CheckoutPaymentSelector({
@@ -24,18 +27,32 @@ export default function CheckoutPaymentSelector({
   mealCardBrandId,
   onMethodChange,
   onMealCardBrandChange,
+  labelVariant = "door",
 }: CheckoutPaymentSelectorProps) {
   const baseId = useId();
   const n = countEnabledPaymentMethods(options);
+  const enabledBrands = MEAL_CARD_BRANDS.filter((b) => options.mealCardBrandIds.includes(b.id));
+  const showMealCard = options.paymentMealCard && enabledBrands.length > 0;
+  const enabledBrandKey = options.mealCardBrandIds.join(",");
+
+  useEffect(() => {
+    if (!mealCardBrandId) return;
+    if (!options.mealCardBrandIds.includes(mealCardBrandId)) {
+      onMealCardBrandChange("");
+    }
+  }, [enabledBrandKey, mealCardBrandId, onMealCardBrandChange, options.mealCardBrandIds]);
 
   if (n === 0) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-950">
-        Bu işletme henüz kapıda ödeme seçeneği tanımlamamış. Lütfen işletmeyle iletişime geçin veya daha sonra tekrar
-        deneyin.
+        Bu işletme henüz ödeme seçeneği tanımlamamış. Lütfen işletmeyle iletişime geçin veya daha sonra tekrar deneyin.
       </div>
     );
   }
+
+  const cashLabel = labelVariant === "counter" ? "Nakit" : "Kapıda nakit";
+  const cardLabel = labelVariant === "counter" ? "Kredi Kartı" : "Kapıda kredi kartı";
+  const mealLabel = "Yemek Kartı";
 
   const rowCls =
     "flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-high bg-white px-3 py-3 has-[:checked]:border-primary has-[:checked]:bg-primary/[0.04]";
@@ -43,7 +60,9 @@ export default function CheckoutPaymentSelector({
   return (
     <fieldset className="space-y-3">
       <legend className="text-xs font-bold uppercase tracking-wider text-secondary">Ödeme yöntemi</legend>
-      <p className="text-[11px] leading-relaxed text-secondary">Çevrimiçi ödeme yok; kapıda ödeme seçenekleri.</p>
+      {labelVariant === "door" ? (
+        <p className="text-[11px] leading-relaxed text-secondary">Çevrimiçi ödeme yok; kapıda ödeme seçenekleri.</p>
+      ) : null}
       <div className="space-y-2">
         {options.paymentCash ? (
           <label className={rowCls}>
@@ -54,7 +73,7 @@ export default function CheckoutPaymentSelector({
               onChange={() => onMethodChange("cash")}
               className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
             />
-            <span className="text-sm font-medium text-on-background">Kapıda nakit</span>
+            <span className="text-sm font-medium text-on-background">{cashLabel}</span>
           </label>
         ) : null}
         {options.paymentDoorCard ? (
@@ -66,10 +85,10 @@ export default function CheckoutPaymentSelector({
               onChange={() => onMethodChange("door_card")}
               className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
             />
-            <span className="text-sm font-medium text-on-background">Kapıda kredi kartı</span>
+            <span className="text-sm font-medium text-on-background">{cardLabel}</span>
           </label>
         ) : null}
-        {options.paymentMealCard ? (
+        {showMealCard ? (
           <div className="rounded-xl border border-surface-container-high bg-surface-container-low/40 p-3">
             <label className="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-1">
               <input
@@ -79,12 +98,12 @@ export default function CheckoutPaymentSelector({
                 onChange={() => onMethodChange("meal_card")}
                 className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
               />
-              <span className="text-sm font-medium text-on-background">Yemek kartı</span>
+              <span className="text-sm font-medium text-on-background">{mealLabel}</span>
             </label>
             {method === "meal_card" ? (
               <div className="mt-3 space-y-2 border-t border-surface-container-high pt-3" role="group" aria-label="Kart türü">
                 <p className="text-[11px] font-medium text-secondary">Kart seçin</p>
-                {MEAL_CARD_BRANDS.map((b) => (
+                {enabledBrands.map((b) => (
                   <label key={b.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/80">
                     <input
                       type="radio"
@@ -107,9 +126,10 @@ export default function CheckoutPaymentSelector({
 
 /** Public menü: tenant ve mirror aynı alanları taşır */
 export function mirrorAsPaymentOptions(m: PublicCheckoutMirror): TenantPaymentFlags {
-  return {
+  return tenantPaymentFlagsFromProfile({
     paymentCash: m.paymentCash,
     paymentDoorCard: m.paymentDoorCard,
     paymentMealCard: m.paymentMealCard,
-  };
+    paymentMealCardBrands: m.paymentMealCardBrands,
+  });
 }

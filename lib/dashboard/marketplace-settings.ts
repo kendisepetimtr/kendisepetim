@@ -169,7 +169,7 @@ export async function updateMarketplaceSettings(
       })
       .eq("id", current.id)
       .select(
-        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, marketplace_enabled, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount",
+        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount",
       )
       .single();
 

@@ -27,6 +27,8 @@ export type TenantRow = {
   payment_cash: boolean;
   payment_door_card: boolean;
   payment_meal_card: boolean;
+  /** Aktif yemek kartı marka id'leri */
+  payment_meal_card_brands?: string[] | null;
   plan: TenantPlan;
   public_menu_enabled: boolean;
   dashboard_enabled: boolean;

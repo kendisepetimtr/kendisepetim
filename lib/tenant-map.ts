@@ -7,6 +7,7 @@ import {
 import { clampDeliveryRadiusKm } from "@/lib/fulfillment";
 import type { LocalTenantProfile } from "@/lib/local-tenant";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { resolveEnabledMealCardBrands } from "@/lib/tenant-payment";
 
 /** Supabase `tenants` satırını panelin kullandığı profile çevirir. */
 export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
@@ -31,6 +32,10 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
     paymentCash: row.payment_cash !== false,
     paymentDoorCard: row.payment_door_card === true,
     paymentMealCard: row.payment_meal_card === true,
+    paymentMealCardBrands: resolveEnabledMealCardBrands(
+      row.payment_meal_card === true,
+      row.payment_meal_card_brands,
+    ),
     marketplaceEnabled: row.marketplace_enabled === true,
     city: row.city ?? "",
     district: row.district ?? "",

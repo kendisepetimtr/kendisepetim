@@ -10,6 +10,7 @@ import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { slimTenantProfileForClient } from "@/lib/tenant-client-sync";
 import { tenantRowToLocalProfile } from "@/lib/tenant-map";
+import { parseMealCardBrandIds, type MealCardBrandId } from "@/lib/tenant-payment";
 import { revalidatePath } from "next/cache";
 
 const MAX_PUBLIC_DESCRIPTION_LENGTH = 280;
@@ -33,6 +34,7 @@ const TENANT_SETTINGS_COLUMNS = [
   "payment_cash",
   "payment_door_card",
   "payment_meal_card",
+  "payment_meal_card_brands",
   "marketplace_enabled",
   "city",
   "district",
@@ -64,6 +66,7 @@ export type TenantSettingsPatch = {
   paymentCash: boolean;
   paymentDoorCard: boolean;
   paymentMealCard: boolean;
+  paymentMealCardBrands: MealCardBrandId[];
 };
 
 export type UpdateTenantSettingsResult =
@@ -95,8 +98,14 @@ export async function updateTenantBusinessSettings(
     const paymentCash = patch.paymentCash !== false;
     const paymentDoorCard = patch.paymentDoorCard === true;
     const paymentMealCard = patch.paymentMealCard === true;
+    const paymentMealCardBrands = paymentMealCard
+      ? parseMealCardBrandIds(patch.paymentMealCardBrands)
+      : [];
     if (!paymentCash && !paymentDoorCard && !paymentMealCard) {
       return { ok: false, error: "QR sipariş için en az bir kapıda ödeme yöntemi seçmelisiniz." };
+    }
+    if (paymentMealCard && paymentMealCardBrands.length === 0) {
+      return { ok: false, error: "Yemek kartı açıksa en az bir kart markası seçmelisiniz." };
     }
 
     const hoursDayMode: BusinessHoursDayMode = patch.hoursDayMode === "shift" ? "shift" : "calendar";
@@ -144,6 +153,7 @@ export async function updateTenantBusinessSettings(
         payment_cash: paymentCash,
         payment_door_card: paymentDoorCard,
         payment_meal_card: paymentMealCard,
+        payment_meal_card_brands: paymentMealCardBrands,
       })
       .eq("id", row.id)
       .select(TENANT_SETTINGS_COLUMNS)

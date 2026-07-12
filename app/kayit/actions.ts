@@ -97,6 +97,7 @@ export async function registerTenantAction(
       payment_cash: true,
       payment_door_card: false,
       payment_meal_card: false,
+      payment_meal_card_brands: [],
     });
 
     if (insertError) {
@@ -156,6 +157,7 @@ export async function registerTenantAction(
     payment_cash: true,
     payment_door_card: false,
     payment_meal_card: false,
+    payment_meal_card_brands: [],
   });
 
   if (insertError) {

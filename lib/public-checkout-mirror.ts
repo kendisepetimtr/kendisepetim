@@ -1,9 +1,11 @@
 import type { LocalTenantProfile } from "@/lib/local-tenant";
+import { parseMealCardBrandIds, type MealCardBrandId } from "@/lib/tenant-payment";
 
 export type PublicCheckoutMirror = {
   paymentCash: boolean;
   paymentDoorCard: boolean;
   paymentMealCard: boolean;
+  paymentMealCardBrands: MealCardBrandId[];
 };
 
 export function publicCheckoutStorageKey(subdomain: string): string {
@@ -14,6 +16,7 @@ const DEFAULTS: PublicCheckoutMirror = {
   paymentCash: true,
   paymentDoorCard: false,
   paymentMealCard: false,
+  paymentMealCardBrands: [],
 };
 
 export function readPublicCheckoutMirror(subdomain: string): PublicCheckoutMirror {
@@ -26,6 +29,7 @@ export function readPublicCheckoutMirror(subdomain: string): PublicCheckoutMirro
       paymentCash: p.paymentCash !== false,
       paymentDoorCard: p.paymentDoorCard === true,
       paymentMealCard: p.paymentMealCard === true,
+      paymentMealCardBrands: parseMealCardBrandIds(p.paymentMealCardBrands),
     };
   } catch {
     return { ...DEFAULTS };
@@ -38,6 +42,7 @@ export function writePublicCheckoutMirror(profile: LocalTenantProfile): void {
     paymentCash: profile.paymentCash,
     paymentDoorCard: profile.paymentDoorCard,
     paymentMealCard: profile.paymentMealCard,
+    paymentMealCardBrands: parseMealCardBrandIds(profile.paymentMealCardBrands),
   };
   window.localStorage.setItem(publicCheckoutStorageKey(profile.subdomain), JSON.stringify(payload));
 }

@@ -3,7 +3,7 @@ import PickupOrderPaymentClient from "@/components/kasa/pickup-order-payment-cli
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadKasaPickupOrderDetail } from "@/lib/kasa/pickup-orders-service";
-import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 type Props = { params: Promise<{ slug: string; orderId: string }> };
 
@@ -23,11 +23,7 @@ export default async function KasaPickupOrderPage({ params }: Props) {
     redirect("/kasa");
   }
 
-  const paymentFlags: TenantPaymentFlags = {
-    paymentCash: auth.tenant.payment_cash === true,
-    paymentDoorCard: auth.tenant.payment_door_card === true,
-    paymentMealCard: auth.tenant.payment_meal_card === true,
-  };
+  const paymentFlags = tenantPaymentFlagsFromRow(auth.tenant);
 
   return (
     <PickupOrderPaymentClient

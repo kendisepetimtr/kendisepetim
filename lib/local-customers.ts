@@ -6,6 +6,7 @@ import {
 } from "@/lib/customer-address";
 import type { CheckoutPaymentMethod } from "@/lib/tenant-payment";
 import type { MealCardBrandId } from "@/lib/tenant-payment";
+import { isMealCardBrandId } from "@/lib/tenant-payment";
 
 export type { CustomerAddress } from "@/lib/customer-address";
 
@@ -74,8 +75,7 @@ function normalizeCustomer(c: Record<string, unknown>): LocalCustomer | null {
   const lastPaymentMethod: CheckoutPaymentMethod | undefined =
     pm === "cash" || pm === "door_card" || pm === "meal_card" ? pm : undefined;
   const mb = c.lastMealCardBrandId;
-  const lastMealCardBrandId: MealCardBrandId | undefined =
-    mb === "multinet" || mb === "sodexo" || mb === "edenred" ? mb : undefined;
+  const lastMealCardBrandId: MealCardBrandId | undefined = isMealCardBrandId(mb) ? mb : undefined;
 
   return {
     id: c.id,

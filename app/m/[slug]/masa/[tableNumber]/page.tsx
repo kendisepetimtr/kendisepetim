@@ -7,7 +7,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { buildLocalMenuState } from "@/lib/menu-map";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
 import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
-import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { getTableMenuUrl } from "@/lib/public-menu-urls";
 
@@ -108,11 +108,7 @@ export default async function TableMenuPage({ params }: Props) {
           .order("name", { ascending: true })
       : { data: [] as MenuProductRow[] };
 
-  const paymentFlags: TenantPaymentFlags = {
-    paymentCash: row.payment_cash === true,
-    paymentDoorCard: row.payment_door_card === true,
-    paymentMealCard: row.payment_meal_card === true,
-  };
+  const paymentFlags = tenantPaymentFlagsFromRow(row);
   const fulfillmentFlags: TenantFulfillmentFlags = {
     fulfillmentPickupEnabled: false,
     fulfillmentDeliveryEnabled: false,

@@ -1,5 +1,6 @@
 import type { CustomerFormValues } from "@/lib/customer-address";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
+import { isMealCardBrandId } from "@/lib/tenant-payment";
 
 const key = (subdomain: string) => `kendisepetim_qr_checkout_session_v1_${subdomain.toLowerCase()}`;
 
@@ -53,12 +54,7 @@ export function loadQrCheckoutSession(subdomain: string): Partial<CustomerFormVa
         p.lastPaymentMethod === "cash" || p.lastPaymentMethod === "door_card" || p.lastPaymentMethod === "meal_card"
           ? p.lastPaymentMethod
           : "",
-      lastMealCardBrandId:
-        p.lastMealCardBrandId === "multinet" ||
-        p.lastMealCardBrandId === "sodexo" ||
-        p.lastMealCardBrandId === "edenred"
-          ? p.lastMealCardBrandId
-          : "",
+      lastMealCardBrandId: isMealCardBrandId(p.lastMealCardBrandId) ? p.lastMealCardBrandId : "",
     };
   } catch {
     return {};

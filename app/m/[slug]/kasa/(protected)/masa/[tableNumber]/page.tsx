@@ -3,7 +3,7 @@ import KasaTableHubClient from "@/components/kasa/kasa-table-hub-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
 import { loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
-import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 type Props = { params: Promise<{ slug: string; tableNumber: string }> };
 
@@ -29,11 +29,7 @@ export default async function KasaTableSessionPage({ params }: Props) {
     redirect("/kasa");
   }
 
-  const paymentFlags: TenantPaymentFlags = {
-    paymentCash: auth.tenant.payment_cash === true,
-    paymentDoorCard: auth.tenant.payment_door_card === true,
-    paymentMealCard: auth.tenant.payment_meal_card === true,
-  };
+  const paymentFlags = tenantPaymentFlagsFromRow(auth.tenant);
 
   const menu = await loadVisibleMenuForTenant(auth.tenant.id);
 

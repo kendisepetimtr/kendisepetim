@@ -4,6 +4,7 @@ import type { AdminOrder } from "@/lib/orders";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 import type { CheckoutPaymentMethod, MealCardBrandId, TenantPaymentFlags } from "@/lib/tenant-payment";
+import { isMealCardBrandAllowed } from "@/lib/tenant-payment";
 
 function isPaymentMethodEnabled(flags: TenantPaymentFlags, method: CheckoutPaymentMethod): boolean {
   if (method === "cash") return flags.paymentCash;
@@ -114,9 +115,8 @@ export async function closePickupOrderWithPayment(input: {
     return { ok: false, error: "Bu ödeme yöntemi aktif değil." };
   }
   if (input.paymentMethod === "meal_card") {
-    const brand = input.mealCardBrandId;
-    if (brand !== "multinet" && brand !== "sodexo" && brand !== "edenred") {
-      return { ok: false, error: "Yemek kartı türü seçilmelidir." };
+    if (!isMealCardBrandAllowed(input.paymentFlags, input.mealCardBrandId)) {
+      return { ok: false, error: "Bu yemek kartı markası bu işletmede aktif değil." };
     }
   }
 

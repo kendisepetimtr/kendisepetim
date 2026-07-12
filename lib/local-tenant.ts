@@ -6,6 +6,7 @@ import {
 } from "@/lib/business-hours";
 import { DEFAULT_DELIVERY_RADIUS_KM } from "@/lib/fulfillment";
 import { writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
+import { parseMealCardBrandIds, type MealCardBrandId } from "@/lib/tenant-payment";
 
 export const LOCAL_TENANT_STORAGE_KEY = "kendisepetim_tenant_v1";
 
@@ -44,8 +45,10 @@ export type LocalTenantProfile = {
   paymentCash: boolean;
   /** Kapıda kredi kartı */
   paymentDoorCard: boolean;
-  /** Yemek kartı (Multinet / Sodexo / Edenred) */
+  /** Yemek kartı (markalar paymentMealCardBrands) */
   paymentMealCard: boolean;
+  /** Ayarlardan seçilen yemek kartı markaları */
+  paymentMealCardBrands: MealCardBrandId[];
   /** Marketplace vitrininde listelenir (opt-in) */
   marketplaceEnabled: boolean;
   city: string;
@@ -87,6 +90,7 @@ export function saveLocalTenant(
     paymentCash: data.paymentCash !== false,
     paymentDoorCard: data.paymentDoorCard === true,
     paymentMealCard: data.paymentMealCard === true,
+    paymentMealCardBrands: parseMealCardBrandIds(data.paymentMealCardBrands),
     marketplaceEnabled: data.marketplaceEnabled === true,
     city: data.city ?? "",
     district: data.district ?? "",
@@ -149,6 +153,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const paymentCash = p.paymentCash !== false;
     const paymentDoorCard = p.paymentDoorCard === true;
     const paymentMealCard = p.paymentMealCard === true;
+    const paymentMealCardBrands = parseMealCardBrandIds(p.paymentMealCardBrands);
 
     const marketplaceEnabled = p.marketplaceEnabled === true;
     const city = typeof p.city === "string" ? p.city : "";
@@ -187,6 +192,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
       paymentCash,
       paymentDoorCard,
       paymentMealCard,
+      paymentMealCardBrands,
       marketplaceEnabled,
       city,
       district,

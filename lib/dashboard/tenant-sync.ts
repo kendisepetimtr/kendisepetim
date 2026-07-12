@@ -27,6 +27,7 @@ const TENANT_SYNC_COLUMNS = [
   "payment_cash",
   "payment_door_card",
   "payment_meal_card",
+  "payment_meal_card_brands",
   "marketplace_enabled",
   "city",
   "district",

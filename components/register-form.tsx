@@ -142,6 +142,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       paymentCash: true,
       paymentDoorCard: false,
       paymentMealCard: false,
+      paymentMealCardBrands: [],
     });
     router.push("/dashboard");
   }

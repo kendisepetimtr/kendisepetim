@@ -2,6 +2,7 @@ import type { CustomerAddress } from "@/lib/customer-address";
 import { sanitizeSelectedVariations, type SelectedVariation } from "@/lib/menu-variations";
 import type { CheckoutPaymentMethod } from "@/lib/tenant-payment";
 import type { MealCardBrandId } from "@/lib/tenant-payment";
+import { isMealCardBrandId } from "@/lib/tenant-payment";
 
 export const localOrdersStorageKey = (subdomain: string) =>
   `kendisepetim_orders_v1_${subdomain.toLowerCase()}`;
@@ -73,8 +74,7 @@ export function getLocalOrders(subdomain: string): LocalOrdersState {
       const paymentMethod: CheckoutPaymentMethod =
         pm === "cash" || pm === "door_card" || pm === "meal_card" ? pm : "cash";
       const mealRaw = row.mealCardBrandId;
-      const mealCardBrandId =
-        mealRaw === "multinet" || mealRaw === "sodexo" || mealRaw === "edenred" ? mealRaw : undefined;
+      const mealCardBrandId = isMealCardBrandId(mealRaw) ? mealRaw : undefined;
       const lines: LocalOrderLine[] = [];
       if (Array.isArray(row.lines)) {
         for (const ln of row.lines) {
