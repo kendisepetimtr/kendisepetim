@@ -55,8 +55,12 @@ export type ReceiptSlip = {
   qrBlocks?: ReceiptQrBlock[];
 };
 
+/**
+ * Tarayıcı + termal sürücüde kenar boşlukları yüzünden 32/48 taşabiliyor;
+ * biraz dar tutmak tire/metin kaymasını önler.
+ */
 export function receiptCharWidth(paperWidthMm: ReceiptPaperWidth): number {
-  return paperWidthMm === 58 ? 32 : 48;
+  return paperWidthMm === 58 ? 30 : 42;
 }
 
 function repeatChar(ch: string, width: number): string {

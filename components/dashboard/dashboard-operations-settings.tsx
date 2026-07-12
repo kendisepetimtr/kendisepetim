@@ -645,6 +645,11 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                 <option value={80}>80 mm (standart termal)</option>
                 <option value={58}>58 mm (küçük termal)</option>
               </select>
+              <p className="mt-1.5 text-[11px] leading-snug text-secondary">
+                Yazıcı kâğıdıyla aynı genişliği seçin. Soluk çıkıyorsa Windows yazıcı
+                özelliklerinde yoğunluğu (density) yükseltin; kenar boşluklarını
+                &quot;Yok / Minimum&quot; yapın.
+              </p>
             </div>
 
             <fieldset className="rounded-xl border border-surface-container-highest p-3">
