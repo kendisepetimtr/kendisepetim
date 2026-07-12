@@ -101,7 +101,7 @@ export async function closeSessionWithPayment(input: {
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
-}): Promise<{ ok: true; sessionTotal: number; orderCount: number } | { ok: false; error: string }> {
+}): Promise<{ ok: true; sessionTotal: number; orderCount: number; paidAt: string } | { ok: false; error: string }> {
   const { tenantId, tableNumber, paymentMethod, paymentFlags } = input;
 
   if (!isPaymentMethodEnabled(paymentFlags, paymentMethod)) {
@@ -133,6 +133,7 @@ export async function closeSessionWithPayment(input: {
     const orderUpdate: Record<string, unknown> = {
       status: "completed",
       payment_method_at_close: paymentMethod,
+      paid_at: now,
     };
     if (paymentMethod === "meal_card") {
       orderUpdate.meal_card_brand_id = input.mealCardBrandId;
@@ -172,6 +173,7 @@ export async function closeSessionWithPayment(input: {
         meal_card: paymentMethod === "meal_card" ? input.mealCardBrandId : null,
         total: sessionTotal,
         order_count: payableOrders.length,
+        paid_at: now,
       },
     });
 
@@ -179,6 +181,7 @@ export async function closeSessionWithPayment(input: {
       ok: true,
       sessionTotal: Math.round(sessionTotal * 100) / 100,
       orderCount: payableOrders.length,
+      paidAt: now,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ödeme kaydedilemedi." };

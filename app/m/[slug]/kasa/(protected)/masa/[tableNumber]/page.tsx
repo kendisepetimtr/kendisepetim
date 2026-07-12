@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import SessionPaymentClient from "@/components/kasa/session-payment-client";
+import KasaTableHubClient from "@/components/kasa/kasa-table-hub-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
+import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
 import { loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
@@ -12,7 +13,7 @@ function parseTableNumber(raw: string): number | null {
   return n;
 }
 
-/** Masa hesabı / ödeme — sipariş alma kasa grid modalında. */
+/** Dolu masa hub: ürün ekle + ödeme / masa kapat. */
 export default async function KasaTableSessionPage({ params }: Props) {
   const { slug, tableNumber: rawTable } = await params;
   const tableNumber = parseTableNumber(rawTable);
@@ -34,12 +35,16 @@ export default async function KasaTableSessionPage({ params }: Props) {
     paymentMealCard: auth.tenant.payment_meal_card === true,
   };
 
+  const menu = await loadVisibleMenuForTenant(auth.tenant.id);
+
   return (
-    <SessionPaymentClient
+    <KasaTableHubClient
       tableNumber={tableNumber}
       businessName={auth.tenant.business_name}
+      subdomain={auth.tenant.subdomain}
       initialSession={detail.session}
       paymentFlags={paymentFlags}
+      menu={menu}
     />
   );
 }

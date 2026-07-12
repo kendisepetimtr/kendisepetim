@@ -20,8 +20,11 @@ function formatTry(n: number): string {
 type SessionPaymentClientProps = {
   tableNumber: number;
   businessName: string;
+  subdomain: string;
   initialSession: KasaSessionDetail;
   paymentFlags: TenantPaymentFlags;
+  /** Ürün ekleme modalını açmak için (parent tahtadan da gelebilir) */
+  onAddItems?: () => void;
 };
 
 export default function SessionPaymentClient({
@@ -29,6 +32,7 @@ export default function SessionPaymentClient({
   businessName,
   initialSession,
   paymentFlags,
+  onAddItems,
 }: SessionPaymentClientProps) {
   const [session, setSession] = useState(initialSession);
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
@@ -38,6 +42,7 @@ export default function SessionPaymentClient({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paidAtLabel, setPaidAtLabel] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -47,8 +52,13 @@ export default function SessionPaymentClient({
       const data = (await res.json()) as {
         ok?: boolean;
         session?: KasaSessionDetail;
+        empty?: boolean;
         error?: string;
       };
+      if (data.empty) {
+        window.location.href = "/kasa";
+        return;
+      }
       if (!res.ok || !data.ok || !data.session) {
         setError(data.error ?? "Oturum yüklenemedi.");
         return;
@@ -78,7 +88,7 @@ export default function SessionPaymentClient({
 
     const label = paymentMethodLabel(payMethod, mealBrand || undefined);
     const ok = window.confirm(
-      `Masa ${tableNumber} — ${formatTry(session.sessionTotal)}\nÖdeme: ${label}\n\nTahsilatı onaylıyor musunuz?`,
+      `Masa ${tableNumber} — ${formatTry(session.sessionTotal)}\nÖdeme: ${label}\n\nTahsilatı onaylıyor musunuz? Masa boşalacak.`,
     );
     if (!ok) return;
 
@@ -94,12 +104,19 @@ export default function SessionPaymentClient({
           mealCardBrandId: payMethod === "meal_card" ? mealBrand : undefined,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; sessionTotal?: number };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        sessionTotal?: number;
+        paidAt?: string;
+      };
       if (!res.ok || !data.ok) {
         window.alert(data.error ?? "Ödeme kaydedilemedi.");
         return;
       }
-      window.alert(`Ödeme alındı.\nMasa ${tableNumber} kapatıldı.`);
+      const when = data.paidAt ? new Date(data.paidAt).toLocaleString("tr-TR") : new Date().toLocaleString("tr-TR");
+      setPaidAtLabel(when);
+      window.alert(`Ödeme alındı (${label})\n${when}\nMasa ${tableNumber} kapatıldı.`);
       window.location.href = "/kasa";
     } catch {
       window.alert("Bağlantı hatası.");
@@ -116,36 +133,53 @@ export default function SessionPaymentClient({
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
             href="/kasa"
-            className="inline-flex items-center gap-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
+            className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white text-on-background active:scale-95"
+            aria-label="Geri"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Masalar
+            <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wide text-primary">
-              Kasa · Masa {tableNumber}
-            </p>
+            <p className="text-xs font-bold uppercase tracking-wide text-primary">Ödeme · Masa {tableNumber}</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
           </div>
+          {onAddItems ? (
+            <button
+              type="button"
+              onClick={onAddItems}
+              className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              Ürün
+            </button>
+          ) : (
+            <Link
+              href={`/kasa?addTable=${tableNumber}`}
+              className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[20px]">add</span>
+              Ürün
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="rounded-xl border border-surface-container-highest bg-white px-2.5 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-60"
+            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95 disabled:opacity-60"
+            aria-label="Yenile"
           >
-            {loading ? "…" : "Yenile"}
+            <span className="material-symbols-outlined text-[22px]">refresh</span>
           </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-2xl space-y-5 px-4 py-6 pb-28">
         {error ? (
           <p className="rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{error}</p>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Oturum durumu</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Durum</p>
             <p
               className={[
                 "mt-1 font-headline text-lg font-bold",
@@ -154,17 +188,20 @@ export default function SessionPaymentClient({
             >
               {statusLabel}
             </p>
+            {paidAtLabel ? (
+              <p className="mt-1 text-xs text-secondary">Ödeme: {paidAtLabel}</p>
+            ) : null}
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Toplam</p>
-            <p className="font-headline text-2xl font-black text-primary">{formatTry(session.sessionTotal)}</p>
+            <p className="font-headline text-3xl font-black text-primary">{formatTry(session.sessionTotal)}</p>
           </div>
         </div>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
           <h2 className="font-headline text-lg font-bold text-on-background">Siparişler</h2>
           {session.orders.length === 0 ? (
-            <p className="mt-4 text-sm text-secondary">Bu oturumda sipariş yok.</p>
+            <p className="mt-4 text-sm text-secondary">Bu oturumda sipariş yok. Ürün ekleyin.</p>
           ) : (
             <ul className="mt-4 space-y-4">
               {session.orders.map((order) => (
@@ -174,7 +211,6 @@ export default function SessionPaymentClient({
                       <p className="font-mono text-sm font-bold text-on-background">{order.orderCode}</p>
                       <p className="text-xs text-secondary">
                         {new Date(order.createdAt).toLocaleString("tr-TR")}
-                        {order.orderSource === "waiter" ? " · Garson" : order.orderSource === "table_qr" ? " · QR" : ""}
                       </p>
                     </div>
                     <p className="font-headline text-sm font-bold text-primary">{formatTry(order.total)}</p>
@@ -197,12 +233,6 @@ export default function SessionPaymentClient({
                       </li>
                     ))}
                   </ul>
-                  {order.orderNote.trim() ? (
-                    <p className="mt-2 text-xs text-secondary">Mutfak notu: {order.orderNote}</p>
-                  ) : null}
-                  {order.courierNote.trim() ? (
-                    <p className="mt-2 text-xs text-secondary">Kurye notu: {order.courierNote}</p>
-                  ) : null}
                 </li>
               ))}
             </ul>
@@ -214,19 +244,30 @@ export default function SessionPaymentClient({
             options={paymentFlags}
             method={payMethod}
             mealCardBrandId={mealBrand}
-            onMethodChange={setPayMethod}
+            onMethodChange={(m) => {
+              setPayMethod(m);
+              if (m !== "meal_card") setMealBrand("");
+            }}
             onMealCardBrandChange={setMealBrand}
           />
-          <button
-            type="button"
-            disabled={submitting || session.orders.length === 0}
-            onClick={() => void handleClosePayment()}
-            className="mt-6 w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
-          >
-            {submitting ? "Kaydediliyor…" : `Ödemeyi al ve masayı kapat (${formatTry(session.sessionTotal)})`}
-          </button>
         </section>
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-surface-container-highest bg-surface-container-lowest/95 p-4 backdrop-blur">
+        <div className="mx-auto max-w-2xl">
+          <button
+            type="button"
+            disabled={submitting || session.orders.length === 0 || !payMethod}
+            onClick={() => void handleClosePayment()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-base font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[22px]">payments</span>
+            {submitting
+              ? "Kaydediliyor…"
+              : `Ödemeyi al · Masayı kapat (${formatTry(session.sessionTotal)})`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

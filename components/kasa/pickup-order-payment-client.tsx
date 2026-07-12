@@ -49,7 +49,7 @@ export default function PickupOrderPaymentClient({
 
     const label = paymentMethodLabel(payMethod, mealBrand || undefined);
     const ok = window.confirm(
-      `${order.orderCode} — ${formatTry(order.total)}\nÖdeme: ${label}\n\nTeslim edildi olarak işaretlensin mi?`,
+      `${order.orderCode} — ${formatTry(order.total)}\nÖdeme: ${label}\n\nGel-Al kapatılsın mı? Slot boşalacak.`,
     );
     if (!ok) return;
 
@@ -64,12 +64,20 @@ export default function PickupOrderPaymentClient({
           mealCardBrandId: payMethod === "meal_card" ? mealBrand : undefined,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; orderCode?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        orderCode?: string;
+        paidAt?: string;
+      };
       if (!res.ok || !data.ok) {
         window.alert(data.error ?? "Ödeme kaydedilemedi.");
         return;
       }
-      window.alert(`Teslim edildi.\nSipariş: ${data.orderCode ?? order.orderCode}`);
+      const when = data.paidAt
+        ? new Date(data.paidAt).toLocaleString("tr-TR")
+        : new Date().toLocaleString("tr-TR");
+      window.alert(`Teslim edildi.\nÖdeme: ${label}\n${when}\nSipariş: ${data.orderCode ?? order.orderCode}`);
       window.location.href = "/kasa";
     } catch {
       window.alert("Bağlantı hatası.");
@@ -84,19 +92,19 @@ export default function PickupOrderPaymentClient({
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
             href="/kasa"
-            className="inline-flex items-center gap-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
+            className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
+            aria-label="Geri"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Gel-Al
+            <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </Link>
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-primary">Gel-Al</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-primary">Gel-Al · Ödeme</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+      <main className="mx-auto max-w-2xl space-y-5 px-4 py-6 pb-28">
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
           <div>
             <p className="font-mono text-2xl font-black text-on-background">{order.orderCode}</p>
@@ -108,7 +116,7 @@ export default function PickupOrderPaymentClient({
               {new Date(order.createdAt).toLocaleString("tr-TR")} · {ORDER_STATUS_LABELS[order.status]}
             </p>
           </div>
-          <p className="font-headline text-2xl font-black text-primary">{formatTry(order.total)}</p>
+          <p className="font-headline text-3xl font-black text-primary">{formatTry(order.total)}</p>
         </div>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
@@ -121,7 +129,9 @@ export default function PickupOrderPaymentClient({
                   {line.selectedOptions.length > 0
                     ? ` – ${formatSelectedVariationLabels(line.selectedOptions).join(", ")}`
                     : ""}
-                  {line.removedIngredients.length > 0 ? ` (${line.removedIngredients.join(", ")} çıkar)` : ""}
+                  {line.removedIngredients.length > 0
+                    ? ` (${line.removedIngredients.join(", ")} çıkar)`
+                    : ""}
                 </span>
                 <span className="shrink-0 tabular-nums text-secondary">
                   {formatTry(line.unitPrice * line.qty)}
@@ -129,11 +139,6 @@ export default function PickupOrderPaymentClient({
               </li>
             ))}
           </ul>
-          {order.orderNote.trim() ? (
-            <p className="mt-4 rounded-xl bg-surface-container-low px-3 py-2 text-xs text-secondary">
-              Mutfak notu: {order.orderNote}
-            </p>
-          ) : null}
         </section>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
@@ -150,16 +155,22 @@ export default function PickupOrderPaymentClient({
             }}
             onMealCardBrandChange={setMealBrand}
           />
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => void handleClosePayment()}
-            className="mt-6 w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
-          >
-            {submitting ? "Kaydediliyor…" : `Ödemeyi al ve teslim et (${formatTry(order.total)})`}
-          </button>
         </section>
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-surface-container-highest bg-surface-container-lowest/95 p-4 backdrop-blur">
+        <div className="mx-auto max-w-2xl">
+          <button
+            type="button"
+            disabled={submitting || !payMethod}
+            onClick={() => void handleClosePayment()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[22px]">payments</span>
+            {submitting ? "Kaydediliyor…" : `Ödemeyi al · Gel-Al kapat (${formatTry(order.total)})`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

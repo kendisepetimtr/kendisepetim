@@ -104,7 +104,7 @@ export async function closePickupOrderWithPayment(input: {
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
-}): Promise<{ ok: true; orderCode: string; total: number } | { ok: false; error: string }> {
+}): Promise<{ ok: true; orderCode: string; total: number; paidAt: string } | { ok: false; error: string }> {
   const detail = await loadKasaPickupOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -122,9 +122,11 @@ export async function closePickupOrderWithPayment(input: {
 
   try {
     const svc = createServiceSupabaseClient();
+    const paidAt = new Date().toISOString();
     const orderUpdate: Record<string, unknown> = {
       status: "completed",
       payment_method_at_close: input.paymentMethod,
+      paid_at: paidAt,
     };
     if (input.paymentMethod === "meal_card") {
       orderUpdate.meal_card_brand_id = input.mealCardBrandId;
@@ -154,6 +156,7 @@ export async function closePickupOrderWithPayment(input: {
         method: input.paymentMethod,
         meal_card: input.paymentMethod === "meal_card" ? input.mealCardBrandId : null,
         total: detail.order.total,
+        paid_at: paidAt,
       },
     });
 
@@ -161,6 +164,7 @@ export async function closePickupOrderWithPayment(input: {
       ok: true,
       orderCode: detail.order.orderCode,
       total: detail.order.total,
+      paidAt,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ödeme kaydedilemedi." };

@@ -266,10 +266,13 @@ export async function updateDeliveryOrderStatus(input: {
 export async function closeDeliveryOrderWithPayment(input: {
   tenantId: string;
   orderId: string;
+  courierId: string;
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
-}): Promise<{ ok: true; orderCode: string; total: number } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; orderCode: string; total: number; paidAt: string; courierId: string } | { ok: false; error: string }
+> {
   const detail = await loadKasaDeliveryOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -278,6 +281,15 @@ export async function closeDeliveryOrderWithPayment(input: {
   const currentStatus = detail.order.deliveryStatus ?? "pending";
   if (currentStatus === "delivered" || currentStatus === "cancelled") {
     return { ok: false, error: "Bu sipariş zaten kapatılmış veya iptal." };
+  }
+
+  const courierId = input.courierId.trim();
+  if (!courierId) {
+    return { ok: false, error: "Teslim eden kuryeyi seçin." };
+  }
+  const courierOk = detail.couriers.some((c) => c.id === courierId);
+  if (!courierOk) {
+    return { ok: false, error: "Geçersiz kurye." };
   }
 
   if (!isPaymentMethodEnabled(input.paymentFlags, input.paymentMethod)) {
@@ -292,10 +304,13 @@ export async function closeDeliveryOrderWithPayment(input: {
 
   try {
     const svc = createServiceSupabaseClient();
+    const paidAt = new Date().toISOString();
     const orderUpdate: Record<string, unknown> = {
       status: "completed",
       delivery_status: "delivered",
+      courier_id: courierId,
       payment_method_at_close: input.paymentMethod,
+      paid_at: paidAt,
     };
     if (input.paymentMethod === "meal_card") {
       orderUpdate.meal_card_brand_id = input.mealCardBrandId;
@@ -312,6 +327,8 @@ export async function closeDeliveryOrderWithPayment(input: {
       return { ok: false, error: error.message };
     }
 
+    const courier = detail.couriers.find((c) => c.id === courierId);
+
     await writeActivityLog({
       tenant_id: input.tenantId,
       actor_type: "cashier",
@@ -323,6 +340,9 @@ export async function closeDeliveryOrderWithPayment(input: {
       metadata: {
         fulfillment_type: "delivery",
         total: detail.order.total,
+        courier_id: courierId,
+        courier_name: courier ? courierDisplayName(courier) : null,
+        paid_at: paidAt,
       },
     });
 
@@ -339,6 +359,8 @@ export async function closeDeliveryOrderWithPayment(input: {
         method: input.paymentMethod,
         meal_card: input.paymentMethod === "meal_card" ? input.mealCardBrandId : null,
         total: detail.order.total,
+        courier_id: courierId,
+        paid_at: paidAt,
       },
     });
 
@@ -346,6 +368,8 @@ export async function closeDeliveryOrderWithPayment(input: {
       ok: true,
       orderCode: detail.order.orderCode,
       total: detail.order.total,
+      paidAt,
+      courierId,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ödeme kaydedilemedi." };

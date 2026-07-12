@@ -13,7 +13,7 @@ export type DashboardOrdersResult =
   | { ok: false; error: string };
 
 const ORDER_COLUMNS =
-  "id, created_at, updated_at, tenant_id, order_code, order_source, status, total, customer_first_name, customer_last_name, customer_phone, customer_email, address_json, payment_method, payment_method_at_close, meal_card_brand_id, order_note, courier_note, fulfillment_type, customer_latitude, customer_longitude, table_number, table_session_id, courier_id, delivery_status";
+  "id, created_at, updated_at, tenant_id, order_code, order_source, status, total, customer_first_name, customer_last_name, customer_phone, customer_email, address_json, payment_method, payment_method_at_close, meal_card_brand_id, paid_at, order_note, courier_note, fulfillment_type, customer_latitude, customer_longitude, table_number, table_session_id, courier_id, delivery_status";
 
 export async function loadDashboardOrderById(orderId: string): Promise<DashboardOrdersResult> {
   if (!orderId) return { ok: false, error: "Geçersiz sipariş." };

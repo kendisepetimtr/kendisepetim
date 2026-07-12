@@ -125,9 +125,13 @@ export async function POST(request: Request) {
     if (paymentMethod !== "cash" && paymentMethod !== "door_card" && paymentMethod !== "meal_card") {
       return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
     }
+    if (!body.courierId) {
+      return NextResponse.json({ ok: false, error: "Teslim eden kuryeyi seçin." }, { status: 400 });
+    }
     const result = await closeDeliveryOrderWithPayment({
       tenantId: auth.tenant.id,
       orderId: body.orderId,
+      courierId: body.courierId,
       paymentMethod,
       mealCardBrandId: body.mealCardBrandId,
       paymentFlags,

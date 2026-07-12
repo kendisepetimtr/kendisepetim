@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
@@ -145,8 +144,8 @@ export default function KasaPanelClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Masaya dokunun → sipariş. Gel-Al kartları QR veya kasadan gelen paket dışı siparişlerdir; boş Gel-Al ile
-          yeni alın. Dolu kartlarda «Öde» ile tahsilat.
+          Boş masaya / Gel-Al’a dokunun → sipariş. Dolu masaya dokunun → ödeme (üstten ürün de eklenir). Paket
+          listesinden kurye seçip kapatın.
         </p>
 
         {features.dineIn && tables.length > 0 ? (
@@ -157,46 +156,41 @@ export default function KasaPanelClient({
                 const copy = STATUS_COPY[table.status] ?? STATUS_COPY.empty;
                 const occupied = table.status === "active" || table.status === "bill_requested";
                 return (
-                  <div
+                  <button
                     key={table.tableNumber}
+                    type="button"
+                    onClick={() => {
+                      if (occupied) {
+                        window.location.href = `/kasa/masa/${table.tableNumber}`;
+                      } else {
+                        setOrderTarget({ channel: "dine_in", tableNumber: table.tableNumber });
+                      }
+                    }}
                     className={[
-                      "relative flex min-h-[132px] flex-col rounded-2xl border p-4 shadow-sm",
+                      "relative flex min-h-[132px] flex-col rounded-2xl border p-4 text-left shadow-sm transition active:scale-[0.98]",
                       copy.card,
                     ].join(" ")}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setOrderTarget({ channel: "dine_in", tableNumber: table.tableNumber })}
-                      className="flex min-h-0 flex-1 flex-col text-left active:scale-[0.98]"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-headline text-2xl font-black text-on-background">
-                          {table.tableNumber}
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${copy.chip}`}>
-                          {copy.label}
-                        </span>
-                      </div>
-                      {occupied ? (
-                        <div className="mt-auto pt-3 text-xs text-secondary">
-                          <p>{table.orderCount} sipariş</p>
-                          <p className="font-headline text-sm font-bold text-on-background">
-                            {formatTry(table.sessionTotal)}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="mt-auto pt-3 text-xs text-secondary">Dokun → sipariş</p>
-                      )}
-                    </button>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-headline text-2xl font-black text-on-background">
+                        {table.tableNumber}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${copy.chip}`}>
+                        {copy.label}
+                      </span>
+                    </div>
                     {occupied ? (
-                      <Link
-                        href={`/kasa/masa/${table.tableNumber}`}
-                        className="mt-3 inline-flex items-center justify-center rounded-xl bg-on-background px-3 py-2.5 text-xs font-bold text-white active:scale-95"
-                      >
-                        Öde
-                      </Link>
-                    ) : null}
-                  </div>
+                      <div className="mt-auto pt-3 text-xs text-secondary">
+                        <p>{table.orderCount} sipariş</p>
+                        <p className="font-headline text-sm font-bold text-on-background">
+                          {formatTry(table.sessionTotal)}
+                        </p>
+                        <p className="mt-2 text-[11px] font-semibold text-primary">Ödeme / ürün ekle →</p>
+                      </div>
+                    ) : (
+                      <p className="mt-auto pt-3 text-xs text-secondary">Dokun → sipariş</p>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -225,31 +219,30 @@ export default function KasaPanelClient({
                     ].join(" ")}
                   >
                     {occupied ? (
-                      <>
-                        <div className="flex min-h-0 flex-1 flex-col">
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="font-headline text-lg font-black text-on-background">
-                              Gel-Al {slot.slotNumber}
-                            </span>
-                            <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-900">
-                              Açık
-                            </span>
-                          </div>
-                          <p className="mt-2 truncate text-xs font-semibold text-on-background">
-                            {slot.customerLabel}
-                          </p>
-                          <p className="truncate text-[11px] text-secondary">{slot.orderCode}</p>
-                          <p className="mt-auto pt-2 font-headline text-sm font-bold text-on-background">
-                            {formatTry(slot.total)}
-                          </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/kasa/gel-al/${slot.orderId}`;
+                        }}
+                        className="flex min-h-0 flex-1 flex-col text-left active:scale-[0.98]"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-headline text-lg font-black text-on-background">
+                            Gel-Al {slot.slotNumber}
+                          </span>
+                          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-900">
+                            Açık
+                          </span>
                         </div>
-                        <Link
-                          href={`/kasa/gel-al/${slot.orderId}`}
-                          className="mt-3 inline-flex items-center justify-center rounded-xl bg-on-background px-3 py-2.5 text-xs font-bold text-white active:scale-95"
-                        >
-                          Öde
-                        </Link>
-                      </>
+                        <p className="mt-2 truncate text-xs font-semibold text-on-background">
+                          {slot.customerLabel}
+                        </p>
+                        <p className="truncate text-[11px] text-secondary">{slot.orderCode}</p>
+                        <p className="mt-auto pt-2 font-headline text-sm font-bold text-on-background">
+                          {formatTry(slot.total)}
+                        </p>
+                        <p className="mt-2 text-[11px] font-semibold text-primary">Ödeme →</p>
+                      </button>
                     ) : (
                       <button
                         type="button"
