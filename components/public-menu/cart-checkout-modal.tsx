@@ -28,6 +28,7 @@ import {
   type TenantFulfillmentFlags,
 } from "@/lib/fulfillment";
 import { upsertLocalCustomerByPhone } from "@/lib/local-customers";
+import type { CashierCustomerMatch } from "@/lib/kasa/customer-search";
 import { loadQrCheckoutSession, saveQrCheckoutSession } from "@/lib/qr-checkout-session";
 import {
   pickDefaultPaymentMethod,
@@ -56,6 +57,11 @@ type CartCheckoutModalProps = {
   tableNumber?: number;
   /** Garson panelinden siparis — musteri formu yok */
   waiterMode?: boolean;
+  /** Kasa POS — /api/kasa/orders, ödeme kapanışta */
+  cashierMode?: boolean;
+  /** Kasa sipariş kanalı (cashierMode iken) */
+  cashierFulfillment?: FulfillmentType;
+  onCashierOrderPlaced?: (result: { orderId: string; orderCode: string }) => void;
   /** Menü subdomain (işletme kimliği) */
   subdomain: string;
   orderingEnabled: boolean;
@@ -73,18 +79,30 @@ export default function CartCheckoutModal({
   orderSource = "qr_menu",
   tableNumber,
   waiterMode = false,
+  cashierMode = false,
+  cashierFulfillment,
+  onCashierOrderPlaced,
   subdomain,
   orderingEnabled,
   closedMessage,
 }: CartCheckoutModalProps) {
   const baseId = useId();
   const isTableOrder = tableNumber != null && tableNumber > 0;
-  const isWaiterOrder = waiterMode && isTableOrder;
-  const defaultFulfillment = isTableOrder ? "dine_in" : resolveDefaultFulfillmentType(fulfillmentFlags);
+  const isWaiterOrder = waiterMode && isTableOrder && !cashierMode;
+  const isCashierOrder = cashierMode;
+  const defaultFulfillment = isTableOrder
+    ? "dine_in"
+    : cashierFulfillment ?? resolveDefaultFulfillmentType(fulfillmentFlags);
   const [step, setStep] = useState<Step>("cart");
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>(
-    isTableOrder ? "dine_in" : defaultFulfillment ?? "pickup",
+    cashierMode && cashierFulfillment
+      ? cashierFulfillment
+      : isTableOrder
+        ? "dine_in"
+        : defaultFulfillment ?? "pickup",
   );
+  const [phoneSuggestions, setPhoneSuggestions] = useState<CashierCustomerMatch[]>([]);
+  const [phoneSuggestOpen, setPhoneSuggestOpen] = useState(false);
   const [customerLatitude, setCustomerLatitude] = useState<number | null>(null);
   const [customerLongitude, setCustomerLongitude] = useState<number | null>(null);
   const [formValues, setFormValues] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
@@ -126,12 +144,44 @@ export default function CartCheckoutModal({
   useEffect(() => {
     if (!open) return;
     setStep("cart");
-  }, [open]);
+    if (cashierMode && cashierFulfillment) {
+      setFulfillmentType(cashierFulfillment);
+    } else if (isTableOrder) {
+      setFulfillmentType("dine_in");
+    }
+  }, [open, cashierMode, cashierFulfillment, isTableOrder]);
+
+  useEffect(() => {
+    if (!isCashierOrder || fulfillmentType !== "delivery") return;
+    const phone = formValues.phone.trim();
+    if (phone.length < 3) {
+      setPhoneSuggestions([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/kasa/customers/search?q=${encodeURIComponent(phone)}`, {
+            cache: "no-store",
+          });
+          const data = (await res.json()) as { ok?: boolean; matches?: CashierCustomerMatch[] };
+          if (res.ok && data.ok && data.matches) {
+            setPhoneSuggestions(data.matches);
+            setPhoneSuggestOpen(data.matches.length > 0);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [formValues.phone, isCashierOrder, fulfillmentType]);
 
   useEffect(() => {
     if (!open || step !== "checkout") return;
+    if (isCashierOrder && fulfillmentType === "dine_in") return;
     hydrateCheckout();
-  }, [open, step, hydrateCheckout]);
+  }, [open, step, hydrateCheckout, isCashierOrder, fulfillmentType]);
 
   useEffect(() => {
     if (!open) return;
@@ -162,7 +212,13 @@ export default function CartCheckoutModal({
   );
 
   const showFulfillmentChoice =
-    fulfillmentFlags.fulfillmentPickupEnabled && fulfillmentFlags.fulfillmentDeliveryEnabled;
+    !isCashierOrder &&
+    fulfillmentFlags.fulfillmentPickupEnabled &&
+    fulfillmentFlags.fulfillmentDeliveryEnabled;
+
+  const cashierNeedsCustomer =
+    isCashierOrder && (cashierFulfillment ?? fulfillmentType) === "delivery";
+  const staffQuickSubmit = isWaiterOrder || (isCashierOrder && !cashierNeedsCustomer);
 
   const upsellProducts = useMemo(() => {
     const inCart = new Set(
@@ -269,6 +325,68 @@ export default function CartCheckoutModal({
         setCart({});
         onClose();
         window.alert(`Sipariş masaya iletildi.\nNo: ${result.orderCode}`);
+      } catch {
+        window.alert("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (isCashierOrder) {
+      const ft = cashierFulfillment ?? fulfillmentType;
+      if (ft === "delivery") {
+        const err = validateCustomerFormForFulfillment(formValues, "delivery");
+        if (err) {
+          window.alert(err);
+          return;
+        }
+      }
+
+      setSubmitting(true);
+      try {
+        const addr = {
+          neighborhood: formValues.neighborhood.trim(),
+          street: formValues.street.trim(),
+          buildingNo: formValues.buildingNo.trim(),
+          buildingName: formValues.buildingName.trim(),
+          floor: formValues.floor.trim(),
+          apartmentNo: formValues.apartmentNo.trim(),
+          livesInSite: formValues.livesInSite,
+          siteName: formValues.siteName.trim(),
+          block: formValues.block.trim(),
+        };
+        const response = await fetch("/api/kasa/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fulfillmentType: ft,
+            tableNumber: ft === "dine_in" ? tableNumber : undefined,
+            lines,
+            orderNote: formValues.orderNote.trim(),
+            courierNote: ft === "delivery" ? formValues.courierNote.trim() : "",
+            firstName: formValues.firstName.trim(),
+            lastName: formValues.lastName.trim(),
+            phone: formValues.phone.trim(),
+            email: formValues.email.trim(),
+            address: addr,
+            customerLatitude: ft === "delivery" ? customerLatitude : null,
+            customerLongitude: ft === "delivery" ? customerLongitude : null,
+          }),
+        });
+        const result = (await response.json()) as {
+          ok?: boolean;
+          orderId?: string;
+          orderCode?: string;
+          error?: string;
+        };
+        if (!response.ok || !result.ok || !result.orderId || !result.orderCode) {
+          window.alert(result.error ?? "Sipariş kaydedilemedi.");
+          return;
+        }
+        setCart({});
+        onClose();
+        onCashierOrderPlaced?.({ orderId: result.orderId, orderCode: result.orderCode });
       } catch {
         window.alert("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
       } finally {
@@ -582,15 +700,15 @@ export default function CartCheckoutModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => (isWaiterOrder ? void handleConfirmOrder() : setStep("checkout"))}
+                    onClick={() => (staffQuickSubmit ? void handleConfirmOrder() : setStep("checkout"))}
                     disabled={!orderingEnabled || submitting}
                     className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
                   >
                     {submitting
                       ? "Gönderiliyor…"
                       : orderingEnabled
-                        ? isWaiterOrder
-                          ? "Masaya gönder"
+                        ? isWaiterOrder || (isCashierOrder && !cashierNeedsCustomer)
+                          ? "Siparişi kaydet"
                           : "Devam et"
                         : "Restoran kapalı"}
                   </button>
@@ -622,9 +740,11 @@ export default function CartCheckoutModal({
                 </p>
               ) : null}
               <p className="text-xs text-secondary">
-                {isTableOrder
-                  ? "Adınızı girin; sipariş masanıza iletilecek. Ödeme kasada alınır."
-                  : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
+                {isCashierOrder
+                  ? "Müşteri bilgilerini girin. Ödeme sipariş kapanışında alınır."
+                  : isTableOrder
+                    ? "Adınızı girin; sipariş masanıza iletilecek. Ödeme kasada alınır."
+                    : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
               </p>
               <div className="mt-4 rounded-xl border border-surface-container-high bg-surface-container-low/50 px-3 py-2 text-xs">
                 <span className="font-semibold text-on-background">Ara toplam:</span>{" "}
@@ -632,7 +752,8 @@ export default function CartCheckoutModal({
               </div>
 
               <div className="mt-6">
-                {!isTableOrder &&
+                {!isCashierOrder &&
+                !isTableOrder &&
                 (showFulfillmentChoice || fulfillmentFlags.fulfillmentPickupEnabled || fulfillmentFlags.fulfillmentDeliveryEnabled) ? (
                   <div className="mb-6">
                     <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sipariş tipi</p>
@@ -665,28 +786,88 @@ export default function CartCheckoutModal({
                       </p>
                     ) : null}
                   </div>
-                ) : isTableOrder ? (
+                ) : isTableOrder && !isCashierOrder ? (
                   <p className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary">
                     Masa {tableNumber} · Ödeme kasada
                   </p>
+                ) : isCashierOrder ? (
+                  <p className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary">
+                    {fulfillmentTypeLabel(cashierFulfillment ?? fulfillmentType)}
+                    {tableNumber ? ` · Masa ${tableNumber}` : ""} · Ödeme kapanışta
+                  </p>
+                ) : null}
+
+                {isCashierOrder && fulfillmentType === "delivery" && phoneSuggestOpen && phoneSuggestions.length > 0 ? (
+                  <div className="mb-4 overflow-hidden rounded-xl border border-primary/25 bg-white shadow-sm">
+                    <p className="border-b border-surface-container-high px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-secondary">
+                      Kayıtlı numaralar
+                    </p>
+                    <ul className="max-h-48 overflow-y-auto">
+                      {phoneSuggestions.map((m) => (
+                        <li key={`${m.phone}-${m.lastOrderAt}`}>
+                          <button
+                            type="button"
+                            className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-primary/5"
+                            onClick={() => {
+                              setFormValues((v) => ({
+                                ...v,
+                                phone: m.phone,
+                                firstName: m.firstName || v.firstName,
+                                lastName: m.lastName || v.lastName,
+                                neighborhood: m.address.neighborhood || v.neighborhood,
+                                street: m.address.street || v.street,
+                                buildingNo: m.address.buildingNo || v.buildingNo,
+                                buildingName: m.address.buildingName || v.buildingName,
+                                floor: m.address.floor || v.floor,
+                                apartmentNo: m.address.apartmentNo || v.apartmentNo,
+                                livesInSite: m.address.livesInSite,
+                                siteName: m.address.siteName || v.siteName,
+                                block: m.address.block || v.block,
+                              }));
+                              setPhoneSuggestOpen(false);
+                            }}
+                          >
+                            <span className="text-sm font-semibold text-on-background">{m.phone}</span>
+                            <span className="text-xs text-secondary">
+                              {[m.firstName, m.lastName].filter(Boolean).join(" ") || "—"}
+                              {m.orderCount > 1 ? ` · ${m.orderCount} sipariş` : ""}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
 
                 <CustomerIdentityAddressForm
                   idPrefix={`${baseId}-co`}
                   values={formValues}
-                  onChange={setFormValues}
-                  showPrefillNotice
+                  onChange={(next) => {
+                    setFormValues(next);
+                    if (isCashierOrder && fulfillmentType === "delivery") {
+                      setPhoneSuggestOpen(true);
+                    }
+                  }}
+                  showPrefillNotice={!isCashierOrder}
                   showOrderNote
-                  showCourierNote={!isTableOrder && fulfillmentType === "delivery"}
-                  hideAddress={isTableOrder || fulfillmentType === "pickup"}
-                  showLocationButton={!isTableOrder && fulfillmentType === "delivery"}
+                  showCourierNote={
+                    (!isTableOrder || isCashierOrder) && fulfillmentType === "delivery"
+                  }
+                  hideAddress={
+                    (!isCashierOrder && isTableOrder) || fulfillmentType === "pickup"
+                  }
+                  showLocationButton={
+                    isCashierOrder
+                      ? fulfillmentType === "delivery"
+                      : !isTableOrder && fulfillmentType === "delivery"
+                  }
                   locationLoading={locLoading}
                   locationMessage={locMsg}
                   onRequestLocation={handleRequestLocation}
                 />
               </div>
 
-              {!isTableOrder ? (
+              {!isTableOrder && !isCashierOrder ? (
               <div className="mt-8">
                 <CheckoutPaymentSelector
                   options={paymentFlags}

@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import { formatAddressOneLine } from "@/lib/customer-address";
 import { DELIVERY_STATUS_LABELS } from "@/lib/delivery-status";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
@@ -22,6 +23,7 @@ function formatTry(n: number): string {
 
 type DeliveryOrdersClientProps = {
   businessName: string;
+  tenantId: string;
   features: KasaFeatures;
   initialOrders: AdminOrder[];
   courierById: Record<string, CourierRow>;
@@ -29,16 +31,15 @@ type DeliveryOrdersClientProps = {
 
 export default function DeliveryOrdersClient({
   businessName,
+  tenantId,
   features,
   initialOrders,
   courierById,
 }: DeliveryOrdersClientProps) {
   const [orders, setOrders] = useState(initialOrders);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/kasa/delivery", { cache: "no-store" });
@@ -50,8 +51,6 @@ export default function DeliveryOrdersClient({
       setOrders(data.orders);
     } catch {
       setError("Bağlantı hatası.");
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -61,20 +60,15 @@ export default function DeliveryOrdersClient({
     onRefresh: refresh,
   });
 
-  useEffect(() => {
-    const id = window.setInterval(() => void refresh(), 20_000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+  useTenantOpsRealtime({
+    tenantId,
+    actions: REFRESH_ON_ACTIONS,
+    onEvent: () => void refresh(),
+  });
 
   return (
     <div className="min-h-screen bg-background">
-      <KasaShellHeader
-        businessName={businessName}
-        features={features}
-        active="paket"
-        onRefresh={() => void refresh()}
-        refreshing={loading}
-      />
+      <KasaShellHeader businessName={businessName} features={features} active="paket" />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {error ? (
@@ -82,13 +76,19 @@ export default function DeliveryOrdersClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Paket siparişleri — kurye atayın, durumu güncelleyin ve teslimatta ödemeyi alın.
+          Paket siparişleri. Sepet ile yeni sipariş alın; listeden POS’a girip ödemeyi kapatın.
         </p>
 
         {orders.length === 0 ? (
           <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-10 text-center">
             <span className="material-symbols-outlined text-4xl text-secondary/50">delivery_dining</span>
             <p className="mt-3 text-sm text-secondary">Bekleyen paket siparişi yok.</p>
+            <Link
+              href="/kasa/siparis?channel=paket"
+              className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+            >
+              Yeni paket siparişi
+            </Link>
           </div>
         ) : (
           <ul className="space-y-3">

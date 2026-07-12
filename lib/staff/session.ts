@@ -188,7 +188,8 @@ export function waiterSessionCookieOptions() {
     httpOnly: true as const,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path: "/garson",
+    /** /api/garson/* isteklerinde cookie gitsin diye kök path */
+    path: "/",
     maxAge: MAX_AGE_SEC,
   };
 }
@@ -198,7 +199,8 @@ export function cashierSessionCookieOptions() {
     httpOnly: true as const,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path: "/kasa",
+    /** /api/kasa/* isteklerinde cookie gitsin diye kök path */
+    path: "/",
     maxAge: MAX_AGE_SEC,
   };
 }

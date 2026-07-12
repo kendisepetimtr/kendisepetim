@@ -21,6 +21,7 @@ export default async function TenantKasaPanelPage({ params }: { params: Promise<
   return (
     <KasaPanelClient
       businessName={auth.tenant.business_name}
+      tenantId={auth.tenant.id}
       features={features}
       initialTables={grid.ok ? grid.tables : []}
     />

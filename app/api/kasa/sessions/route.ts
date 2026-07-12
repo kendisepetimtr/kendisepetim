@@ -26,11 +26,24 @@ export async function GET(request: Request) {
 
   const result = await loadKasaSessionDetail(auth.tenant.id, tableNumber);
   if (!result.ok) {
+    if (result.error === "Bu masada açık oturum yok.") {
+      return NextResponse.json({
+        ok: true,
+        empty: true,
+        session: null,
+        paymentFlags: {
+          paymentCash: auth.tenant.payment_cash === true,
+          paymentDoorCard: auth.tenant.payment_door_card === true,
+          paymentMealCard: auth.tenant.payment_meal_card === true,
+        },
+      });
+    }
     return NextResponse.json(result, { status: 400 });
   }
 
   return NextResponse.json({
     ok: true,
+    empty: false,
     session: result.session,
     paymentFlags: {
       paymentCash: auth.tenant.payment_cash === true,

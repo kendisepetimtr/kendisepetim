@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
@@ -24,21 +25,21 @@ const STATUS_CHIP: Record<string, string> = {
 
 type PickupOrdersClientProps = {
   businessName: string;
+  tenantId: string;
   features: KasaFeatures;
   initialOrders: AdminOrder[];
 };
 
 export default function PickupOrdersClient({
   businessName,
+  tenantId,
   features,
   initialOrders,
 }: PickupOrdersClientProps) {
   const [orders, setOrders] = useState(initialOrders);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/kasa/pickup", { cache: "no-store" });
@@ -50,8 +51,6 @@ export default function PickupOrdersClient({
       setOrders(data.orders);
     } catch {
       setError("Bağlantı hatası.");
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -61,20 +60,15 @@ export default function PickupOrdersClient({
     onRefresh: refresh,
   });
 
-  useEffect(() => {
-    const id = window.setInterval(() => void refresh(), 20_000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+  useTenantOpsRealtime({
+    tenantId,
+    actions: REFRESH_ON_ACTIONS,
+    onEvent: () => void refresh(),
+  });
 
   return (
     <div className="min-h-screen bg-background">
-      <KasaShellHeader
-        businessName={businessName}
-        features={features}
-        active="gel-al"
-        onRefresh={() => void refresh()}
-        refreshing={loading}
-      />
+      <KasaShellHeader businessName={businessName} features={features} active="gel-al" />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {error ? (
@@ -82,13 +76,19 @@ export default function PickupOrdersClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Online gel-al siparişleri. Müşteri geldiğinde siparişe dokunun, ödemeyi alın ve teslim edin.
+          Gel-al siparişleri. Sepet ile yeni sipariş alın; listeden dokunarak ödemeyi kapatın.
         </p>
 
         {orders.length === 0 ? (
           <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-10 text-center">
             <span className="material-symbols-outlined text-4xl text-secondary/50">shopping_bag</span>
             <p className="mt-3 text-sm text-secondary">Bekleyen gel-al siparişi yok.</p>
+            <Link
+              href="/kasa/siparis?channel=gel-al"
+              className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+            >
+              Yeni gel-al siparişi
+            </Link>
           </div>
         ) : (
           <ul className="space-y-3">

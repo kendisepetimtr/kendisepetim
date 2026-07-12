@@ -32,6 +32,7 @@ export default async function KasaDeliveryOrdersPage({ params }: { params: Promi
   return (
     <DeliveryOrdersClient
       businessName={auth.tenant.business_name}
+      tenantId={auth.tenant.id}
       features={features}
       initialOrders={ordersResult.ok ? ordersResult.orders : []}
       courierById={courierById}

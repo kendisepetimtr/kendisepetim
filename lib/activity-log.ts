@@ -1,8 +1,10 @@
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { ActivityLogInsert } from "@/lib/supabase/activity-log-types";
+import { broadcastTenantOpsEvent } from "@/lib/tenant-realtime-broadcast";
 
 /**
  * Operasyon kaydi yazar. Hata durumunda sessizce basarisiz olur — ana islem bozulmaz.
+ * Basarili yazimda Realtime broadcast yayinlar (kasa/garson yenileme).
  */
 export async function writeActivityLog(input: ActivityLogInsert): Promise<string | null> {
   try {
@@ -26,6 +28,13 @@ export async function writeActivityLog(input: ActivityLogInsert): Promise<string
       console.error("[activity_log] insert failed:", error.message);
       return null;
     }
+
+    void broadcastTenantOpsEvent(input.tenant_id, {
+      action: input.action,
+      entityType: input.entity_type,
+      entityId: input.entity_id,
+      orderCode: input.order_code,
+    });
 
     return data?.id ?? null;
   } catch (err) {

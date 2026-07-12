@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { signOutCashierAction } from "@/app/kasa/actions";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 
@@ -11,19 +11,32 @@ type KasaShellHeaderProps = {
   businessName: string;
   features: KasaFeatures;
   active: TabId;
-  onRefresh?: () => void;
-  refreshing?: boolean;
+  /** Sepet: yeni sipariş — yoksa aktif sekmeye göre varsayılan */
+  newOrderHref?: string;
   children?: ReactNode;
 };
+
+function defaultNewOrderHref(active: TabId, features: KasaFeatures): string {
+  if (active === "masalar" && features.dineIn) return "/kasa/siparis?channel=masa";
+  if (active === "gel-al" && features.pickup) return "/kasa/siparis?channel=gel-al";
+  if (active === "paket" && features.delivery) return "/kasa/siparis?channel=paket";
+  if (features.dineIn) return "/kasa/siparis?channel=masa";
+  if (features.pickup) return "/kasa/siparis?channel=gel-al";
+  if (features.delivery) return "/kasa/siparis?channel=paket";
+  return "/kasa";
+}
 
 export default function KasaShellHeader({
   businessName,
   features,
   active,
-  onRefresh,
-  refreshing,
+  newOrderHref,
   children,
 }: KasaShellHeaderProps) {
+  const menuId = useId();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const tabs = (
     [
       { id: "masalar" as const, href: "/kasa", label: "Masalar", enabled: features.dineIn },
@@ -33,6 +46,23 @@ export default function KasaShellHeader({
   ).filter((t) => t.enabled);
 
   const showTabs = tabs.length > 1;
+  const basketHref = newOrderHref ?? defaultNewOrderHref(active, features);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
@@ -43,27 +73,47 @@ export default function KasaShellHeader({
             {businessName}
           </h1>
         </div>
+
         <div className="flex shrink-0 items-center gap-2">
-          {onRefresh ? (
+          <Link
+            href={basketHref}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white shadow-md transition hover:brightness-105 active:scale-95"
+            aria-label="Yeni sipariş al"
+            title="Sipariş al"
+          >
+            <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              shopping_basket
+            </span>
+          </Link>
+
+          <div className="relative" ref={menuRef}>
             <button
               type="button"
-              onClick={onRefresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low disabled:opacity-60"
+              aria-expanded={menuOpen}
+              aria-controls={menuId}
+              aria-label="Menü"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-surface-container-highest bg-white text-on-background hover:bg-surface-container-low"
             >
-              <span className="material-symbols-outlined text-[18px]">refresh</span>
-              {refreshing ? "…" : "Yenile"}
+              <span className="material-symbols-outlined text-[22px]">more_vert</span>
             </button>
-          ) : null}
-          <form action={signOutCashierAction}>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
-            >
-              <span className="material-symbols-outlined text-[18px]">logout</span>
-              Çıkış
-            </button>
-          </form>
+            {menuOpen ? (
+              <div
+                id={menuId}
+                className="absolute right-0 z-30 mt-2 min-w-[10rem] overflow-hidden rounded-xl border border-surface-container-highest bg-white py-1 shadow-lg"
+              >
+                <form action={signOutCashierAction}>
+                  <button
+                    type="submit"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    Çıkış
+                  </button>
+                </form>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 

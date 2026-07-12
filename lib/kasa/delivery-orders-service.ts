@@ -276,8 +276,8 @@ export async function closeDeliveryOrderWithPayment(input: {
   }
 
   const currentStatus = detail.order.deliveryStatus ?? "pending";
-  if (currentStatus !== "out_for_delivery" && currentStatus !== "ready_for_dispatch") {
-    return { ok: false, error: "Ödeme için sipariş «Yolda» veya «Kuryeye hazır» olmalıdır." };
+  if (currentStatus === "delivered" || currentStatus === "cancelled") {
+    return { ok: false, error: "Bu sipariş zaten kapatılmış veya iptal." };
   }
 
   if (!isPaymentMethodEnabled(input.paymentFlags, input.paymentMethod)) {

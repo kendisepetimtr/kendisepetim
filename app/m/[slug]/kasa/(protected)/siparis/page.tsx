@@ -1,28 +1,51 @@
 import { notFound, redirect } from "next/navigation";
 import KasaPosClient from "@/components/kasa/kasa-pos-client";
 import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
+import { clampDeliveryRadiusKm, type FulfillmentType, type TenantFulfillmentFlags } from "@/lib/fulfillment";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
-import { loadKasaPickupOrderDetail } from "@/lib/kasa/pickup-orders-service";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
-type Props = { params: Promise<{ slug: string; orderId: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ channel?: string; table?: string }>;
+};
 
-export default async function KasaPickupOrderPage({ params }: Props) {
-  const { slug, orderId } = await params;
+export default async function KasaNewOrderPage({ params, searchParams }: Props) {
+  const { slug } = await params;
+  const sp = await searchParams;
   const auth = await getAuthenticatedCashierTenant(slug);
   if (!auth.ok) notFound();
 
   const features = getKasaFeatures(auth.tenant);
-  if (!features.pickup) {
+  const channelRaw = (sp.channel ?? "").toLowerCase();
+
+  if (channelRaw === "masa" || channelRaw === "dine_in") {
+    const table = Number.parseInt(sp.table ?? "", 10);
+    if (Number.isFinite(table) && table >= 1) {
+      redirect(`/kasa/masa/${table}`);
+    }
+    // Masa seçimi için ana grid
     redirect("/kasa");
   }
 
-  const detail = await loadKasaPickupOrderDetail(auth.tenant.id, orderId);
-  if (!detail.ok) {
-    redirect("/kasa/gel-al");
+  let channel: FulfillmentType;
+  let backHref: string;
+  let backLabel: string;
+
+  if (channelRaw === "gel-al" || channelRaw === "pickup") {
+    if (!features.pickup) redirect("/kasa");
+    channel = "pickup";
+    backHref = "/kasa/gel-al";
+    backLabel = "Gel-Al";
+  } else if (channelRaw === "paket" || channelRaw === "delivery") {
+    if (!features.delivery) redirect("/kasa");
+    channel = "delivery";
+    backHref = "/kasa/paket";
+    backLabel = "Paket";
+  } else {
+    redirect("/kasa");
   }
 
   const row = auth.tenant;
@@ -32,8 +55,8 @@ export default async function KasaPickupOrderPage({ params }: Props) {
     paymentMealCard: row.payment_meal_card === true,
   };
   const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: true,
-    fulfillmentDeliveryEnabled: false,
+    fulfillmentPickupEnabled: channel === "pickup",
+    fulfillmentDeliveryEnabled: channel === "delivery",
     deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
     minOrderAmount:
       row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
@@ -58,10 +81,9 @@ export default async function KasaPickupOrderPage({ params }: Props) {
       paymentFlags={paymentFlags}
       fulfillmentFlags={fulfillmentFlags}
       initialMenu={initialMenu}
-      channel="pickup"
-      backHref="/kasa/gel-al"
-      backLabel="Gel-Al"
-      initialOrder={detail.order}
+      channel={channel}
+      backHref={backHref}
+      backLabel={backLabel}
     />
   );
 }

@@ -25,7 +25,7 @@ import {
   type CartLine,
   type CartState,
 } from "@/lib/public-cart";
-import type { TenantFulfillmentFlags } from "@/lib/fulfillment";
+import type { FulfillmentType, TenantFulfillmentFlags } from "@/lib/fulfillment";
 import {
   getBusinessClosedMessage,
   getBusinessHoursRangeLabel,
@@ -101,6 +101,12 @@ type PublicMenuClientProps = {
   tableNumber?: number;
   /** Garson paneli — siparis API /api/garson/orders */
   waiterMode?: boolean;
+  /** Kasa POS — /api/kasa/orders */
+  cashierMode?: boolean;
+  cashierFulfillment?: FulfillmentType;
+  onCashierOrderPlaced?: (result: { orderId: string; orderCode: string }) => void;
+  /** Staff: daha sade menü kabuğu */
+  compactChrome?: boolean;
   initialMenu: LocalMenuState;
 };
 
@@ -132,10 +138,15 @@ export default function PublicMenuClient({
   orderSource = "qr_menu",
   tableNumber,
   waiterMode = false,
+  cashierMode = false,
+  cashierFulfillment,
+  onCashierOrderPlaced,
+  compactChrome = false,
   initialMenu,
 }: PublicMenuClientProps) {
   const slug = rawSlug.toLowerCase();
   const isTableMenu = tableNumber != null && tableNumber > 0;
+  const staffChrome = waiterMode || cashierMode || compactChrome;
   const [menu] = useState<LocalMenuState>(initialMenu);
   const [title] = useState<string>(businessName);
   const [search, setSearch] = useState("");
@@ -340,7 +351,7 @@ export default function PublicMenuClient({
             ) : null}
             <div className="min-w-0">
               <h1 className="font-headline text-3xl font-extrabold tracking-tighter text-primary">{title}</h1>
-              {isTableMenu && !waiterMode ? (
+              {isTableMenu && !waiterMode && !cashierMode ? (
                 <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                   <span className="material-symbols-outlined text-[16px]">table_restaurant</span>
                   Masa {tableNumber}
@@ -621,7 +632,7 @@ export default function PublicMenuClient({
             </div>
           </section>
         ) : null}
-        {!waiterMode && !isTableMenu ? (
+        {!staffChrome && !isTableMenu ? (
         <PublicMenuPwaCard businessName={title} controller={pwaInstall} showAction={false} />
         ) : null}
         {!isOnline ? (
@@ -633,6 +644,7 @@ export default function PublicMenuClient({
             </p>
           </section>
         ) : null}
+        {staffChrome ? null : (
         <footer className="rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -655,6 +667,7 @@ export default function PublicMenuClient({
             </a>
           </div>
         </footer>
+        )}
       </main>
 
       {cartCount > 0 ? (
@@ -697,6 +710,9 @@ export default function PublicMenuClient({
         orderSource={isTableMenu ? "table_qr" : orderSource}
         tableNumber={tableNumber}
         waiterMode={waiterMode}
+        cashierMode={cashierMode}
+        cashierFulfillment={cashierFulfillment}
+        onCashierOrderPlaced={onCashierOrderPlaced}
         subdomain={slug}
         orderingEnabled={orderingEnabled}
         closedMessage={closedMessage}

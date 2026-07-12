@@ -21,6 +21,7 @@ export default async function KasaPickupOrdersPage({ params }: { params: Promise
   return (
     <PickupOrdersClient
       businessName={auth.tenant.business_name}
+      tenantId={auth.tenant.id}
       features={features}
       initialOrders={result.ok ? result.orders : []}
     />
