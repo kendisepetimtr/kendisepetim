@@ -49,8 +49,7 @@ export function kasaAccessError(
 }
 
 export function getDefaultKasaPath(features: KasaFeatures): string {
-  if (features.dineIn) return "/kasa";
-  if (features.pickup) return "/kasa/gel-al";
+  if (features.dineIn || features.pickup) return "/kasa";
   if (features.delivery) return "/kasa/paket";
   return "/kasa";
 }

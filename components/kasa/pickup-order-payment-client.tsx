@@ -70,7 +70,7 @@ export default function PickupOrderPaymentClient({
         return;
       }
       window.alert(`Teslim edildi.\nSipariş: ${data.orderCode ?? order.orderCode}`);
-      window.location.href = "/kasa/gel-al";
+      window.location.href = "/kasa";
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -83,7 +83,7 @@ export default function PickupOrderPaymentClient({
       <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
-            href="/kasa/gel-al"
+            href="/kasa"
             className="inline-flex items-center gap-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>

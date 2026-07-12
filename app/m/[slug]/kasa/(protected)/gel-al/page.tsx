@@ -1,29 +1,6 @@
 import { redirect } from "next/navigation";
-import PickupOrdersClient from "@/components/kasa/pickup-orders-client";
-import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
-import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
-import { loadKasaPickupOrders } from "@/lib/kasa/pickup-orders-service";
 
-export default async function KasaPickupOrdersPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const auth = await getAuthenticatedCashierTenant(slug);
-  if (!auth.ok) {
-    return null;
-  }
-
-  const features = getKasaFeatures(auth.tenant);
-  if (!features.pickup) {
-    redirect(getDefaultKasaPath(features));
-  }
-
-  const result = await loadKasaPickupOrders(auth.tenant.id);
-
-  return (
-    <PickupOrdersClient
-      businessName={auth.tenant.business_name}
-      tenantId={auth.tenant.id}
-      features={features}
-      initialOrders={result.ok ? result.orders : []}
-    />
-  );
+/** Gel-al sekmesi kaldırıldı — ana kasa tahtasındaki Gel-Al slotlarına yönlendir. */
+export default async function KasaPickupOrdersPage() {
+  redirect("/kasa");
 }

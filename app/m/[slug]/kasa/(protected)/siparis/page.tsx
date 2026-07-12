@@ -1,89 +1,15 @@
-import { notFound, redirect } from "next/navigation";
-import KasaPosClient from "@/components/kasa/kasa-pos-client";
-import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { clampDeliveryRadiusKm, type FulfillmentType, type TenantFulfillmentFlags } from "@/lib/fulfillment";
-import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
-import { getKasaFeatures } from "@/lib/kasa/kasa-access";
-import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
-import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { redirect } from "next/navigation";
 
-type Props = {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ channel?: string; table?: string }>;
-};
-
-export default async function KasaNewOrderPage({ params, searchParams }: Props) {
-  const { slug } = await params;
+/** Eski sipariş URL'leri — ana kasa / paket modalına yönlendir. */
+export default async function KasaNewOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ channel?: string }>;
+}) {
   const sp = await searchParams;
-  const auth = await getAuthenticatedCashierTenant(slug);
-  if (!auth.ok) notFound();
-
-  const features = getKasaFeatures(auth.tenant);
-  const channelRaw = (sp.channel ?? "").toLowerCase();
-
-  if (channelRaw === "masa" || channelRaw === "dine_in") {
-    const table = Number.parseInt(sp.table ?? "", 10);
-    if (Number.isFinite(table) && table >= 1) {
-      redirect(`/kasa/masa/${table}`);
-    }
-    // Masa seçimi için ana grid
-    redirect("/kasa");
+  const channel = (sp.channel ?? "").toLowerCase();
+  if (channel === "paket" || channel === "delivery") {
+    redirect("/kasa/paket");
   }
-
-  let channel: FulfillmentType;
-  let backHref: string;
-  let backLabel: string;
-
-  if (channelRaw === "gel-al" || channelRaw === "pickup") {
-    if (!features.pickup) redirect("/kasa");
-    channel = "pickup";
-    backHref = "/kasa/gel-al";
-    backLabel = "Gel-Al";
-  } else if (channelRaw === "paket" || channelRaw === "delivery") {
-    if (!features.delivery) redirect("/kasa");
-    channel = "delivery";
-    backHref = "/kasa/paket";
-    backLabel = "Paket";
-  } else {
-    redirect("/kasa");
-  }
-
-  const row = auth.tenant;
-  const paymentFlags: TenantPaymentFlags = {
-    paymentCash: row.payment_cash === true,
-    paymentDoorCard: row.payment_door_card === true,
-    paymentMealCard: row.payment_meal_card === true,
-  };
-  const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: channel === "pickup",
-    fulfillmentDeliveryEnabled: channel === "delivery",
-    deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
-    minOrderAmount:
-      row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
-        ? Number(row.min_order_amount)
-        : null,
-    latitude: row.latitude != null ? Number(row.latitude) : null,
-    longitude: row.longitude != null ? Number(row.longitude) : null,
-  };
-
-  const initialMenu = await loadVisibleMenuForTenant(row.id);
-
-  return (
-    <KasaPosClient
-      slug={slug}
-      tenantId={row.id}
-      businessName={row.business_name}
-      businessLogoUrl={row.logo_url ?? ""}
-      businessCoverImageUrl={row.cover_image_url ?? ""}
-      hoursPair={{ open: row.open_time, close: row.close_time }}
-      initialOpenStatus={isBusinessOpenNow(row.open_time, row.close_time)}
-      initialClosedMessage={getBusinessClosedMessage(row.open_time, row.close_time)}
-      paymentFlags={paymentFlags}
-      fulfillmentFlags={fulfillmentFlags}
-      initialMenu={initialMenu}
-      channel={channel}
-      backHref={backHref}
-      backLabel={backLabel}
-    />
-  );
+  redirect("/kasa");
 }

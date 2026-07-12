@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import { formatAddressOneLine } from "@/lib/customer-address";
@@ -9,6 +10,7 @@ import { DELIVERY_STATUS_LABELS } from "@/lib/delivery-status";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
 import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
+import type { LocalMenuState } from "@/lib/local-menu";
 import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
@@ -23,21 +25,26 @@ function formatTry(n: number): string {
 
 type DeliveryOrdersClientProps = {
   businessName: string;
+  subdomain: string;
   tenantId: string;
   features: KasaFeatures;
   initialOrders: AdminOrder[];
   courierById: Record<string, CourierRow>;
+  menu: LocalMenuState;
 };
 
 export default function DeliveryOrdersClient({
   businessName,
+  subdomain,
   tenantId,
   features,
   initialOrders,
   courierById,
+  menu,
 }: DeliveryOrdersClientProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [error, setError] = useState<string | null>(null);
+  const [orderOpen, setOrderOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -68,7 +75,12 @@ export default function DeliveryOrdersClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <KasaShellHeader businessName={businessName} features={features} active="paket" />
+      <KasaShellHeader
+        businessName={businessName}
+        features={features}
+        active="paket"
+        onBasketClick={() => setOrderOpen(true)}
+      />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {error ? (
@@ -76,19 +88,20 @@ export default function DeliveryOrdersClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Paket siparişleri. Sepet ile yeni sipariş alın; listeden POS’a girip ödemeyi kapatın.
+          Sepet ile yeni paket siparişi alın (müşteri + ürün modalı). Listedeki siparişe dokunarak detay / ödeme.
         </p>
 
         {orders.length === 0 ? (
           <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-10 text-center">
             <span className="material-symbols-outlined text-4xl text-secondary/50">delivery_dining</span>
             <p className="mt-3 text-sm text-secondary">Bekleyen paket siparişi yok.</p>
-            <Link
-              href="/kasa/siparis?channel=paket"
-              className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+            <button
+              type="button"
+              onClick={() => setOrderOpen(true)}
+              className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white active:scale-95"
             >
               Yeni paket siparişi
-            </Link>
+            </button>
           </div>
         ) : (
           <ul className="space-y-3">
@@ -139,6 +152,19 @@ export default function DeliveryOrdersClient({
           </ul>
         )}
       </main>
+
+      {orderOpen ? (
+        <KasaOrderModal
+          open
+          channel="delivery"
+          title="Paket"
+          businessName={businessName}
+          subdomain={subdomain}
+          menu={menu}
+          onClose={() => setOrderOpen(false)}
+          onOrderPlaced={() => void refresh()}
+        />
+      ) : null}
 
       <NotificationToastStack
         toasts={toasts}

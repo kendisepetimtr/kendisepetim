@@ -68,7 +68,7 @@ export default function PickupOrdersClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <KasaShellHeader businessName={businessName} features={features} active="gel-al" />
+      <KasaShellHeader businessName={businessName} features={features} active="masalar" />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {error ? (

@@ -1,15 +1,13 @@
 import { notFound, redirect } from "next/navigation";
-import KasaPosClient from "@/components/kasa/kasa-pos-client";
-import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
+import PickupOrderPaymentClient from "@/components/kasa/pickup-order-payment-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
-import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
 import { loadKasaPickupOrderDetail } from "@/lib/kasa/pickup-orders-service";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
 type Props = { params: Promise<{ slug: string; orderId: string }> };
 
+/** Gel-al tahsilat — sipariş alma ana tahtadaki modalda. */
 export default async function KasaPickupOrderPage({ params }: Props) {
   const { slug, orderId } = await params;
   const auth = await getAuthenticatedCashierTenant(slug);
@@ -22,46 +20,20 @@ export default async function KasaPickupOrderPage({ params }: Props) {
 
   const detail = await loadKasaPickupOrderDetail(auth.tenant.id, orderId);
   if (!detail.ok) {
-    redirect("/kasa/gel-al");
+    redirect("/kasa");
   }
 
-  const row = auth.tenant;
   const paymentFlags: TenantPaymentFlags = {
-    paymentCash: row.payment_cash === true,
-    paymentDoorCard: row.payment_door_card === true,
-    paymentMealCard: row.payment_meal_card === true,
+    paymentCash: auth.tenant.payment_cash === true,
+    paymentDoorCard: auth.tenant.payment_door_card === true,
+    paymentMealCard: auth.tenant.payment_meal_card === true,
   };
-  const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: true,
-    fulfillmentDeliveryEnabled: false,
-    deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
-    minOrderAmount:
-      row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
-        ? Number(row.min_order_amount)
-        : null,
-    latitude: row.latitude != null ? Number(row.latitude) : null,
-    longitude: row.longitude != null ? Number(row.longitude) : null,
-  };
-
-  const initialMenu = await loadVisibleMenuForTenant(row.id);
 
   return (
-    <KasaPosClient
-      slug={slug}
-      tenantId={row.id}
-      businessName={row.business_name}
-      businessLogoUrl={row.logo_url ?? ""}
-      businessCoverImageUrl={row.cover_image_url ?? ""}
-      hoursPair={{ open: row.open_time, close: row.close_time }}
-      initialOpenStatus={isBusinessOpenNow(row.open_time, row.close_time)}
-      initialClosedMessage={getBusinessClosedMessage(row.open_time, row.close_time)}
+    <PickupOrderPaymentClient
+      order={detail.order}
+      businessName={auth.tenant.business_name}
       paymentFlags={paymentFlags}
-      fulfillmentFlags={fulfillmentFlags}
-      initialMenu={initialMenu}
-      channel="pickup"
-      backHref="/kasa/gel-al"
-      backLabel="Gel-Al"
-      initialOrder={detail.order}
     />
   );
 }

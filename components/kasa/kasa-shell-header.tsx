@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { signOutCashierAction } from "@/app/kasa/actions";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 
-type TabId = "masalar" | "gel-al" | "paket";
+type TabId = "masalar" | "paket";
 
 type KasaShellHeaderProps = {
   businessName: string;
@@ -13,40 +13,38 @@ type KasaShellHeaderProps = {
   active: TabId;
   /** Sepet: yeni sipariş — yoksa aktif sekmeye göre varsayılan */
   newOrderHref?: string;
+  onBasketClick?: () => void;
   children?: ReactNode;
 };
-
-function defaultNewOrderHref(active: TabId, features: KasaFeatures): string {
-  if (active === "masalar" && features.dineIn) return "/kasa/siparis?channel=masa";
-  if (active === "gel-al" && features.pickup) return "/kasa/siparis?channel=gel-al";
-  if (active === "paket" && features.delivery) return "/kasa/siparis?channel=paket";
-  if (features.dineIn) return "/kasa/siparis?channel=masa";
-  if (features.pickup) return "/kasa/siparis?channel=gel-al";
-  if (features.delivery) return "/kasa/siparis?channel=paket";
-  return "/kasa";
-}
 
 export default function KasaShellHeader({
   businessName,
   features,
   active,
   newOrderHref,
+  onBasketClick,
   children,
 }: KasaShellHeaderProps) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const showBoard = features.dineIn || features.pickup;
   const tabs = (
     [
-      { id: "masalar" as const, href: "/kasa", label: "Masalar", enabled: features.dineIn },
-      { id: "gel-al" as const, href: "/kasa/gel-al", label: "Gel-Al", enabled: features.pickup },
+      { id: "masalar" as const, href: "/kasa", label: "Masalar", enabled: showBoard },
       { id: "paket" as const, href: "/kasa/paket", label: "Paket", enabled: features.delivery },
     ] as const
   ).filter((t) => t.enabled);
 
   const showTabs = tabs.length > 1;
-  const basketHref = newOrderHref ?? defaultNewOrderHref(active, features);
+  const basketHref =
+    newOrderHref ??
+    (active === "paket" && features.delivery
+      ? "/kasa/paket"
+      : features.dineIn || features.pickup
+        ? "/kasa"
+        : "/kasa/paket");
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -75,16 +73,30 @@ export default function KasaShellHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href={basketHref}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white shadow-md transition hover:brightness-105 active:scale-95"
-            aria-label="Yeni sipariş al"
-            title="Sipariş al"
-          >
-            <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              shopping_basket
-            </span>
-          </Link>
+          {onBasketClick ? (
+            <button
+              type="button"
+              onClick={onBasketClick}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white shadow-md transition hover:brightness-105 active:scale-95"
+              aria-label="Yeni sipariş al"
+              title="Sipariş al"
+            >
+              <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                shopping_basket
+              </span>
+            </button>
+          ) : (
+            <Link
+              href={basketHref}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white shadow-md transition hover:brightness-105 active:scale-95"
+              aria-label="Yeni sipariş al"
+              title="Sipariş al"
+            >
+              <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                shopping_basket
+              </span>
+            </Link>
+          )}
 
           <div className="relative" ref={menuRef}>
             <button

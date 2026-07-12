@@ -1,9 +1,6 @@
-import { notFound } from "next/navigation";
-import KasaPosClient from "@/components/kasa/kasa-pos-client";
-import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
+import { notFound, redirect } from "next/navigation";
+import SessionPaymentClient from "@/components/kasa/session-payment-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
-import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
 import { loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
@@ -15,7 +12,8 @@ function parseTableNumber(raw: string): number | null {
   return n;
 }
 
-export default async function KasaTablePosPage({ params }: Props) {
+/** Masa hesabı / ödeme — sipariş alma kasa grid modalında. */
+export default async function KasaTableSessionPage({ params }: Props) {
   const { slug, tableNumber: rawTable } = await params;
   const tableNumber = parseTableNumber(rawTable);
   if (tableNumber == null) notFound();
@@ -26,46 +24,22 @@ export default async function KasaTablePosPage({ params }: Props) {
   if (tableNumber > (auth.tenant.table_count ?? 0)) notFound();
 
   const detail = await loadKasaSessionDetail(auth.tenant.id, tableNumber);
-  const session = detail.ok ? detail.session : null;
+  if (!detail.ok) {
+    redirect("/kasa");
+  }
 
-  const row = auth.tenant;
   const paymentFlags: TenantPaymentFlags = {
-    paymentCash: row.payment_cash === true,
-    paymentDoorCard: row.payment_door_card === true,
-    paymentMealCard: row.payment_meal_card === true,
+    paymentCash: auth.tenant.payment_cash === true,
+    paymentDoorCard: auth.tenant.payment_door_card === true,
+    paymentMealCard: auth.tenant.payment_meal_card === true,
   };
-  const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: false,
-    fulfillmentDeliveryEnabled: false,
-    deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
-    minOrderAmount:
-      row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
-        ? Number(row.min_order_amount)
-        : null,
-    latitude: row.latitude != null ? Number(row.latitude) : null,
-    longitude: row.longitude != null ? Number(row.longitude) : null,
-  };
-
-  const initialMenu = await loadVisibleMenuForTenant(row.id);
 
   return (
-    <KasaPosClient
-      slug={slug}
-      tenantId={row.id}
-      businessName={row.business_name}
-      businessLogoUrl={row.logo_url ?? ""}
-      businessCoverImageUrl={row.cover_image_url ?? ""}
-      hoursPair={{ open: row.open_time, close: row.close_time }}
-      initialOpenStatus={isBusinessOpenNow(row.open_time, row.close_time)}
-      initialClosedMessage={getBusinessClosedMessage(row.open_time, row.close_time)}
-      paymentFlags={paymentFlags}
-      fulfillmentFlags={fulfillmentFlags}
-      initialMenu={initialMenu}
-      channel="dine_in"
+    <SessionPaymentClient
       tableNumber={tableNumber}
-      backHref="/kasa"
-      backLabel="Masalar"
-      initialSession={session}
+      businessName={auth.tenant.business_name}
+      initialSession={detail.session}
+      paymentFlags={paymentFlags}
     />
   );
 }

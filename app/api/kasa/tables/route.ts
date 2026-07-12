@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadGarsonTableGrid } from "@/lib/garson/tables-service";
+import { loadKasaBoard } from "@/lib/kasa/board-service";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 
@@ -13,16 +13,22 @@ export async function GET() {
   }
 
   const features = getKasaFeatures(auth.tenant);
-  if (!features.dineIn) {
+  if (!features.dineIn && !features.pickup) {
     return NextResponse.json({
       ok: true,
       businessName: auth.tenant.business_name,
       tableCount: 0,
       tables: [],
+      pickupSlots: [],
+      features,
     });
   }
 
-  const result = await loadGarsonTableGrid(auth.tenant.id, auth.tenant.table_count ?? 0);
+  const result = await loadKasaBoard(auth.tenant.id, auth.tenant.table_count ?? 0, {
+    dineInEnabled: features.dineIn,
+    pickupEnabled: features.pickup,
+  });
+
   if (!result.ok) {
     return NextResponse.json(result, { status: 400 });
   }
@@ -31,6 +37,8 @@ export async function GET() {
     ok: true,
     businessName: auth.tenant.business_name,
     tableCount: auth.tenant.table_count ?? 0,
-    tables: result.tables,
+    tables: result.board.tables,
+    pickupSlots: result.board.pickupSlots,
+    features,
   });
 }
