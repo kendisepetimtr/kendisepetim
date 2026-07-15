@@ -31,16 +31,18 @@ export default function CheckoutPaymentSelector({
 }: CheckoutPaymentSelectorProps) {
   const baseId = useId();
   const n = countEnabledPaymentMethods(options);
-  const enabledBrands = MEAL_CARD_BRANDS.filter((b) => options.mealCardBrandIds.includes(b.id));
+  const brandIds = options.mealCardBrandIds ?? [];
+  const enabledBrands = MEAL_CARD_BRANDS.filter((b) => brandIds.includes(b.id));
   const showMealCard = options.paymentMealCard && enabledBrands.length > 0;
-  const enabledBrandKey = options.mealCardBrandIds.join(",");
+  const enabledBrandKey = brandIds.join(",");
 
   useEffect(() => {
     if (!mealCardBrandId) return;
-    if (!options.mealCardBrandIds.includes(mealCardBrandId)) {
+    const ids = enabledBrandKey.length > 0 ? enabledBrandKey.split(",") : [];
+    if (!ids.includes(mealCardBrandId)) {
       onMealCardBrandChange("");
     }
-  }, [enabledBrandKey, mealCardBrandId, onMealCardBrandChange, options.mealCardBrandIds]);
+  }, [enabledBrandKey, mealCardBrandId, onMealCardBrandChange]);
 
   if (n === 0) {
     return (

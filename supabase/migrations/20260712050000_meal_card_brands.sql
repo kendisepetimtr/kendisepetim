@@ -6,7 +6,8 @@ alter table public.tenants
 comment on column public.tenants.payment_meal_card_brands is
   'Aktif yemek kartı marka id listesi (multinet, sodexo, ticket, …). payment_meal_card true iken kullanılır.';
 
--- Yemek kartı zaten açık işletmeler: klasik üç markayı varsayılan aç
+-- Yemek kartı zaten açık işletmeler: marka listesi boşsa klasik üçü doldur
+-- (sonra ayarlardan Setcard / Metropol vb. eklenebilir; müşteri yalnızca seçilenleri görür)
 update public.tenants
 set payment_meal_card_brands = array['multinet', 'sodexo', 'edenred']::text[]
 where payment_meal_card = true
@@ -21,10 +22,11 @@ alter table public.orders
       'multinet',
       'sodexo',
       'edenred',
-      'ticket',
-      'paye',
       'setcard',
       'metropol',
-      'tokenflex'
+      'ticket',
+      'paye',
+      'tokenflex',
+      'winwin'
     )
   );

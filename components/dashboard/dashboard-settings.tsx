@@ -609,8 +609,8 @@ export default function DashboardSettings({
             <div className="sm:col-span-2 mt-2 rounded-xl border border-surface-container-high bg-surface-container-low/50 p-4">
               <h3 className="font-headline text-sm font-bold text-on-background">Ödeme yöntemleri</h3>
               <p className="mt-1 text-xs leading-relaxed text-secondary">
-                Kasa ve QR siparişte müşteri / kasiyer yalnızca burada işaretlediğiniz yöntemleri görür. Yemek kartı
-                açıksa hangi markaların kabul edildiğini aşağıdan seçin.
+                Kasa ve QR siparişte müşteri yalnızca burada işaretlediğiniz yöntemleri ve yemek kartı
+                markalarını görür. Örneğin yalnızca Multinet açıksa müşteriye sadece Multinet çıkar.
               </p>
               <div className="mt-4 space-y-3">
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-2 hover:bg-white/60">
@@ -642,23 +642,27 @@ export default function DashboardSettings({
                     onChange={(e) => {
                       const on = e.target.checked;
                       setPaymentMealCard(on);
-                      if (on && paymentMealCardBrands.length === 0) {
-                        setPaymentMealCardBrands(["multinet", "sodexo", "ticket"]);
-                      }
+                      if (!on) setPaymentMealCardBrands([]);
                     }}
                     className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
                   />
                   <span>
                     <span className="block text-sm font-medium text-on-background">Yemek Kartı</span>
                     <span className="mt-0.5 block text-xs text-secondary">
-                      Açıkken yalnızca seçtiğiniz markalar kasada ve QR’da ödenebilir.
+                      Açıkken aşağıdan kabul ettiğiniz markaları seçin; müşteri yalnızca bunları görür.
                     </span>
                   </span>
                 </label>
               </div>
               {paymentMealCard ? (
                 <div className="mt-4 rounded-xl border border-surface-container-high bg-white/70 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-secondary">Kabul edilen yemek kartları</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-secondary">
+                    Kabul edilen yemek kartları
+                  </p>
+                  <p className="mt-1 text-[11px] text-secondary">
+                    Multinet, Sodexo, Edenred, Setcard, Metropol ve diğerleri — yalnızca işaretledikleriniz
+                    QR ve kasada listelenir.
+                  </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {MEAL_CARD_BRANDS.map((b) => (
                       <label

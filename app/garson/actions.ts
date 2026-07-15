@@ -68,4 +68,4 @@ export async function signOutWaiterAction(): Promise<void> {
   jar.set(WAITER_SESSION_COOKIE, "", legacyStaffCookieClearOptions("/garson"));
   redirect("/garson/pin");
 }
-
+

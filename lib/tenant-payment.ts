@@ -2,30 +2,28 @@ export type TenantPaymentFlags = {
   paymentCash: boolean;
   paymentDoorCard: boolean;
   paymentMealCard: boolean;
-  /** Restoranın ayarlardan seçtiği yemek kartı markaları (sadece bunlar ödenebilir) */
+  /** Restoranın ayarlardan seçtiği yemek kartı markaları (müşteri/kasa yalnızca bunları görür) */
   mealCardBrandIds: MealCardBrandId[];
 };
 
 export type CheckoutPaymentMethod = "cash" | "door_card" | "meal_card";
 
-/** Katalog — ayarlardan genişletilir; kasada yalnızca tenant seçimleri görünür */
+/** Katalog — ayarlardan seçilir; müşteri ve kasada yalnızca seçilenler görünür */
 export const MEAL_CARD_BRANDS = [
   { id: "multinet", label: "Multinet" },
   { id: "sodexo", label: "Sodexo" },
-  { id: "ticket", label: "Ticket" },
   { id: "edenred", label: "Edenred" },
-  { id: "paye", label: "Paye" },
   { id: "setcard", label: "Setcard" },
   { id: "metropol", label: "Metropol" },
+  { id: "ticket", label: "Ticket" },
+  { id: "paye", label: "Paye" },
   { id: "tokenflex", label: "TokenFlex" },
+  { id: "winwin", label: "WinWin" },
 ] as const;
 
 export type MealCardBrandId = (typeof MEAL_CARD_BRANDS)[number]["id"];
 
 const MEAL_CARD_BRAND_ID_SET = new Set<string>(MEAL_CARD_BRANDS.map((b) => b.id));
-
-/** Eski kayıtlar: yemek kartı açık ama marka listesi boşsa */
-const LEGACY_MEAL_CARD_BRANDS: MealCardBrandId[] = ["multinet", "sodexo", "edenred"];
 
 export function isMealCardBrandId(value: unknown): value is MealCardBrandId {
   return typeof value === "string" && MEAL_CARD_BRAND_ID_SET.has(value);
@@ -43,14 +41,13 @@ export function parseMealCardBrandIds(raw: unknown): MealCardBrandId[] {
   return out;
 }
 
+/** Yalnızca ayarlarda kayıtlı markalar — boşsa müşteriye hiçbiri gösterilmez */
 export function resolveEnabledMealCardBrands(
   paymentMealCard: boolean,
   rawBrands: unknown,
 ): MealCardBrandId[] {
   if (!paymentMealCard) return [];
-  const parsed = parseMealCardBrandIds(rawBrands);
-  if (parsed.length > 0) return parsed;
-  return [...LEGACY_MEAL_CARD_BRANDS];
+  return parseMealCardBrandIds(rawBrands);
 }
 
 export function mealCardBrandLabel(brandId?: string | null): string | undefined {
@@ -80,7 +77,7 @@ export function tenantPaymentFlagsFromRow(row: TenantPaymentSource): TenantPayme
     paymentCash: row.payment_cash !== false,
     paymentDoorCard: row.payment_door_card === true,
     paymentMealCard: paymentMealCard && mealCardBrandIds.length > 0,
-    mealCardBrandIds: paymentMealCard ? mealCardBrandIds : [],
+    mealCardBrandIds,
   };
 }
 
@@ -98,7 +95,7 @@ export function tenantPaymentFlagsFromProfile(profile: {
     paymentCash: profile.paymentCash,
     paymentDoorCard: profile.paymentDoorCard,
     paymentMealCard: profile.paymentMealCard && mealCardBrandIds.length > 0,
-    mealCardBrandIds: profile.paymentMealCard ? mealCardBrandIds : [],
+    mealCardBrandIds,
   };
 }
 
