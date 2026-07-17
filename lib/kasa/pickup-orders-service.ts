@@ -4,13 +4,7 @@ import type { AdminOrder } from "@/lib/orders";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 import type { CheckoutPaymentMethod, MealCardBrandId, TenantPaymentFlags } from "@/lib/tenant-payment";
-import { isMealCardBrandAllowed } from "@/lib/tenant-payment";
-
-function isPaymentMethodEnabled(flags: TenantPaymentFlags, method: CheckoutPaymentMethod): boolean {
-  if (method === "cash") return flags.paymentCash;
-  if (method === "door_card") return flags.paymentDoorCard;
-  return flags.paymentMealCard;
-}
+import { isMealCardBrandAllowed, isPaymentMethodEnabled } from "@/lib/tenant-payment";
 
 async function loadOrderWithLines(tenantId: string, orderId: string): Promise<AdminOrder | null> {
   const svc = createServiceSupabaseClient();

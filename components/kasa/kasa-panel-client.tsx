@@ -11,6 +11,7 @@ import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import type { LocalMenuState } from "@/lib/local-menu";
 import type { FulfillmentType } from "@/lib/fulfillment";
+import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 
 const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
@@ -57,6 +58,7 @@ type KasaPanelClientProps = {
   initialTables: GarsonTableCell[];
   initialPickupSlots: KasaPickupSlot[];
   menu: LocalMenuState;
+  paymentFlags: TenantPaymentFlags;
 };
 
 export default function KasaPanelClient({
@@ -67,6 +69,7 @@ export default function KasaPanelClient({
   initialTables,
   initialPickupSlots,
   menu,
+  paymentFlags,
 }: KasaPanelClientProps) {
   const [tables, setTables] = useState(initialTables);
   const [pickupSlots, setPickupSlots] = useState(initialPickupSlots);
@@ -327,6 +330,7 @@ export default function KasaPanelClient({
           businessName={businessName}
           subdomain={subdomain}
           menu={menu}
+          paymentFlags={paymentFlags}
           onClose={() => setOrderTarget(null)}
           onOrderPlaced={() => void refresh()}
         />

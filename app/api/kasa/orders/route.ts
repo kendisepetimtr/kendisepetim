@@ -4,6 +4,7 @@ import type { FulfillmentType } from "@/lib/fulfillment";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import { placeCashierOrder } from "@/lib/kasa/orders-service";
 import type { PublicOrderLineInput } from "@/lib/orders";
+import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
     address?: CustomerAddress;
     customerLatitude?: number | null;
     customerLongitude?: number | null;
+    paymentMethod?: CheckoutPaymentMethod;
+    mealCardBrandId?: MealCardBrandId;
   };
 
   try {
@@ -59,6 +62,8 @@ export async function POST(request: Request) {
     address: body.address,
     customerLatitude: body.customerLatitude,
     customerLongitude: body.customerLongitude,
+    paymentMethod: body.paymentMethod,
+    mealCardBrandId: body.mealCardBrandId,
   });
 
   if (!result.ok) {

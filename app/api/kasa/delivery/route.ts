@@ -3,6 +3,7 @@ import type { DeliveryStatus } from "@/lib/fulfillment";
 import {
   assignCourierToDeliveryOrder,
   closeDeliveryOrderWithPayment,
+  loadKasaClosedDeliveryOrders,
   loadKasaDeliveryOrderDetail,
   loadKasaDeliveryOrders,
   updateDeliveryOrderStatus,
@@ -10,7 +11,7 @@ import {
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
-import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
+import { isCheckoutPaymentMethod, tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,15 @@ export async function GET(request: Request) {
       couriers: detail.couriers,
       paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
     });
+  }
+
+  const scope = searchParams.get("scope");
+  if (scope === "closed") {
+    const result = await loadKasaClosedDeliveryOrders(auth.tenant.id);
+    if (!result.ok) {
+      return NextResponse.json(result, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, orders: result.orders });
   }
 
   const result = await loadKasaDeliveryOrders(auth.tenant.id);
@@ -115,7 +125,7 @@ export async function POST(request: Request) {
 
   if (body.action === "close" || !body.action) {
     const paymentMethod = body.paymentMethod;
-    if (paymentMethod !== "cash" && paymentMethod !== "door_card" && paymentMethod !== "meal_card") {
+    if (!isCheckoutPaymentMethod(paymentMethod)) {
       return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
     }
     if (!body.courierId) {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
@@ -15,13 +15,15 @@ import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
 import type { CourierRow } from "@/lib/supabase/courier-types";
-import { paymentMethodLabel } from "@/lib/tenant-payment";
+import { paymentMethodLabel, type TenantPaymentFlags } from "@/lib/tenant-payment";
 
 const REFRESH_ON_ACTIONS = ["order_created", "payment_closed", "delivery_status_updated", "courier_assigned"];
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
 }
+
+type ListTab = "active" | "history";
 
 type DeliveryOrdersClientProps = {
   businessName: string;
@@ -31,6 +33,8 @@ type DeliveryOrdersClientProps = {
   initialOrders: AdminOrder[];
   courierById: Record<string, CourierRow>;
   menu: LocalMenuState;
+  paymentFlags: TenantPaymentFlags;
+  initialTab?: ListTab;
 };
 
 export default function DeliveryOrdersClient({
@@ -41,12 +45,17 @@ export default function DeliveryOrdersClient({
   initialOrders,
   courierById,
   menu,
+  paymentFlags,
+  initialTab = "active",
 }: DeliveryOrdersClientProps) {
+  const [tab, setTab] = useState<ListTab>(initialTab);
   const [orders, setOrders] = useState(initialOrders);
+  const [historyOrders, setHistoryOrders] = useState<AdminOrder[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderOpen, setOrderOpen] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refreshActive = useCallback(async () => {
     setError(null);
     try {
       const res = await fetch("/api/kasa/delivery", { cache: "no-store" });
@@ -61,18 +70,47 @@ export default function DeliveryOrdersClient({
     }
   }, []);
 
+  const refreshHistory = useCallback(async () => {
+    setError(null);
+    try {
+      const res = await fetch("/api/kasa/delivery?scope=closed", { cache: "no-store" });
+      const data = (await res.json()) as { ok?: boolean; orders?: AdminOrder[]; error?: string };
+      if (!res.ok || !data.ok || !data.orders) {
+        setError(data.error ?? "Geçmiş yüklenemedi.");
+        return;
+      }
+      setHistoryOrders(data.orders);
+      setHistoryLoaded(true);
+    } catch {
+      setError("Bağlantı hatası.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "history") return;
+    void refreshHistory();
+  }, [tab, refreshHistory]);
+
   const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
     streamUrl: "/api/kasa/notifications/stream",
     refreshOnActions: REFRESH_ON_ACTIONS,
-    onRefresh: refresh,
+    onRefresh: () => {
+      void refreshActive();
+      if (tab === "history") void refreshHistory();
+    },
     crossClientPresence: { role: "kasa", scope: subdomain },
   });
 
   useTenantOpsRealtime({
     tenantId,
     actions: REFRESH_ON_ACTIONS,
-    onEvent: () => void refresh(),
+    onEvent: () => {
+      void refreshActive();
+      if (tab === "history") void refreshHistory();
+    },
   });
+
+  const list = tab === "active" ? orders : historyOrders;
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,7 +118,7 @@ export default function DeliveryOrdersClient({
         businessName={businessName}
         features={features}
         active="paket"
-        onBasketClick={() => setOrderOpen(true)}
+        onBasketClick={tab === "active" ? () => setOrderOpen(true) : undefined}
       />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -88,37 +126,82 @@ export default function DeliveryOrdersClient({
           <p className="mb-4 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{error}</p>
         ) : null}
 
+        <div className="mb-5 flex gap-2 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-1">
+          <button
+            type="button"
+            onClick={() => setTab("active")}
+            className={[
+              "flex-1 rounded-xl px-3 py-2.5 text-sm font-bold transition",
+              tab === "active" ? "bg-primary text-white" : "text-secondary hover:text-on-background",
+            ].join(" ")}
+          >
+            Aktif ({orders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("history")}
+            className={[
+              "flex-1 rounded-xl px-3 py-2.5 text-sm font-bold transition",
+              tab === "history" ? "bg-primary text-white" : "text-secondary hover:text-on-background",
+            ].join(" ")}
+          >
+            Kapanan
+          </button>
+        </div>
+
         <p className="mb-5 text-sm text-secondary">
-          Sepet ile yeni paket siparişi alın (müşteri + ürün modalı). Listedeki siparişe dokunarak detay / ödeme.
+          {tab === "active"
+            ? "Siparişe dokunun → kurye + gerçek ödeme yöntemini seçin → kapatın. Beyan ile tahsilat farklı olabilir."
+            : "Kapanmış paket siparişleri. Kurye, tahsilat ve müşteri bilgisi burada kalır."}
         </p>
 
-        {orders.length === 0 ? (
+        {tab === "history" && !historyLoaded ? (
+          <p className="py-12 text-center text-sm text-secondary">Geçmiş yükleniyor…</p>
+        ) : list.length === 0 ? (
           <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-10 text-center">
-            <span className="material-symbols-outlined text-4xl text-secondary/50">delivery_dining</span>
-            <p className="mt-3 text-sm text-secondary">Bekleyen paket siparişi yok.</p>
-            <button
-              type="button"
-              onClick={() => setOrderOpen(true)}
-              className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white active:scale-95"
-            >
-              Yeni paket siparişi
-            </button>
+            <span className="material-symbols-outlined text-4xl text-secondary/50">
+              {tab === "active" ? "delivery_dining" : "history"}
+            </span>
+            <p className="mt-3 text-sm text-secondary">
+              {tab === "active" ? "Bekleyen paket siparişi yok." : "Henüz kapanmış paket siparişi yok."}
+            </p>
+            {tab === "active" ? (
+              <button
+                type="button"
+                onClick={() => setOrderOpen(true)}
+                className="mt-4 inline-flex rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white active:scale-95"
+              >
+                Yeni paket siparişi
+              </button>
+            ) : null}
           </div>
         ) : (
           <ul className="space-y-3">
-            {orders.map((order) => {
+            {list.map((order) => {
               const courier = order.courierId ? courierById[order.courierId] : null;
+              const courierLabel =
+                order.courierName || (courier ? courierDisplayName(courier) : null);
               const deliveryLabel =
                 DELIVERY_STATUS_LABELS[order.deliveryStatus ?? "pending"] ?? "Bekliyor";
+              const payLabel =
+                tab === "history" && order.paymentMethodAtClose
+                  ? paymentMethodLabel(order.paymentMethodAtClose, order.mealCardBrandId)
+                  : paymentMethodLabel(order.paymentMethod, order.mealCardBrandId);
               return (
                 <li key={order.id}>
                   <Link
-                    href={`/kasa/paket/${order.id}`}
+                    href={
+                      tab === "history"
+                        ? `/kasa/paket/${order.id}?view=history`
+                        : `/kasa/paket/${order.id}`
+                    }
                     className="flex flex-col gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-lg font-black text-on-background">{order.orderCode}</span>
+                        <span className="font-mono text-lg font-black text-on-background">
+                          {order.orderCode}
+                        </span>
                         <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-900">
                           {deliveryLabel}
                         </span>
@@ -132,16 +215,19 @@ export default function DeliveryOrdersClient({
                       <p className="mt-0.5 line-clamp-1 text-xs text-secondary">
                         {formatAddressOneLine(order.address)}
                       </p>
-                      {courier ? (
-                        <p className="mt-1 text-xs font-medium text-primary">
-                          Kurye: {courierDisplayName(courier)}
-                        </p>
-                      ) : (
+                      {courierLabel ? (
+                        <p className="mt-1 text-xs font-medium text-primary">Kurye: {courierLabel}</p>
+                      ) : tab === "active" ? (
                         <p className="mt-1 text-xs text-amber-800">Kurye atanmadı</p>
-                      )}
+                      ) : null}
                       <p className="mt-1 text-xs text-secondary">
-                        Ödeme (beyan): {paymentMethodLabel(order.paymentMethod, order.mealCardBrandId)}
+                        {tab === "history" ? "Tahsilat" : "Ödeme (beyan)"}: {payLabel}
                       </p>
+                      {tab === "history" && order.paidAt ? (
+                        <p className="mt-0.5 text-[11px] text-secondary">
+                          {new Date(order.paidAt).toLocaleString("tr-TR")}
+                        </p>
+                      ) : null}
                     </div>
                     <p className="font-headline text-xl font-black text-primary sm:shrink-0">
                       {formatTry(order.total)}
@@ -162,8 +248,9 @@ export default function DeliveryOrdersClient({
           businessName={businessName}
           subdomain={subdomain}
           menu={menu}
+          paymentFlags={paymentFlags}
           onClose={() => setOrderOpen(false)}
-          onOrderPlaced={() => void refresh()}
+          onOrderPlaced={() => void refreshActive()}
         />
       ) : null}
 

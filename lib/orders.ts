@@ -53,6 +53,8 @@ export type AdminOrder = {
   tableNumber: number | null;
   deliveryStatus: DeliveryStatus | null;
   courierId: string | null;
+  /** Kapanışta / atamada görünen kurye adı (varsa zenginleştirilir) */
+  courierName?: string | null;
   customerLatitude: number | null;
   customerLongitude: number | null;
   lines: AdminOrderLine[];
@@ -65,6 +67,7 @@ export type AdminOrder = {
   paymentMethod: CheckoutPaymentMethod;
   paymentMethodAtClose: CheckoutPaymentMethod | null;
   mealCardBrandId?: MealCardBrandId;
+  paidAt?: string | null;
   orderNote: string;
   courierNote: string;
 };

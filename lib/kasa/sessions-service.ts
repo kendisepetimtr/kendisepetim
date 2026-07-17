@@ -93,6 +93,7 @@ export async function loadKasaSessionDetail(
 function isPaymentMethodEnabled(flags: TenantPaymentFlags, method: CheckoutPaymentMethod): boolean {
   if (method === "cash") return flags.paymentCash;
   if (method === "door_card") return flags.paymentDoorCard;
+  if (method === "havale") return flags.paymentHavale;
   return flags.paymentMealCard;
 }
 

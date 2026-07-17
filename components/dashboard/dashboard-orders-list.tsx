@@ -257,15 +257,28 @@ export default function DashboardOrdersList({
                     <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">Ödeme</p>
                     <p className="mt-1 text-on-background">
                       {paymentMethodLabel(o.paymentMethod, o.mealCardBrandId)}
-                      {o.paymentMethodAtClose && o.paymentMethodAtClose !== o.paymentMethod
+                      {o.paymentMethodAtClose
                         ? ` → kapanış: ${paymentMethodLabel(o.paymentMethodAtClose, o.mealCardBrandId)}`
                         : null}
                     </p>
+                    {o.paidAt ? (
+                      <p className="mt-1 text-xs text-secondary">
+                        Tahsilat: {new Date(o.paidAt).toLocaleString("tr-TR")}
+                      </p>
+                    ) : null}
 
                     {o.fulfillmentType === "delivery" ? (
                       <>
                         <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">Adres</p>
                         <p className="mt-1 text-secondary">{formatAddressOneLine(o.address) || "—"}</p>
+                        {o.courierName ? (
+                          <>
+                            <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-secondary">
+                              Kurye
+                            </p>
+                            <p className="mt-1 text-on-background">{o.courierName}</p>
+                          </>
+                        ) : null}
                       </>
                     ) : null}
 

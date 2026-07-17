@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { closeSessionWithPayment, loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
 import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
-import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
+import { isCheckoutPaymentMethod, tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   const paymentMethod = body.paymentMethod;
-  if (paymentMethod !== "cash" && paymentMethod !== "door_card" && paymentMethod !== "meal_card") {
+  if (!isCheckoutPaymentMethod(paymentMethod)) {
     return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
   }
 

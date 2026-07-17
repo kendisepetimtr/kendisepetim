@@ -40,7 +40,7 @@ export async function loadDashboardOrderById(orderId: string): Promise<Dashboard
 
     if (lineErr) return { ok: false, error: lineErr.message };
 
-    const orders = buildAdminOrders([row], lineRows ?? []);
+    const orders = await enrichOrdersWithCourierNames(tenant.id, buildAdminOrders([row], lineRows ?? []));
     return { ok: true, orders };
   } catch (error) {
     return {
@@ -82,13 +82,39 @@ export async function loadDashboardOrders(channel: OrderChannelFilter): Promise<
 
     if (lineErr) return { ok: false, error: lineErr.message };
 
-    const orders = buildAdminOrders(rows ?? [], lineRows ?? []);
+    const orders = await enrichOrdersWithCourierNames(tenant.id, buildAdminOrders(rows ?? [], lineRows ?? []));
     return { ok: true, orders };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Siparişler yüklenemedi.",
     };
+  }
+}
+
+async function enrichOrdersWithCourierNames(
+  tenantId: string,
+  orders: AdminOrder[],
+): Promise<AdminOrder[]> {
+  const courierIds = Array.from(
+    new Set(orders.map((o) => o.courierId).filter((id): id is string => Boolean(id))),
+  );
+  if (courierIds.length === 0) return orders;
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data } = await svc.from("couriers").select("*").eq("tenant_id", tenantId).in("id", courierIds);
+    const byId = new Map<string, string>();
+    for (const c of data ?? []) {
+      const row = c as { id: string; first_name: string; last_name: string };
+      byId.set(row.id, `${row.first_name} ${row.last_name}`.trim());
+    }
+    return orders.map((o) => ({
+      ...o,
+      courierName: o.courierId ? byId.get(o.courierId) ?? null : null,
+    }));
+  } catch {
+    return orders;
   }
 }
 

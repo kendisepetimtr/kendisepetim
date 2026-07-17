@@ -4,6 +4,7 @@ import { loadKasaBoard } from "@/lib/kasa/board-service";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export default async function TenantKasaPanelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -34,6 +35,7 @@ export default async function TenantKasaPanelPage({ params }: { params: Promise<
       initialTables={board.ok ? board.board.tables : []}
       initialPickupSlots={board.ok ? board.board.pickupSlots : []}
       menu={menu}
+      paymentFlags={tenantPaymentFlagsFromRow(auth.tenant)}
     />
   );
 }

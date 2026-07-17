@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
 import CustomerIdentityAddressForm from "@/components/customer/customer-identity-address-form";
 import {
   emptyCustomerFormValues,
@@ -35,6 +36,13 @@ import { getProductPriceForFulfillmentWithVariations } from "@/lib/product-prici
 import { fetchKasaReceiptPrintOptions, printThermalReceipt } from "@/lib/receipt-print";
 import type { ReceiptOrderData } from "@/lib/receipt-template";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
+import {
+  pickDefaultPaymentMethod,
+  paymentMethodLabel,
+  type CheckoutPaymentMethod,
+  type MealCardBrandId,
+  type TenantPaymentFlags,
+} from "@/lib/tenant-payment";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -56,6 +64,8 @@ export type KasaOrderModalProps = {
   businessName: string;
   subdomain: string;
   menu: LocalMenuState;
+  /** Paket/gel-al ödeme beyanı için */
+  paymentFlags?: TenantPaymentFlags;
   onOrderPlaced?: () => void;
 };
 
@@ -68,6 +78,7 @@ export default function KasaOrderModal({
   businessName,
   subdomain,
   menu,
+  paymentFlags,
   onOrderPlaced,
 }: KasaOrderModalProps) {
   const categories = useMemo(
@@ -75,6 +86,18 @@ export default function KasaOrderModal({
     [menu.categories],
   );
   const products = useMemo(() => menu.products.filter((p) => !p.hidden), [menu.products]);
+  const needsDeclaredPayment = channel === "delivery" || channel === "pickup";
+  const resolvedPaymentFlags = useMemo<TenantPaymentFlags>(
+    () =>
+      paymentFlags ?? {
+        paymentCash: true,
+        paymentDoorCard: false,
+        paymentMealCard: false,
+        paymentHavale: true,
+        mealCardBrandIds: [],
+      },
+    [paymentFlags],
+  );
 
   const [categoryId, setCategoryId] = useState<string>("all");
   const [cart, setCart] = useState<CartState>({});
@@ -90,6 +113,10 @@ export default function KasaOrderModal({
   const [phoneSearching, setPhoneSearching] = useState(false);
   /** Paket: ürün seç → müşteri bilgisi (üstte sabit form yok) */
   const [step, setStep] = useState<"menu" | "customer">("menu");
+  const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
+    pickDefaultPaymentMethod(resolvedPaymentFlags, ""),
+  );
+  const [mealBrand, setMealBrand] = useState<MealCardBrandId | "">("");
 
   const headerTitle =
     title ??
@@ -111,7 +138,9 @@ export default function KasaOrderModal({
     setPhoneSuggestOpen(false);
     setPhoneSearching(false);
     setStep("menu");
-  }, [open, tableNumber, channel]);
+    setPayMethod(pickDefaultPaymentMethod(resolvedPaymentFlags, ""));
+    setMealBrand("");
+  }, [open, tableNumber, channel, resolvedPaymentFlags]);
 
   useEffect(() => {
     if (!open) return;
@@ -328,6 +357,18 @@ export default function KasaOrderModal({
         return;
       }
     }
+    if (needsDeclaredPayment) {
+      if (!payMethod) {
+        window.alert("Ödeme yöntemi seçin.");
+        if (channel === "delivery") setStep("customer");
+        return;
+      }
+      if (payMethod === "meal_card" && !mealBrand) {
+        window.alert("Yemek kartı markası seçin.");
+        if (channel === "delivery") setStep("customer");
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -368,6 +409,9 @@ export default function KasaOrderModal({
           phone: customer.phone.trim(),
           email: customer.email.trim(),
           address: formValuesToAddress(customer),
+          paymentMethod: needsDeclaredPayment && payMethod ? payMethod : undefined,
+          mealCardBrandId:
+            needsDeclaredPayment && payMethod === "meal_card" && mealBrand ? mealBrand : undefined,
         }),
       });
       const result = (await response.json()) as {
@@ -425,7 +469,9 @@ export default function KasaOrderModal({
         }),
         subtotal: cartTotal,
         total: cartTotal,
-        paymentMethodLabel: "Kasada",
+        paymentMethodLabel: needsDeclaredPayment && payMethod
+          ? paymentMethodLabel(payMethod, mealBrand || undefined)
+          : "Kasada",
         orderNote: orderNote.trim() || undefined,
         courierNote: channel === "delivery" ? customer.courierNote.trim() || undefined : undefined,
       };
@@ -561,6 +607,22 @@ export default function KasaOrderModal({
                   </div>
                 }
               />
+              <div className="mt-6 border-t border-surface-container-highest pt-5">
+                <CheckoutPaymentSelector
+                  options={resolvedPaymentFlags}
+                  method={payMethod}
+                  mealCardBrandId={mealBrand}
+                  onMethodChange={(m) => {
+                    setPayMethod(m);
+                    if (m !== "meal_card") setMealBrand("");
+                  }}
+                  onMealCardBrandChange={setMealBrand}
+                  labelVariant="counter"
+                />
+                <p className="mt-2 text-[11px] text-secondary">
+                  Kurye fişinde bu ödeme yöntemi görünür.
+                </p>
+              </div>
             </div>
           ) : (
             <>
@@ -716,6 +778,27 @@ export default function KasaOrderModal({
           </div>
 
           <div className="shrink-0 space-y-3 border-t border-surface-container-highest p-4">
+            {channel === "pickup" ? (
+              <CheckoutPaymentSelector
+                options={resolvedPaymentFlags}
+                method={payMethod}
+                mealCardBrandId={mealBrand}
+                onMethodChange={(m) => {
+                  setPayMethod(m);
+                  if (m !== "meal_card") setMealBrand("");
+                }}
+                onMealCardBrandChange={setMealBrand}
+                labelVariant="counter"
+              />
+            ) : null}
+            {channel === "delivery" && step === "customer" && payMethod ? (
+              <p className="text-xs text-secondary">
+                Ödeme:{" "}
+                <span className="font-semibold text-on-background">
+                  {paymentMethodLabel(payMethod, mealBrand || undefined)}
+                </span>
+              </p>
+            ) : null}
             <label className="block">
               <span className="text-[11px] font-bold uppercase tracking-wide text-secondary">
                 Sipariş notu

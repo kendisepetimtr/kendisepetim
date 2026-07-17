@@ -18,6 +18,12 @@ import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import {
+  isMealCardBrandAllowed,
+  tenantPaymentFlagsFromRow,
+  type CheckoutPaymentMethod,
+  type MealCardBrandId,
+} from "@/lib/tenant-payment";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -36,6 +42,10 @@ export type PlaceCashierOrderInput = {
     | "public_menu_enabled"
     | "fulfillment_pickup_enabled"
     | "fulfillment_delivery_enabled"
+    | "payment_cash"
+    | "payment_door_card"
+    | "payment_meal_card"
+    | "payment_meal_card_brands"
   >;
   fulfillmentType: FulfillmentType;
   tableNumber?: number;
@@ -49,6 +59,8 @@ export type PlaceCashierOrderInput = {
   address?: CustomerAddress;
   customerLatitude?: number | null;
   customerLongitude?: number | null;
+  paymentMethod?: CheckoutPaymentMethod;
+  mealCardBrandId?: MealCardBrandId;
 };
 
 export async function placeCashierOrder(
@@ -119,6 +131,36 @@ export async function placeCashierOrder(
     }
   }
 
+  const paymentFlags = tenantPaymentFlagsFromRow(tenant);
+  let paymentMethod: CheckoutPaymentMethod = "cash";
+  let mealCardBrandId: MealCardBrandId | null = null;
+
+  if (fulfillmentType === "delivery" || fulfillmentType === "pickup") {
+    const requested = input.paymentMethod;
+    if (requested !== "cash" && requested !== "door_card" && requested !== "meal_card" && requested !== "havale") {
+      return { ok: false, error: "Ödeme yöntemi seçin." };
+    }
+    if (requested === "cash" && !paymentFlags.paymentCash) {
+      return { ok: false, error: "Nakit ödeme bu işletmede kapalı." };
+    }
+    if (requested === "door_card" && !paymentFlags.paymentDoorCard) {
+      return { ok: false, error: "Kredi kartı ödemesi bu işletmede kapalı." };
+    }
+    if (requested === "havale" && !paymentFlags.paymentHavale) {
+      return { ok: false, error: "Havale bu işletmede kapalı." };
+    }
+    if (requested === "meal_card") {
+      if (!paymentFlags.paymentMealCard) {
+        return { ok: false, error: "Yemek kartı bu işletmede kapalı." };
+      }
+      if (!isMealCardBrandAllowed(paymentFlags, input.mealCardBrandId)) {
+        return { ok: false, error: "Yemek kartı markası seçin." };
+      }
+      mealCardBrandId = input.mealCardBrandId!;
+    }
+    paymentMethod = requested;
+  }
+
   try {
     const svc = createServiceSupabaseClient();
     const productIds = extractOrderLineProductIds(rawLines);
@@ -166,7 +208,8 @@ export async function placeCashierOrder(
         customer_phone: fulfillmentType === "dine_in" ? "-" : phone || "-",
         customer_email: email,
         address_json: fulfillmentType === "delivery" ? address : emptyCustomerAddress(),
-        payment_method: "cash",
+        payment_method: paymentMethod,
+        meal_card_brand_id: mealCardBrandId,
         order_note: orderNote,
         courier_note: fulfillmentType === "delivery" ? courierNote : "",
         customer_latitude:

@@ -7,13 +7,7 @@ import type { CourierRow } from "@/lib/supabase/courier-types";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 import type { CheckoutPaymentMethod, MealCardBrandId, TenantPaymentFlags } from "@/lib/tenant-payment";
-import { isMealCardBrandAllowed } from "@/lib/tenant-payment";
-
-function isPaymentMethodEnabled(flags: TenantPaymentFlags, method: CheckoutPaymentMethod): boolean {
-  if (method === "cash") return flags.paymentCash;
-  if (method === "door_card") return flags.paymentDoorCard;
-  return flags.paymentMealCard;
-}
+import { isMealCardBrandAllowed, isPaymentMethodEnabled } from "@/lib/tenant-payment";
 
 function isOpenDeliveryOrder(order: AdminOrder): boolean {
   if (order.status === "completed" || order.status === "cancelled") return false;
@@ -105,9 +99,98 @@ export async function loadKasaDeliveryOrders(
       return { ok: false, error: lineErr.message };
     }
 
-    return { ok: true, orders: buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]) };
+    return {
+      ok: true,
+      orders: await enrichDeliveryOrdersWithCouriers(
+        tenantId,
+        buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]),
+      ),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Paket siparişleri yüklenemedi." };
+  }
+}
+
+/** Son kapanan paket siparişleri (kasa geçmişi). */
+export async function loadKasaClosedDeliveryOrders(
+  tenantId: string,
+  limit = 60,
+): Promise<{ ok: true; orders: AdminOrder[] } | { ok: false; error: string }> {
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data: rows, error } = await svc
+      .from("orders")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("fulfillment_type", "delivery")
+      .or("status.eq.completed,delivery_status.eq.delivered")
+      .order("paid_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+
+    const orderRows = ((rows ?? []) as OrderRow[]).filter(
+      (row) => row.status === "completed" || row.delivery_status === "delivered",
+    );
+
+    if (orderRows.length === 0) {
+      return { ok: true, orders: [] };
+    }
+
+    const orderIds = orderRows.map((o) => o.id);
+    const { data: lineRows, error: lineErr } = await svc
+      .from("order_lines")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .in("order_id", orderIds);
+
+    if (lineErr) {
+      return { ok: false, error: lineErr.message };
+    }
+
+    return {
+      ok: true,
+      orders: await enrichDeliveryOrdersWithCouriers(
+        tenantId,
+        buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]),
+      ),
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Geçmiş yüklenemedi." };
+  }
+}
+
+async function enrichDeliveryOrdersWithCouriers(
+  tenantId: string,
+  orders: AdminOrder[],
+): Promise<AdminOrder[]> {
+  const courierIds = Array.from(
+    new Set(orders.map((o) => o.courierId).filter((id): id is string => Boolean(id))),
+  );
+  if (courierIds.length === 0) return orders;
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data } = await svc
+      .from("couriers")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .in("id", courierIds);
+
+    const byId = new Map<string, string>();
+    for (const c of (data ?? []) as CourierRow[]) {
+      byId.set(c.id, courierDisplayName(c));
+    }
+
+    return orders.map((o) => ({
+      ...o,
+      courierName: o.courierId ? byId.get(o.courierId) ?? o.courierName ?? null : null,
+    }));
+  } catch {
+    return orders;
   }
 }
 
@@ -115,7 +198,7 @@ export async function loadKasaDeliveryOrderDetail(
   tenantId: string,
   orderId: string,
 ): Promise<
-  | { ok: true; order: AdminOrder; couriers: CourierRow[] }
+  | { ok: true; order: AdminOrder; couriers: CourierRow[]; open: true; courierName: string | null }
   | { ok: false; error: string }
 > {
   if (!orderId) {
@@ -139,7 +222,51 @@ export async function loadKasaDeliveryOrderDetail(
       return couriersResult;
     }
 
-    return { ok: true, order, couriers: couriersResult.couriers };
+    const [enriched] = await enrichDeliveryOrdersWithCouriers(tenantId, [order]);
+    return {
+      ok: true,
+      order: enriched ?? order,
+      couriers: couriersResult.couriers,
+      open: true,
+      courierName: enriched?.courierName ?? null,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Sipariş yüklenemedi." };
+  }
+}
+
+/** Kapanmış paket siparişi — salt okunur geçmiş. */
+export async function loadKasaDeliveryOrderHistoryDetail(
+  tenantId: string,
+  orderId: string,
+): Promise<
+  | { ok: true; order: AdminOrder; couriers: CourierRow[]; open: false; courierName: string | null }
+  | { ok: false; error: string }
+> {
+  if (!orderId) {
+    return { ok: false, error: "Geçersiz sipariş." };
+  }
+
+  try {
+    const order = await loadOrderWithLines(tenantId, orderId);
+    if (!order) {
+      return { ok: false, error: "Sipariş bulunamadı." };
+    }
+    if (order.fulfillmentType !== "delivery") {
+      return { ok: false, error: "Bu sipariş paket değil." };
+    }
+    if (isOpenDeliveryOrder(order)) {
+      return { ok: false, error: "Sipariş hâlâ açık; aktif listeden açın." };
+    }
+
+    const [enriched] = await enrichDeliveryOrdersWithCouriers(tenantId, [order]);
+    return {
+      ok: true,
+      order: enriched ?? order,
+      couriers: [],
+      open: false,
+      courierName: enriched?.courierName ?? null,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Sipariş yüklenemedi." };
   }

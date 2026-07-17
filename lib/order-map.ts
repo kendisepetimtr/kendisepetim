@@ -48,8 +48,10 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
     paymentMethod: row.payment_method,
     paymentMethodAtClose: row.payment_method_at_close,
     mealCardBrandId: row.meal_card_brand_id ?? undefined,
+    paidAt: row.paid_at ?? null,
     orderNote: row.order_note,
     courierNote: row.courier_note ?? "",
+    courierName: null,
     lines: (linesByOrderId.get(row.id) ?? [])
       .slice()
       .sort((a, b) => a.sort_order - b.sort_order)

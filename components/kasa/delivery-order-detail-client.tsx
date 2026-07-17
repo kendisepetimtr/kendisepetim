@@ -31,6 +31,8 @@ type DeliveryOrderDetailClientProps = {
   couriers: CourierRow[];
   businessName: string;
   paymentFlags: TenantPaymentFlags;
+  readOnly?: boolean;
+  courierName?: string | null;
 };
 
 export default function DeliveryOrderDetailClient({
@@ -38,11 +40,13 @@ export default function DeliveryOrderDetailClient({
   couriers,
   businessName,
   paymentFlags,
+  readOnly = false,
+  courierName = null,
 }: DeliveryOrderDetailClientProps) {
   const [order, setOrder] = useState(initialOrder);
   const [selectedCourierId, setSelectedCourierId] = useState(order.courierId ?? "");
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
-    pickDefaultPaymentMethod(paymentFlags, order.paymentMethod),
+    pickDefaultPaymentMethod(paymentFlags, order.paymentMethodAtClose ?? order.paymentMethod),
   );
   const [mealBrand, setMealBrand] = useState<MealCardBrandId | "">(
     order.paymentMethod === "meal_card" && order.mealCardBrandId ? order.mealCardBrandId : "",
@@ -51,10 +55,114 @@ export default function DeliveryOrderDetailClient({
 
   const currentDeliveryStatus = order.deliveryStatus ?? "pending";
   const assignedCourier = couriers.find((c) => c.id === (selectedCourierId || order.courierId));
+  const displayCourierName =
+    courierName ||
+    order.courierName ||
+    (assignedCourier ? courierDisplayName(assignedCourier) : null);
   const mapUrl =
     order.customerLatitude != null && order.customerLongitude != null
       ? googleMapsPlaceUrl(order.customerLatitude, order.customerLongitude)
       : null;
+
+  if (readOnly) {
+    const closedPay = order.paymentMethodAtClose ?? order.paymentMethod;
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+            <Link
+              href="/kasa/paket?tab=history"
+              className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
+              aria-label="Geri"
+            >
+              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+            </Link>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wide text-primary">Paket · Geçmiş</p>
+              <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm font-semibold text-emerald-900">
+            Sipariş kapatıldı — salt okunur kayıt
+          </div>
+
+          <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="font-mono text-2xl font-black text-on-background">{order.orderCode}</p>
+                <p className="mt-1 text-sm text-on-background">
+                  {order.firstName} {order.lastName} · {order.phone}
+                </p>
+                <p className="mt-2 text-xs text-secondary">
+                  {ORDER_STATUS_LABELS[order.status]} · {DELIVERY_STATUS_LABELS[currentDeliveryStatus]}
+                </p>
+              </div>
+              <p className="font-headline text-3xl font-black text-primary">{formatTry(order.total)}</p>
+            </div>
+            <p className="mt-3 text-sm text-on-background">{formatAddressOneLine(order.address)}</p>
+            {mapUrl ? (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary"
+              >
+                <span className="material-symbols-outlined text-[16px]">map</span>
+                Haritada aç
+              </a>
+            ) : null}
+          </div>
+
+          <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+            <h2 className="font-headline text-lg font-bold text-on-background">Teslimat özeti</h2>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-secondary">Kurye</dt>
+                <dd className="mt-0.5 font-semibold text-on-background">{displayCourierName || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-secondary">Müşteri beyanı</dt>
+                <dd className="mt-0.5 text-on-background">
+                  {paymentMethodLabel(order.paymentMethod, order.mealCardBrandId)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-secondary">Tahsil edilen</dt>
+                <dd className="mt-0.5 font-semibold text-on-background">
+                  {paymentMethodLabel(closedPay, order.mealCardBrandId)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-secondary">Kapanış</dt>
+                <dd className="mt-0.5 text-on-background">
+                  {order.paidAt
+                    ? new Date(order.paidAt).toLocaleString("tr-TR")
+                    : new Date(order.createdAt).toLocaleString("tr-TR")}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+            <h2 className="font-headline text-lg font-bold text-on-background">Ürünler</h2>
+            <ul className="mt-3 space-y-2">
+              {order.lines.map((line) => (
+                <li key={line.id} className="flex justify-between gap-3 text-sm">
+                  <span className="text-on-background">
+                    {line.qty}x {line.name}
+                  </span>
+                  <span className="shrink-0 font-semibold">{formatTry(line.unitPrice * line.qty)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   async function reloadOrder() {
     const res = await fetch(`/api/kasa/delivery?orderId=${order.id}`, { cache: "no-store" });

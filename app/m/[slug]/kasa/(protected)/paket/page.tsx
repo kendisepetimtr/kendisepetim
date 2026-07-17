@@ -5,9 +5,16 @@ import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
 import { loadActiveCouriers, loadKasaDeliveryOrders } from "@/lib/kasa/delivery-orders-service";
 import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
 import type { CourierRow } from "@/lib/supabase/courier-types";
+import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
-export default async function KasaDeliveryOrdersPage({ params }: { params: Promise<{ slug: string }> }) {
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
+};
+
+export default async function KasaDeliveryOrdersPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { tab } = await searchParams;
   const auth = await getAuthenticatedCashierTenant(slug);
   if (!auth.ok) {
     return null;
@@ -40,6 +47,8 @@ export default async function KasaDeliveryOrdersPage({ params }: { params: Promi
       initialOrders={ordersResult.ok ? ordersResult.orders : []}
       courierById={courierById}
       menu={menu}
+      paymentFlags={tenantPaymentFlagsFromRow(auth.tenant)}
+      initialTab={tab === "history" ? "history" : "active"}
     />
   );
 }

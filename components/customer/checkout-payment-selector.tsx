@@ -90,6 +90,18 @@ export default function CheckoutPaymentSelector({
             <span className="text-sm font-medium text-on-background">{cardLabel}</span>
           </label>
         ) : null}
+        {options.paymentHavale ? (
+          <label className={rowCls}>
+            <input
+              type="radio"
+              name={`${baseId}-pay`}
+              checked={method === "havale"}
+              onChange={() => onMethodChange("havale")}
+              className="h-4 w-4 border-surface-container-highest text-primary focus:ring-primary/30"
+            />
+            <span className="text-sm font-medium text-on-background">Havale</span>
+          </label>
+        ) : null}
         {showMealCard ? (
           <div className="rounded-xl border border-surface-container-high bg-surface-container-low/40 p-3">
             <label className="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-1">

@@ -1,17 +1,18 @@
 import { notFound, redirect } from "next/navigation";
-import KasaPosClient from "@/components/kasa/kasa-pos-client";
-import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
+import DeliveryOrderDetailClient from "@/components/kasa/delivery-order-detail-client";
 import { getAuthenticatedCashierTenant } from "@/lib/kasa/cashier-tenant";
 import { getDefaultKasaPath, getKasaFeatures } from "@/lib/kasa/kasa-access";
-import { loadKasaDeliveryOrderDetail } from "@/lib/kasa/delivery-orders-service";
-import { loadVisibleMenuForTenant } from "@/lib/kasa/menu-load";
+import {
+  loadKasaDeliveryOrderDetail,
+  loadKasaDeliveryOrderHistoryDetail,
+} from "@/lib/kasa/delivery-orders-service";
 import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
-type Props = { params: Promise<{ slug: string; orderId: string }> };
+type Props = { params: Promise<{ slug: string; orderId: string }>; searchParams: Promise<{ view?: string }> };
 
-export default async function KasaDeliveryOrderPage({ params }: Props) {
+export default async function KasaDeliveryOrderPage({ params, searchParams }: Props) {
   const { slug, orderId } = await params;
+  const { view } = await searchParams;
   const auth = await getAuthenticatedCashierTenant(slug);
   if (!auth.ok) notFound();
 
@@ -20,44 +21,23 @@ export default async function KasaDeliveryOrderPage({ params }: Props) {
     redirect(getDefaultKasaPath(features));
   }
 
-  const detail = await loadKasaDeliveryOrderDetail(auth.tenant.id, orderId);
+  const historyView = view === "history";
+  const detail = historyView
+    ? await loadKasaDeliveryOrderHistoryDetail(auth.tenant.id, orderId)
+    : await loadKasaDeliveryOrderDetail(auth.tenant.id, orderId);
+
   if (!detail.ok) {
     redirect("/kasa/paket");
   }
 
-  const row = auth.tenant;
-  const paymentFlags = tenantPaymentFlagsFromRow(row);
-  const fulfillmentFlags: TenantFulfillmentFlags = {
-    fulfillmentPickupEnabled: false,
-    fulfillmentDeliveryEnabled: true,
-    deliveryRadiusKm: clampDeliveryRadiusKm(Number(row.delivery_radius_km ?? 5)),
-    minOrderAmount:
-      row.min_order_amount != null && Number.isFinite(Number(row.min_order_amount))
-        ? Number(row.min_order_amount)
-        : null,
-    latitude: row.latitude != null ? Number(row.latitude) : null,
-    longitude: row.longitude != null ? Number(row.longitude) : null,
-  };
-
-  const initialMenu = await loadVisibleMenuForTenant(row.id);
-
   return (
-    <KasaPosClient
-      slug={slug}
-      tenantId={row.id}
-      businessName={row.business_name}
-      businessLogoUrl={row.logo_url ?? ""}
-      businessCoverImageUrl={row.cover_image_url ?? ""}
-      hoursPair={{ open: row.open_time, close: row.close_time }}
-      initialOpenStatus={isBusinessOpenNow(row.open_time, row.close_time)}
-      initialClosedMessage={getBusinessClosedMessage(row.open_time, row.close_time)}
-      paymentFlags={paymentFlags}
-      fulfillmentFlags={fulfillmentFlags}
-      initialMenu={initialMenu}
-      channel="delivery"
-      backHref="/kasa/paket"
-      backLabel="Paket"
-      initialOrder={detail.order}
+    <DeliveryOrderDetailClient
+      order={detail.order}
+      couriers={detail.couriers}
+      businessName={auth.tenant.business_name}
+      paymentFlags={tenantPaymentFlagsFromRow(auth.tenant)}
+      readOnly={historyView || !detail.open}
+      courierName={detail.courierName}
     />
   );
 }
