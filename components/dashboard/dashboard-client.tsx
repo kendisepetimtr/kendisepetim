@@ -408,6 +408,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   useEffect(() => {
     if (!tenant || activeNav !== "overview") return;
 
+    const currentTenant = tenant;
     let cancelled = false;
 
     async function loadOverview() {
@@ -425,14 +426,14 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           setActiveTableCount(tables);
           setMenuPreview(preview);
           setOverviewLogs(logs.slice(0, 8));
-          setCustomerCount(countDistinctCustomers(orders, tenant.subdomain));
+          setCustomerCount(countDistinctCustomers(orders, currentTenant.subdomain));
         } else {
           if (cancelled) return;
           setOverviewOrders([]);
           setActiveTableCount(0);
           setMenuPreview([]);
           setOverviewLogs([]);
-          setCustomerCount(countLocalCustomers(tenant.subdomain));
+          setCustomerCount(countLocalCustomers(currentTenant.subdomain));
         }
       } finally {
         if (!cancelled) setOverviewLoading(false);
