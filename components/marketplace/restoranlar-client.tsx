@@ -1,17 +1,18 @@
 "use client";
 
 import RestaurantCard from "@/components/marketplace/restaurant-card";
+import SiteLogo from "@/components/site-logo";
 import { CUISINE_TAG_OPTIONS } from "@/lib/marketplace";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, MURATPASA_NEIGHBORHOODS } from "@/lib/turkey-geography";
 import type { MarketplaceListing } from "@/lib/marketplace";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-type KesfetClientProps = {
+type RestoranlarClientProps = {
   initialListings: MarketplaceListing[];
 };
 
-export default function KesfetClient({ initialListings }: KesfetClientProps) {
+export default function RestoranlarClient({ initialListings }: RestoranlarClientProps) {
   const [search, setSearch] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [cuisineTag, setCuisineTag] = useState("");
@@ -36,29 +37,30 @@ export default function KesfetClient({ initialListings }: KesfetClientProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-surface-container-highest bg-surface-container-lowest">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link href="/" className="font-headline text-lg font-bold text-on-background">
-            KendiSepetim
-          </Link>
+      <header className="glass-nav sticky top-0 z-40 border-b border-surface-container-highest/80">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-8">
+          <SiteLogo variant="compact" />
           <nav className="flex items-center gap-4 text-sm font-semibold">
-            <Link href="/kesfet" className="text-primary">
-              Keşfet
+            <Link href="/restoranlar" className="text-primary">
+              Restoranlar
+            </Link>
+            <Link href="/#planlar" className="text-secondary hover:text-on-background">
+              Planlar
             </Link>
             <Link href="/kayit" className="text-secondary hover:text-on-background">
-              Restoranlar için
+              Restoranını kaydet
             </Link>
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
         <div className="mb-8">
           <h1 className="font-headline text-3xl font-extrabold tracking-tight text-on-background">
-            {LAUNCH_CITY} {LAUNCH_DISTRICT}&apos;da restoran keşfet
+            Restoranlar
           </h1>
           <p className="mt-2 max-w-2xl text-secondary">
-            Yakınınızdaki restoranların menüsüne gidin, gel-al veya teslimat ile sipariş verin.
+            {LAUNCH_CITY} {LAUNCH_DISTRICT} — menüye gidin, gel-al veya teslimat ile sipariş verin.
           </p>
         </div>
 

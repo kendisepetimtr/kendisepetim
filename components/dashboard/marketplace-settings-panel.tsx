@@ -355,7 +355,7 @@ export default function MarketplaceSettingsPanel({
             value={publicDescription}
             onChange={(e) => setPublicDescription(e.target.value.slice(0, MAX_PUBLIC_DESCRIPTION_LENGTH))}
             rows={3}
-            placeholder="Keşfet ve ana sayfada görünecek kısa tanıtım…"
+            placeholder="Restoranlar ve ana sayfada görünecek kısa tanıtım…"
             className="mt-1 w-full resize-y rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <p className="mt-1 text-[11px] text-secondary">
@@ -518,7 +518,7 @@ export default function MarketplaceSettingsPanel({
           <span>
             <span className="block text-sm font-semibold text-on-background">Marketplace&apos;te yayınla</span>
             <span className="mt-0.5 block text-xs text-secondary">
-              Açıkken restoranınız Keşfet ve ana sayfada listelenir. Kapatmak için işareti kaldırın.
+              Açıkken restoranınız Restoranlar listesinde ve ana sayfada görünür. Kapatmak için işareti kaldırın.
             </span>
             {marketplaceEnabled && !canPublish ? (
               <span className="mt-2 block text-xs font-medium text-amber-800">

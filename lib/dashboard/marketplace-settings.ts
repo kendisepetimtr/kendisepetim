@@ -177,6 +177,7 @@ export async function updateMarketplaceSettings(
       return { ok: false, error: formatSaveError(upErr?.message ?? "Kayıt güncellenemedi.") };
     }
 
+    revalidatePath("/restoranlar");
     revalidatePath("/kesfet");
     revalidatePath("/");
     revalidatePath(`/m/${updated.subdomain}`);

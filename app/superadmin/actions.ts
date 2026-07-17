@@ -108,6 +108,7 @@ export async function superadminSetMarketplace(tenantId: string, enabled: boolea
   const { error } = await svc.from("tenants").update({ marketplace_enabled: enabled }).eq("id", tenantId);
   if (error) return { error: error.message };
   revalidateSuperadminPaths();
+  revalidatePath("/restoranlar");
   revalidatePath("/kesfet");
   revalidatePath("/");
   return {};

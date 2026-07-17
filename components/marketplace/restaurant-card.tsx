@@ -2,10 +2,6 @@ import Link from "next/link";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import type { MarketplaceListing } from "@/lib/marketplace";
 
-function formatTry(n: number): string {
-  return `${Math.round(n)} ₺`;
-}
-
 type RestaurantCardProps = {
   listing: MarketplaceListing;
 };
@@ -68,7 +64,6 @@ export default function RestaurantCard({ listing }: RestaurantCardProps) {
         {listing.signatureDishName ? (
           <p className="mt-3 text-xs text-secondary">
             <span className="font-semibold text-on-background">{listing.signatureDishName}</span>
-            {listing.signatureDishPrice != null ? ` · ${formatTry(listing.signatureDishPrice)}` : null}
           </p>
         ) : null}
 
