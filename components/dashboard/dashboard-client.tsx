@@ -1,5 +1,6 @@
 "use client";
 
+import { signOutDashboardAction } from "@/app/dashboard/actions";
 import CustomersManager from "@/components/dashboard/customers-manager";
 import DashboardOrdersList from "@/components/dashboard/dashboard-orders-list";
 import DashboardNotificationsBell from "@/components/dashboard/dashboard-notifications-bell";
@@ -351,7 +352,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
 
           if (!result.ok) {
             if (!local) {
-              router.replace("/kayit");
+              router.replace("/kayit?reason=tenant-missing");
               setTenant(null);
               return;
             }
@@ -368,7 +369,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
         }
 
         if (!local) {
-          router.replace("/kayit");
+          router.replace("/kayit?reason=tenant-missing");
           setTenant(null);
           return;
         }
@@ -503,10 +504,11 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
       try {
         await fetch("/api/dashboard/sign-out", { method: "POST", credentials: "include" });
       } catch {
-        /* sunucu oturumu kapanmazsa yine ana sayfaya yönlendir */
+        /* sunucu oturumu kapanmazsa yine girişe yönlendir */
       }
     }
-    router.push("/giris");
+    // Soft router.push eski oturum çerezini bırakabiliyor — tam yenileme
+    window.location.assign("/giris");
   }
 
   if (tenant === undefined) {
@@ -758,16 +760,28 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
             >
               {initials}
             </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="hidden rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low sm:inline-block"
+            <form
+              action={signOutDashboardAction}
+              onSubmit={() => {
+                const t = getLocalTenant();
+                if (t) {
+                  clearLocalCustomers(t.subdomain);
+                  clearLocalOrders(t.subdomain);
+                  clearPublicCheckoutMirror(t.subdomain);
+                }
+                clearLocalTenant();
+              }}
+              className="hidden sm:block"
             >
-              Çıkış
-            </button>
+              <button
+                type="submit"
+                className="rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
+              >
+                Çıkış
+              </button>
+            </form>
           </div>
         </header>
-
         <main className="px-4 py-8 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             {activeNav === "menu" ? (
@@ -1084,14 +1098,26 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                   <span className="font-medium text-on-background">{tenant.subdomain}.kendisepetim.com</span>{" "}
                   adresinde. QR kodu indirmek için soldaki QR sekmesine geçin; menüyü Menü bölümünden düzenleyin.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="mt-4 inline-flex items-center justify-center rounded-xl border border-surface-container-highest bg-white px-4 py-2.5 text-sm font-semibold text-on-background hover:bg-surface-container-low sm:hidden"
+                <form
+                  action={signOutDashboardAction}
+                  onSubmit={() => {
+                    const t = getLocalTenant();
+                    if (t) {
+                      clearLocalCustomers(t.subdomain);
+                      clearLocalOrders(t.subdomain);
+                      clearPublicCheckoutMirror(t.subdomain);
+                    }
+                    clearLocalTenant();
+                  }}
+                  className="mt-4 sm:hidden"
                 >
-                  Çıkış yap
-                </button>
-              </div>
+                  <button
+                    type="submit"
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-surface-container-highest bg-white px-4 py-2.5 text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                  >
+                    Çıkış yap
+                  </button>
+                </form>              </div>
             </section>
               </>
             )}

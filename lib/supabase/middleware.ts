@@ -120,28 +120,10 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     }
   }
 
-  if ((pathname === LOGIN_PATH || pathname.startsWith(`${LOGIN_PATH}/`)) && user) {
-    /* E-posta doğrulandıktan sonra başarı mesajını göstermek için bir tur /giris?verified=1 */
-    if (request.nextUrl.searchParams.get("verified") === "1") {
-      return supabaseResponse;
-    }
-    const nextParam = request.nextUrl.searchParams.get("next");
-    let target = nextParam && nextParam.startsWith("/") ? nextParam : "/dashboard";
-
-    if (target === "/dashboard" || target.startsWith("/dashboard/")) {
-      const tenantRedirect = await resolveTenantDashboardRedirect(request, user.id);
-      if (tenantRedirect) {
-        copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
-        return tenantRedirect;
-      }
-    }
-
-    const redirectRes = NextResponse.redirect(new URL(target, request.url));
-    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
-    return redirectRes;
-  }
+  // /giris: oturum açık olsa bile formu göster — son kullanıcıyı otomatik açma
 
   if ((pathname === "/kayit" || pathname.startsWith("/kayit/")) && user) {
+    // İşletmesi olmayan kullanıcı kayıtta kalsın (dashboard ↔ kayit loop olmasın)
     if (request.nextUrl.searchParams.get("reason") === "tenant-missing") {
       return supabaseResponse;
     }
@@ -150,9 +132,8 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
       copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
       return tenantRedirect;
     }
-    const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
-    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
-    return redirectRes;
+    // Oturum var ama tenant yok → kayıtta kal (dashboard'a zorlama)
+    return supabaseResponse;
   }
 
   if (
@@ -164,9 +145,7 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
       copyCookies(supabaseResponse, tenantRedirect, hostname, refreshedCookies);
       return tenantRedirect;
     }
-    const redirectRes = NextResponse.redirect(new URL("/dashboard", request.url));
-    copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
-    return redirectRes;
+    return supabaseResponse;
   }
 
   /* Şifre sıfırlama bağlantısı oturum açar; kullanıcı bu sayfada kalmalı */

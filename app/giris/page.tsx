@@ -51,6 +51,7 @@ export default async function LoginPage({ searchParams }: Props) {
     q.durum === "oauth-hata" && typeof q.mesaj === "string" ? q.mesaj : null;
 
   let signedIn = false;
+  let signedInEmail: string | null = null;
   if (getSupabaseEnv()) {
     try {
       const supabase = await createServerSupabaseClient();
@@ -58,8 +59,10 @@ export default async function LoginPage({ searchParams }: Props) {
         data: { user },
       } = await supabase.auth.getUser();
       signedIn = !!user;
+      signedInEmail = user?.email ?? null;
     } catch {
       signedIn = false;
+      signedInEmail = null;
     }
   }
 
@@ -83,6 +86,7 @@ export default async function LoginPage({ searchParams }: Props) {
             notice={notice}
             oauthError={oauthError}
             signedIn={signedIn}
+            signedInEmail={signedInEmail}
             supabaseConfigured={!!getSupabaseEnv()}
           />
         </div>

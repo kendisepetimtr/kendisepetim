@@ -5,5 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   await signOutDashboardSession();
-  return NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true });
+  res.headers.set("Cache-Control", "no-store");
+  return res;
 }
