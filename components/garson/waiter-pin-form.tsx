@@ -47,8 +47,8 @@ export default function WaiterPinForm({ slug, nextPath, pinConfigured, businessN
 
       {!pinConfigured ? (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-on-background">
-          Garson PIN henüz tanımlanmadı. İşletme sahibi Dashboard → Ayarlar → Operasyon bölümünden PIN
-          belirlemelidir.
+          Aktif garson yok. İşletme sahibi Dashboard → Operasyon → Garsonlar bölümünden en az bir garson
+          eklemelidir.
         </p>
       ) : null}
 

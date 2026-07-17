@@ -12,12 +12,14 @@ import { playNotificationSound } from "@/lib/notification-sounds";
 import { DEFAULT_RECEIPT_SETTINGS, type TenantReceiptSettings } from "@/lib/receipt-settings";
 import type { CourierRow } from "@/lib/supabase/courier-types";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
-import type { StaffPinRole } from "@/lib/staff/pin";
+import type { WaiterPublicRow } from "@/lib/supabase/waiter-types";
+import { waiterDisplayName } from "@/lib/supabase/waiter-types";
 import { type FormEvent, useCallback, useEffect, useId, useState, useTransition } from "react";
 
-const PIN_ROLES: { id: StaffPinRole; label: string; hint: string }[] = [
+type OpsPinRole = "admin" | "cashier";
+
+const PIN_ROLES: { id: OpsPinRole; label: string; hint: string }[] = [
   { id: "admin", label: "Admin PIN", hint: "Patron paneli (/admin)" },
-  { id: "waiter", label: "Garson PIN", hint: "Garson paneli (/garson)" },
   { id: "cashier", label: "Kasa PIN", hint: "Kasa modu (/kasa)" },
 ];
 
@@ -32,10 +34,11 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
   const [tableCount, setTableCount] = useState(0);
   const [dineInEnabled, setDineInEnabled] = useState(false);
   const [couriers, setCouriers] = useState<CourierRow[]>([]);
+  const [waiters, setWaiters] = useState<WaiterPublicRow[]>([]);
   const [savedFlash, setSavedFlash] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const [pinRole, setPinRole] = useState<StaffPinRole>("waiter");
+  const [pinRole, setPinRole] = useState<OpsPinRole>("cashier");
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -44,6 +47,13 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
   const [courierLastName, setCourierLastName] = useState("");
   const [courierPhone, setCourierPhone] = useState("");
   const [editingCourierId, setEditingCourierId] = useState<string | null>(null);
+
+  const [waiterFirstName, setWaiterFirstName] = useState("");
+  const [waiterLastName, setWaiterLastName] = useState("");
+  const [waiterPhone, setWaiterPhone] = useState("");
+  const [waiterPin, setWaiterPin] = useState("");
+  const [waiterConfirmPin, setWaiterConfirmPin] = useState("");
+  const [editingWaiterId, setEditingWaiterId] = useState<string | null>(null);
 
   const [notificationSettings, setNotificationSettings] = useState<TenantNotificationSettings>(
     DEFAULT_NOTIFICATION_SETTINGS,
@@ -68,6 +78,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       setTableCount(data.settings.tableCount);
       setDineInEnabled(data.settings.dineInEnabled);
       setCouriers(data.settings.couriers);
+      setWaiters(data.settings.waiters ?? []);
       setNotificationSettings(data.settings.notificationSettings);
       setReceiptSettings(data.settings.receiptSettings);
       setBusinessName(data.settings.businessName);
@@ -215,6 +226,99 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
     });
   }
 
+  function resetWaiterForm() {
+    setEditingWaiterId(null);
+    setWaiterFirstName("");
+    setWaiterLastName("");
+    setWaiterPhone("");
+    setWaiterPin("");
+    setWaiterConfirmPin("");
+  }
+
+  function handleEditWaiter(waiter: WaiterPublicRow) {
+    setEditingWaiterId(waiter.id);
+    setWaiterFirstName(waiter.first_name);
+    setWaiterLastName(waiter.last_name);
+    setWaiterPhone(waiter.phone);
+    setWaiterPin("");
+    setWaiterConfirmPin("");
+  }
+
+  function handleSaveWaiter(e: FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/operations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "waiter-upsert",
+          waiter: {
+            id: editingWaiterId ?? undefined,
+            firstName: waiterFirstName,
+            lastName: waiterLastName,
+            phone: waiterPhone,
+            isActive: true,
+            pin: waiterPin || undefined,
+            confirmPin: waiterConfirmPin || undefined,
+          },
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Garson kaydedilemedi.");
+        return;
+      }
+      resetWaiterForm();
+      await loadSettings();
+    });
+  }
+
+  function handleDeleteWaiter(waiterId: string) {
+    if (!window.confirm("Bu garsonu silmek istediğinize emin misiniz?")) return;
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/operations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "waiter-delete", waiterId }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Garson silinemedi.");
+        return;
+      }
+      if (editingWaiterId === waiterId) resetWaiterForm();
+      await loadSettings();
+    });
+  }
+
+  function handleToggleWaiterActive(waiter: WaiterPublicRow) {
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/operations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "waiter-upsert",
+          waiter: {
+            id: waiter.id,
+            firstName: waiter.first_name,
+            lastName: waiter.last_name,
+            phone: waiter.phone,
+            isActive: !waiter.is_active,
+          },
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Güncellenemedi.");
+        return;
+      }
+      await loadSettings();
+    });
+  }
+
   function handleSaveNotification(e: FormEvent) {
     e.preventDefault();
     startTransition(async () => {
@@ -259,9 +363,8 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
 
   if (!enabled) return null;
 
-  const pinFlags: Record<StaffPinRole, boolean> = {
+  const pinFlags: Record<"admin" | "cashier", boolean> = {
     admin: settings?.hasAdminPin ?? false,
-    waiter: settings?.hasWaiterPin ?? false,
     cashier: settings?.hasCashierPin ?? false,
   };
 
@@ -328,7 +431,8 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       >
         <h3 className="font-headline text-base font-bold text-on-background">Personel PIN&apos;leri</h3>
         <p className="mt-1 text-xs leading-relaxed text-secondary">
-          Garson, kasa ve admin panelleri 4 haneli PIN ile korunur. İlk kez tanımlarken mevcut PIN gerekmez.
+          Kasa ve admin panelleri 4 haneli PIN ile korunur. Garson girişleri aşağıdaki Garsonlar listesinden kişi
+          bazlı PIN ile yapılır.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {PIN_ROLES.map((role) => (
@@ -388,6 +492,120 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
           PIN kaydet
         </button>
       </form>
+
+      <div className="rounded-2xl border border-surface-container-high bg-surface-container-low/50 p-5 sm:p-6">
+        <h3 className="font-headline text-base font-bold text-on-background">Garsonlar</h3>
+        <p className="mt-1 text-xs leading-relaxed text-secondary">
+          Her garsonun 4 haneli benzersiz PIN&apos;i vardır. PIN ile giriş yapan kişinin paneli açılır. Tek aktif
+          garsonda oturum uzun kalır; birden fazla garsonda oturum 30 dakika sonra PIN ister.
+        </p>
+
+        {waiters.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {waiters.map((w) => (
+              <li
+                key={w.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-surface-container-highest bg-white px-3 py-2.5"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-on-background">{waiterDisplayName(w)}</p>
+                  <p className="text-xs text-secondary">
+                    {w.phone || "Telefon yok"} · {w.is_active ? "Aktif" : "Pasif"} · PIN tanımlı
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditWaiter(w)}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                  >
+                    Düzenle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWaiterActive(w)}
+                    disabled={pending}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold text-secondary hover:bg-surface-container-low"
+                  >
+                    {w.is_active ? "Pasifleştir" : "Aktifleştir"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteWaiter(w.id)}
+                    disabled={pending}
+                    className="rounded-lg px-2 py-1 text-xs font-semibold text-error hover:bg-error/5"
+                  >
+                    Sil
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-sm text-secondary">Henüz garson eklenmedi. En az bir aktif garson gerekir.</p>
+        )}
+
+        <form onSubmit={handleSaveWaiter} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <input
+            value={waiterFirstName}
+            onChange={(e) => setWaiterFirstName(e.target.value)}
+            placeholder="Ad"
+            required
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+          />
+          <input
+            value={waiterLastName}
+            onChange={(e) => setWaiterLastName(e.target.value)}
+            placeholder="Soyad"
+            required
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+          />
+          <input
+            value={waiterPhone}
+            onChange={(e) => setWaiterPhone(e.target.value)}
+            placeholder="Telefon (opsiyonel)"
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm sm:col-span-2"
+          />
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={waiterPin}
+            onChange={(e) => setWaiterPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder={editingWaiterId ? "Yeni PIN (opsiyonel)" : "4 haneli PIN"}
+            required={!editingWaiterId}
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+          />
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={waiterConfirmPin}
+            onChange={(e) => setWaiterConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="PIN tekrar"
+            required={!editingWaiterId || waiterPin.length > 0}
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+          />
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-60"
+            >
+              {editingWaiterId ? "Garsonu güncelle" : "Garson ekle"}
+            </button>
+            {editingWaiterId ? (
+              <button
+                type="button"
+                onClick={resetWaiterForm}
+                className="rounded-xl border border-surface-container-highest px-4 py-2.5 text-sm font-semibold text-secondary"
+              >
+                İptal
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </div>
 
       <div className="rounded-2xl border border-surface-container-high bg-surface-container-low/50 p-5 sm:p-6">
         <h3 className="font-headline text-base font-bold text-on-background">Kuryeler</h3>

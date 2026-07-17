@@ -187,111 +187,61 @@ export async function loadGarsonTableGrid(
 
 
 export async function requestTableBill(
-
   tenantId: string,
-
   tableNumber: number,
-
+  waiter?: { id: string; displayName: string },
 ): Promise<{ ok: true; sessionId: string } | { ok: false; error: string }> {
-
   if (tableNumber < 1) {
-
     return { ok: false, error: "Geçersiz masa numarası." };
-
   }
 
-
+  const actorLabel = waiter?.displayName?.trim() || "Garson";
 
   try {
-
     const svc = createServiceSupabaseClient();
-
     const { data: session, error: findErr } = await svc
-
       .from("table_sessions")
-
       .select("id, status, table_number")
-
       .eq("tenant_id", tenantId)
-
       .eq("table_number", tableNumber)
-
       .in("status", ["active", "bill_requested"])
-
       .maybeSingle();
 
-
-
     if (findErr) {
-
       return { ok: false, error: findErr.message };
-
     }
-
     if (!session?.id) {
-
       return { ok: false, error: "Bu masada açık oturum yok." };
-
     }
-
     if (session.status === "bill_requested") {
-
       return { ok: true, sessionId: session.id as string };
-
     }
-
-
 
     const { error: updateErr } = await svc
-
       .from("table_sessions")
-
       .update({ status: "bill_requested" })
-
       .eq("id", session.id)
-
       .eq("tenant_id", tenantId);
 
-
-
     if (updateErr) {
-
       return { ok: false, error: updateErr.message };
-
     }
 
-
-
     await writeActivityLog({
-
       tenant_id: tenantId,
-
       actor_type: "waiter",
-
-      actor_label: "Garson",
-
+      actor_label: actorLabel,
       action: "bill_requested",
-
       entity_type: "table_session",
-
       entity_id: session.id as string,
-
       order_code: null,
-
-      metadata: { table: tableNumber },
-
+      metadata: { table: tableNumber, waiter: actorLabel },
     });
 
-
-
     return { ok: true, sessionId: session.id as string };
-
   } catch (err) {
-
     return { ok: false, error: err instanceof Error ? err.message : "Hesap isteği gönderilemedi." };
-
   }
-
 }
 
 

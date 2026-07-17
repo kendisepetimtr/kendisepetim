@@ -9,6 +9,7 @@ export async function ensureTableSession(
   tenantId: string,
   tableNumber: number,
   openedBy: TableSessionOpenedBy = "table_qr",
+  waiterId?: string,
 ): Promise<string> {
   const { data: existing, error: findErr } = await svc
     .from("table_sessions")
@@ -32,6 +33,7 @@ export async function ensureTableSession(
       table_number: tableNumber,
       status: "active",
       opened_by: openedBy,
+      ...(waiterId ? { waiter_id: waiterId } : {}),
     })
     .select("id")
     .single();

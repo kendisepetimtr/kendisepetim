@@ -26,9 +26,11 @@ export async function placeWaiterOrder(input: {
   tableNumber: number;
   lines: PublicOrderLineInput[];
   orderNote?: string;
+  waiter?: { id: string; displayName: string };
 }): Promise<{ ok: true; orderId: string; orderCode: string } | { ok: false; error: string }> {
-  const { tenant, tableNumber } = input;
+  const { tenant, tableNumber, waiter } = input;
   const tableCount = Number(tenant.table_count ?? 0);
+  const actorLabel = waiter?.displayName?.trim() || "Garson";
 
   if (tenant.public_menu_enabled !== true || tenant.dine_in_enabled !== true) {
     return { ok: false, error: "Masa siparişi alınamıyor." };
@@ -68,7 +70,13 @@ export async function placeWaiterOrder(input: {
 
     const total = lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
     const code = orderCode();
-    const tableSessionId = await ensureTableSession(svc, tenant.id, tableNumber, "waiter");
+    const tableSessionId = await ensureTableSession(
+      svc,
+      tenant.id,
+      tableNumber,
+      "waiter",
+      waiter?.id,
+    );
     const orderNote = typeof input.orderNote === "string" ? input.orderNote.trim() : "";
 
     const { data: insertedOrder, error: orderError } = await svc
@@ -80,6 +88,7 @@ export async function placeWaiterOrder(input: {
         fulfillment_type: "dine_in",
         table_number: tableNumber,
         table_session_id: tableSessionId,
+        waiter_id: waiter?.id ?? null,
         total,
         customer_first_name: "Garson",
         customer_last_name: `Masa ${tableNumber}`,
@@ -112,7 +121,7 @@ export async function placeWaiterOrder(input: {
     await writeActivityLog({
       tenant_id: tenant.id,
       actor_type: "waiter",
-      actor_label: "Garson",
+      actor_label: actorLabel,
       action: "order_created",
       entity_type: "order",
       entity_id: insertedOrder.id as string,
@@ -122,6 +131,7 @@ export async function placeWaiterOrder(input: {
         fulfillment_type: "dine_in",
         table: tableNumber,
         item_count: lines.length,
+        waiter: actorLabel,
       },
     });
 
@@ -134,4 +144,3 @@ export async function placeWaiterOrder(input: {
     return { ok: false, error: err instanceof Error ? err.message : "Sipariş kaydedilemedi." };
   }
 }
-

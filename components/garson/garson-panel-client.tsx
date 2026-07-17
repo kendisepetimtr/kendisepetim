@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
+import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import { signOutWaiterAction } from "@/app/garson/actions";
 import type { GarsonTableCell } from "@/lib/garson/tables-service";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import type { LocalMenuState } from "@/lib/local-menu";
 
 const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
@@ -41,14 +42,24 @@ const STATUS_COPY: Record<
 
 type GarsonPanelClientProps = {
   businessName: string;
+  subdomain: string;
+  waiterDisplayName: string;
+  menu: LocalMenuState;
   initialTables: GarsonTableCell[];
 };
 
-export default function GarsonPanelClient({ businessName, initialTables }: GarsonPanelClientProps) {
+export default function GarsonPanelClient({
+  businessName,
+  subdomain,
+  waiterDisplayName,
+  menu,
+  initialTables,
+}: GarsonPanelClientProps) {
   const [tables, setTables] = useState(initialTables);
   const [loading, setLoading] = useState(false);
   const [billBusy, setBillBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [orderTable, setOrderTable] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -112,6 +123,7 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
             <h1 className="truncate font-headline text-xl font-extrabold text-on-background sm:text-2xl">
               {businessName}
             </h1>
+            <p className="mt-0.5 truncate text-xs text-secondary">{waiterDisplayName}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
@@ -123,6 +135,14 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
               <span className="material-symbols-outlined text-[18px]">refresh</span>
               {loading ? "…" : "Yenile"}
             </button>
+            <form action={signOutWaiterAction}>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-xs font-semibold text-on-background hover:bg-surface-container-low"
+              >
+                Kullanıcı değiştir
+              </button>
+            </form>
             <form action={signOutWaiterAction}>
               <button
                 type="submit"
@@ -142,7 +162,8 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Masaya dokunarak sipariş alın. Dolu masalarda hesap isteğini kasaya iletebilirsiniz.
+          Masaya dokunarak sipariş alın. Dolu masalarda hesap isteğini kasaya iletebilirsiniz. Fiş basımı kasa /
+          paneldedir.
         </p>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
@@ -151,10 +172,11 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
             const occupied = table.status === "active" || table.status === "bill_requested";
             return (
               <div key={table.tableNumber} className="relative">
-                <Link
-                  href={`/garson/masa/${table.tableNumber}`}
+                <button
+                  type="button"
+                  onClick={() => setOrderTable(table.tableNumber)}
                   className={[
-                    "flex min-h-[120px] flex-col rounded-2xl border p-4 shadow-sm transition",
+                    "flex min-h-[120px] w-full flex-col rounded-2xl border p-4 text-left shadow-sm transition",
                     copy.card,
                   ].join(" ")}
                 >
@@ -174,7 +196,7 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
                   ) : (
                     <p className="mt-auto pt-3 text-xs text-secondary">Sipariş al</p>
                   )}
-                </Link>
+                </button>
                 {occupied && table.status === "active" ? (
                   <button
                     type="button"
@@ -190,6 +212,25 @@ export default function GarsonPanelClient({ businessName, initialTables }: Garso
           })}
         </div>
       </main>
+
+      {orderTable != null ? (
+        <KasaOrderModal
+          open
+          channel="dine_in"
+          tableNumber={orderTable}
+          title={`Masa ${orderTable}`}
+          businessName={businessName}
+          subdomain={subdomain}
+          menu={menu}
+          ordersEndpoint="/api/garson/orders"
+          skipPrint
+          onClose={() => setOrderTable(null)}
+          onOrderPlaced={() => {
+            setOrderTable(null);
+            void refresh();
+          }}
+        />
+      ) : null}
 
       <NotificationToastStack
         toasts={toasts}

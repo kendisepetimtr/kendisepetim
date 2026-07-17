@@ -9,6 +9,8 @@ import { hashStaffPin, isValidStaffPin, verifyStaffPin, type StaffPinRole } from
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { CourierRow } from "@/lib/supabase/courier-types";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
+import type { WaiterPublicRow, WaiterRow } from "@/lib/supabase/waiter-types";
+import { toWaiterPublicRow, waiterDisplayName } from "@/lib/supabase/waiter-types";
 import { revalidatePath } from "next/cache";
 
 export type OperationsSettingsState = {
@@ -17,7 +19,9 @@ export type OperationsSettingsState = {
   hasAdminPin: boolean;
   hasWaiterPin: boolean;
   hasCashierPin: boolean;
+  activeWaiterCount: number;
   couriers: CourierRow[];
+  waiters: WaiterPublicRow[];
   notificationSettings: TenantNotificationSettings;
   receiptSettings: TenantReceiptSettings;
   businessName: string;
@@ -48,6 +52,17 @@ export type CourierInput = {
   isActive: boolean;
 };
 
+export type WaiterInput = {
+  id?: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  isActive: boolean;
+  /** Yeni kayıtta zorunlu; güncellemede boş bırakılırsa PIN değişmez */
+  pin?: string;
+  confirmPin?: string;
+};
+
 function pinHashField(role: StaffPinRole): "owner_admin_pin_hash" | "waiter_pin_hash" | "cashier_pin_hash" {
   if (role === "admin") return "owner_admin_pin_hash";
   if (role === "waiter") return "waiter_pin_hash";
@@ -72,15 +87,16 @@ export async function loadOperationsSettings(): Promise<OperationsSettingsResult
 
   try {
     const svc = createServiceSupabaseClient();
-    const { data: couriers, error } = await svc
-      .from("couriers")
-      .select("*")
-      .eq("tenant_id", tenant.id)
-      .order("last_name")
-      .order("first_name");
+    const [{ data: couriers, error: courierErr }, { data: waiters, error: waiterErr }] = await Promise.all([
+      svc.from("couriers").select("*").eq("tenant_id", tenant.id).order("last_name").order("first_name"),
+      svc.from("waiters").select("*").eq("tenant_id", tenant.id).order("last_name").order("first_name"),
+    ]);
 
-    if (error) return { ok: false, error: error.message };
+    if (courierErr) return { ok: false, error: courierErr.message };
+    if (waiterErr) return { ok: false, error: waiterErr.message };
 
+    const waiterRows = (waiters ?? []) as WaiterRow[];
+    const activeWaiterCount = waiterRows.filter((w) => w.is_active).length;
     const row = tenant as unknown as Record<string, unknown>;
 
     return {
@@ -89,9 +105,11 @@ export async function loadOperationsSettings(): Promise<OperationsSettingsResult
         tableCount: tenant.table_count ?? 0,
         dineInEnabled: tenant.dine_in_enabled === true,
         hasAdminPin: Boolean(tenant.owner_admin_pin_hash),
-        hasWaiterPin: Boolean(tenant.waiter_pin_hash),
+        hasWaiterPin: activeWaiterCount > 0,
         hasCashierPin: Boolean(tenant.cashier_pin_hash),
+        activeWaiterCount,
         couriers: (couriers ?? []) as CourierRow[],
+        waiters: waiterRows.map(toWaiterPublicRow),
         notificationSettings: parseNotificationSettings(row.notification_settings),
         receiptSettings: parseReceiptSettings(row.receipt_settings),
         businessName: tenant.business_name ?? tenant.subdomain,
@@ -159,6 +177,12 @@ export async function updateStaffPin(
   if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
 
   const { role, newPin, confirmPin } = patch;
+  if (role === "waiter") {
+    return {
+      ok: false,
+      error: "Garson PIN'leri artık kişi bazlıdır. Operasyon → Garsonlar bölümünden ekleyin.",
+    };
+  }
   const currentPin = patch.currentPin?.trim() ?? "";
 
   if (!isValidStaffPin(newPin)) {
@@ -382,6 +406,155 @@ export async function deleteCourier(courierId: string): Promise<{ ok: false; err
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Kurye silinemedi.",
+    };
+  }
+}
+
+async function assertWaiterPinUnique(
+  tenantId: string,
+  pin: string,
+  excludeWaiterId?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const svc = createServiceSupabaseClient();
+  const { data, error } = await svc.from("waiters").select("id, pin_hash").eq("tenant_id", tenantId);
+  if (error) return { ok: false, error: error.message };
+  for (const row of (data ?? []) as Pick<WaiterRow, "id" | "pin_hash">[]) {
+    if (excludeWaiterId && row.id === excludeWaiterId) continue;
+    if (verifyStaffPin(pin, row.pin_hash)) {
+      return { ok: false, error: "Bu PIN başka bir garsonda kayıtlı. Farklı 4 haneli PIN seçin." };
+    }
+  }
+  return { ok: true };
+}
+
+export async function upsertWaiter(
+  input: WaiterInput,
+): Promise<{ ok: true; waiter: WaiterPublicRow } | { ok: false; error: string }> {
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  const phone = input.phone.trim();
+  const pin = input.pin?.trim() ?? "";
+  const confirmPin = input.confirmPin?.trim() ?? "";
+
+  if (!firstName || !lastName) {
+    return { ok: false, error: "Garson adı ve soyadı zorunludur." };
+  }
+
+  const isCreate = !input.id;
+  if (isCreate || pin) {
+    if (!isValidStaffPin(pin)) {
+      return { ok: false, error: "PIN tam olarak 4 haneli olmalıdır." };
+    }
+    if (pin !== confirmPin) {
+      return { ok: false, error: "PIN ve tekrar alanı aynı olmalıdır." };
+    }
+    const unique = await assertWaiterPinUnique(tenant.id, pin, input.id);
+    if (!unique.ok) return unique;
+  }
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const basePayload: Record<string, unknown> = {
+      tenant_id: tenant.id,
+      first_name: firstName,
+      last_name: lastName,
+      phone,
+      is_active: input.isActive !== false,
+    };
+
+    if (isCreate) {
+      const pinSetAt = new Date().toISOString();
+      const { data, error } = await svc
+        .from("waiters")
+        .insert({
+          ...basePayload,
+          pin_hash: hashStaffPin(pin),
+          pin_set_at: pinSetAt,
+        })
+        .select("*")
+        .single();
+      if (error || !data) return { ok: false, error: error?.message ?? "Garson eklenemedi." };
+
+      await writeActivityLog({
+        tenant_id: tenant.id,
+        actor_type: "owner",
+        actor_label: tenant.owner_name || "Dashboard",
+        action: "waiter_created",
+        entity_type: "waiter",
+        entity_id: data.id,
+        order_code: null,
+        metadata: { name: waiterDisplayName(data as WaiterRow) },
+      });
+
+      revalidatePath(`/m/${tenant.subdomain}/dashboard`);
+      return { ok: true, waiter: toWaiterPublicRow(data as WaiterRow) };
+    }
+
+    if (pin) {
+      basePayload.pin_hash = hashStaffPin(pin);
+      basePayload.pin_set_at = new Date().toISOString();
+    }
+
+    const { data, error } = await svc
+      .from("waiters")
+      .update(basePayload)
+      .eq("id", input.id!)
+      .eq("tenant_id", tenant.id)
+      .select("*")
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "Garson güncellenemedi." };
+
+    await writeActivityLog({
+      tenant_id: tenant.id,
+      actor_type: "owner",
+      actor_label: tenant.owner_name || "Dashboard",
+      action: "waiter_updated",
+      entity_type: "waiter",
+      entity_id: data.id,
+      order_code: null,
+      metadata: { name: waiterDisplayName(data as WaiterRow), pin_rotated: Boolean(pin) },
+    });
+
+    revalidatePath(`/m/${tenant.subdomain}/dashboard`);
+    return { ok: true, waiter: toWaiterPublicRow(data as WaiterRow) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Garson kaydedilemedi.",
+    };
+  }
+}
+
+export async function deleteWaiter(waiterId: string): Promise<{ ok: false; error: string } | { ok: true }> {
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+  if (!waiterId) return { ok: false, error: "Geçersiz garson." };
+
+  try {
+    const svc = createServiceSupabaseClient();
+    const { error } = await svc.from("waiters").delete().eq("id", waiterId).eq("tenant_id", tenant.id);
+    if (error) return { ok: false, error: error.message };
+
+    await writeActivityLog({
+      tenant_id: tenant.id,
+      actor_type: "owner",
+      actor_label: tenant.owner_name || "Dashboard",
+      action: "waiter_deleted",
+      entity_type: "waiter",
+      entity_id: waiterId,
+      order_code: null,
+      metadata: {},
+    });
+
+    revalidatePath(`/m/${tenant.subdomain}/dashboard`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Garson silinemedi.",
     };
   }
 }

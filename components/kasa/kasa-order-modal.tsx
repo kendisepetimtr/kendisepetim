@@ -67,6 +67,10 @@ export type KasaOrderModalProps = {
   /** Paket/gel-al ödeme beyanı için */
   paymentFlags?: TenantPaymentFlags;
   onOrderPlaced?: () => void;
+  /** Varsayılan: /api/kasa/orders — garson için /api/garson/orders */
+  ordersEndpoint?: string;
+  /** Garson paneli fiş basmaz */
+  skipPrint?: boolean;
 };
 
 export default function KasaOrderModal({
@@ -80,6 +84,8 @@ export default function KasaOrderModal({
   menu,
   paymentFlags,
   onOrderPlaced,
+  ordersEndpoint = "/api/kasa/orders",
+  skipPrint = false,
 }: KasaOrderModalProps) {
   const categories = useMemo(
     () => sortCategoriesForMenu(menu.categories.filter((c) => !c.hidden)),
@@ -394,7 +400,7 @@ export default function KasaOrderModal({
         selectedOptions: l.selectedOptions.length > 0 ? l.selectedOptions : undefined,
       }));
 
-      const response = await fetch("/api/kasa/orders", {
+      const response = await fetch(ordersEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -425,63 +431,65 @@ export default function KasaOrderModal({
         return;
       }
 
-      const fulfillmentLabel =
-        channel === "dine_in"
-          ? `Masa ${tableNumber}`
-          : fulfillmentTypeLabel(channel);
+      if (!skipPrint) {
+        const fulfillmentLabel =
+          channel === "dine_in"
+            ? `Masa ${tableNumber}`
+            : fulfillmentTypeLabel(channel);
 
-      const receipt: ReceiptOrderData = {
-        businessName,
-        subdomain,
-        menuUrl: getPrimaryPublicMenuUrl(subdomain),
-        orderCode: result.orderCode,
-        createdAt: new Date().toISOString(),
-        fulfillmentType: channel,
-        fulfillmentLabel,
-        customerName:
-          channel !== "dine_in"
-            ? [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() || undefined
-            : undefined,
-        customerPhone: channel !== "dine_in" ? customer.phone.trim() || undefined : undefined,
-        customerAddress:
-          channel === "delivery"
-            ? [
-                customer.neighborhood,
-                customer.street,
-                customer.buildingNo && `No:${customer.buildingNo}`,
-                customer.apartmentNo && `D:${customer.apartmentNo}`,
-              ]
-                .filter(Boolean)
-                .join(" ")
-            : undefined,
-        items: lines.map((l) => {
-          const modifiers = [
-            ...(l.selectedOptions ? formatSelectedVariationLabels(l.selectedOptions) : []),
-            ...(l.removedIngredients?.map((r) => `${r} çıkar`) ?? []),
-          ];
-          return {
-            qty: l.qty,
-            name: l.name,
-            unitPrice: l.unitPrice,
-            lineTotal: Math.round(l.unitPrice * l.qty * 100) / 100,
-            modifiers: modifiers.length > 0 ? modifiers : undefined,
-          };
-        }),
-        subtotal: cartTotal,
-        total: cartTotal,
-        paymentMethodLabel: needsDeclaredPayment && payMethod
-          ? paymentMethodLabel(payMethod, mealBrand || undefined)
-          : "Kasada",
-        orderNote: orderNote.trim() || undefined,
-        courierNote: channel === "delivery" ? customer.courierNote.trim() || undefined : undefined,
-      };
+        const receipt: ReceiptOrderData = {
+          businessName,
+          subdomain,
+          menuUrl: getPrimaryPublicMenuUrl(subdomain),
+          orderCode: result.orderCode,
+          createdAt: new Date().toISOString(),
+          fulfillmentType: channel,
+          fulfillmentLabel,
+          customerName:
+            channel !== "dine_in"
+              ? [customer.firstName, customer.lastName].filter(Boolean).join(" ").trim() || undefined
+              : undefined,
+          customerPhone: channel !== "dine_in" ? customer.phone.trim() || undefined : undefined,
+          customerAddress:
+            channel === "delivery"
+              ? [
+                  customer.neighborhood,
+                  customer.street,
+                  customer.buildingNo && `No:${customer.buildingNo}`,
+                  customer.apartmentNo && `D:${customer.apartmentNo}`,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : undefined,
+          items: lines.map((l) => {
+            const modifiers = [
+              ...(l.selectedOptions ? formatSelectedVariationLabels(l.selectedOptions) : []),
+              ...(l.removedIngredients?.map((r) => `${r} çıkar`) ?? []),
+            ];
+            return {
+              qty: l.qty,
+              name: l.name,
+              unitPrice: l.unitPrice,
+              lineTotal: Math.round(l.unitPrice * l.qty * 100) / 100,
+              modifiers: modifiers.length > 0 ? modifiers : undefined,
+            };
+          }),
+          subtotal: cartTotal,
+          total: cartTotal,
+          paymentMethodLabel: needsDeclaredPayment && payMethod
+            ? paymentMethodLabel(payMethod, mealBrand || undefined)
+            : "Kasada",
+          orderNote: orderNote.trim() || undefined,
+          courierNote: channel === "delivery" ? customer.courierNote.trim() || undefined : undefined,
+        };
 
-      const baseOptions = await fetchKasaReceiptPrintOptions();
-      if (baseOptions) {
-        printThermalReceipt(receipt, {
-          ...baseOptions,
-          settings: receiptSettingsForKasaChannel(baseOptions.settings, channel),
-        });
+        const baseOptions = await fetchKasaReceiptPrintOptions();
+        if (baseOptions) {
+          printThermalReceipt(receipt, {
+            ...baseOptions,
+            settings: receiptSettingsForKasaChannel(baseOptions.settings, channel),
+          });
+        }
       }
 
       setCart({});

@@ -14,6 +14,9 @@ export const ACTIVITY_ACTION_LABELS: Record<string, string> = {
   courier_created: "Kurye eklendi",
   courier_updated: "Kurye güncellendi",
   courier_deleted: "Kurye silindi",
+  waiter_created: "Garson eklendi",
+  waiter_updated: "Garson güncellendi",
+  waiter_deleted: "Garson silindi",
   operations_settings_updated: "Operasyon ayarları güncellendi",
   staff_pin_updated: "Personel PIN güncellendi",
   bill_requested: "Hesap istendi",
@@ -38,6 +41,10 @@ export function formatActivityLogSummary(log: ActivityLogRow): string {
   if (typeof meta.table === "number") parts.push(`Masa ${meta.table}`);
   if (typeof meta.fulfillment_type === "string") parts.push(String(meta.fulfillment_type));
   if (typeof meta.courier === "string") parts.push(String(meta.courier));
+  if (typeof meta.name === "string" && (log.action.startsWith("waiter_") || log.action.startsWith("courier_"))) {
+    parts.push(String(meta.name));
+  }
+  if (typeof meta.waiter === "string") parts.push(String(meta.waiter));
   if (typeof meta.method === "string") parts.push(String(meta.method));
   if (typeof meta.from === "string" && typeof meta.to === "string") {
     parts.push(`${meta.from} → ${meta.to}`);
