@@ -28,7 +28,7 @@ import {
   type TenantFulfillmentFlags,
 } from "@/lib/fulfillment";
 import { upsertLocalCustomerByPhone } from "@/lib/local-customers";
-import type { CashierCustomerMatch } from "@/lib/kasa/customer-search";
+import { formatCashierPhonePreview, type CashierCustomerMatch } from "@/lib/kasa/customer-search";
 import { loadQrCheckoutSession, saveQrCheckoutSession } from "@/lib/qr-checkout-session";
 import {
   pickDefaultPaymentMethod,
@@ -797,48 +797,6 @@ export default function CartCheckoutModal({
                   </p>
                 ) : null}
 
-                {isCashierOrder && fulfillmentType === "delivery" && phoneSuggestOpen && phoneSuggestions.length > 0 ? (
-                  <div className="mb-4 overflow-hidden rounded-xl border border-primary/25 bg-white shadow-sm">
-                    <p className="border-b border-surface-container-high px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-secondary">
-                      Kayıtlı numaralar
-                    </p>
-                    <ul className="max-h-48 overflow-y-auto">
-                      {phoneSuggestions.map((m) => (
-                        <li key={`${m.phone}-${m.lastOrderAt}`}>
-                          <button
-                            type="button"
-                            className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-primary/5"
-                            onClick={() => {
-                              setFormValues((v) => ({
-                                ...v,
-                                phone: m.phone,
-                                firstName: m.firstName || v.firstName,
-                                lastName: m.lastName || v.lastName,
-                                neighborhood: m.address.neighborhood || v.neighborhood,
-                                street: m.address.street || v.street,
-                                buildingNo: m.address.buildingNo || v.buildingNo,
-                                buildingName: m.address.buildingName || v.buildingName,
-                                floor: m.address.floor || v.floor,
-                                apartmentNo: m.address.apartmentNo || v.apartmentNo,
-                                livesInSite: m.address.livesInSite,
-                                siteName: m.address.siteName || v.siteName,
-                                block: m.address.block || v.block,
-                              }));
-                              setPhoneSuggestOpen(false);
-                            }}
-                          >
-                            <span className="text-sm font-semibold text-on-background">{m.phone}</span>
-                            <span className="text-xs text-secondary">
-                              {[m.firstName, m.lastName].filter(Boolean).join(" ") || "—"}
-                              {m.orderCount > 1 ? ` · ${m.orderCount} sipariş` : ""}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
                 <CustomerIdentityAddressForm
                   idPrefix={`${baseId}-co`}
                   values={formValues}
@@ -848,6 +806,7 @@ export default function CartCheckoutModal({
                       setPhoneSuggestOpen(true);
                     }
                   }}
+                  phoneFirst={isCashierOrder && fulfillmentType === "delivery"}
                   showPrefillNotice={!isCashierOrder}
                   showOrderNote
                   showCourierNote={
@@ -864,6 +823,54 @@ export default function CartCheckoutModal({
                   locationLoading={locLoading}
                   locationMessage={locMsg}
                   onRequestLocation={handleRequestLocation}
+                  phoneFieldSlot={
+                    isCashierOrder &&
+                    fulfillmentType === "delivery" &&
+                    phoneSuggestOpen &&
+                    phoneSuggestions.length > 0 ? (
+                      <div className="mt-2 overflow-hidden rounded-xl border border-primary/25 bg-white shadow-sm">
+                        <p className="border-b border-surface-container-high px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-secondary">
+                          Eşleşen müşteriler
+                        </p>
+                        <ul className="max-h-48 overflow-y-auto">
+                          {phoneSuggestions.map((m) => (
+                            <li key={`${m.phone}-${m.lastOrderAt}`}>
+                              <button
+                                type="button"
+                                className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-primary/5"
+                                onClick={() => {
+                                  setFormValues((v) => ({
+                                    ...v,
+                                    phone: m.phone,
+                                    firstName: m.firstName || v.firstName,
+                                    lastName: m.lastName || v.lastName,
+                                    neighborhood: m.address.neighborhood || v.neighborhood,
+                                    street: m.address.street || v.street,
+                                    buildingNo: m.address.buildingNo || v.buildingNo,
+                                    buildingName: m.address.buildingName || v.buildingName,
+                                    floor: m.address.floor || v.floor,
+                                    apartmentNo: m.address.apartmentNo || v.apartmentNo,
+                                    livesInSite: m.address.livesInSite,
+                                    siteName: m.address.siteName || v.siteName,
+                                    block: m.address.block || v.block,
+                                  }));
+                                  setPhoneSuggestOpen(false);
+                                }}
+                              >
+                                <span className="font-mono text-sm font-bold tracking-wide text-on-background">
+                                  {formatCashierPhonePreview(m.phone)}
+                                </span>
+                                <span className="text-xs text-secondary">
+                                  {[m.firstName, m.lastName].filter(Boolean).join(" ") || "İsimsiz"}
+                                  {m.orderCount > 1 ? ` · ${m.orderCount} sipariş` : ""}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null
+                  }
                 />
               </div>
 
