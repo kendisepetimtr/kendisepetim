@@ -4,23 +4,34 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { hashOwnerAdminPin, isValidOwnerAdminPin } from "@/lib/owner-admin/pin";
+import {
+  deleteAccountingEntry,
+  upsertAccountingEntry,
+  type AccountingEntryInput,
+} from "@/lib/superadmin/accounting-service";
 import { requireSuperadminOrRedirect } from "@/lib/superadmin/guard";
 import {
   isReservedSubdomain,
   isValidSubdomainFormat,
 } from "@/lib/superadmin/reserved-subdomains";
 import { mintSuperadminToken, SUPERADMIN_COOKIE, superadminCookieOptions } from "@/lib/superadmin/session";
+import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantPlan } from "@/lib/supabase/tenant-types";
 
 export type SuperadminLoginState = { error: string } | null;
+
+function revalidateSuperadminPaths() {
+  revalidatePath("/superadmin");
+  revalidatePath("/superadmin/isletmeler");
+  revalidatePath("/superadmin/muhasebe");
+}
 
 function hashPw(s: string): Buffer {
   return createHash("sha256").update(s, "utf8").digest();
 }
 
-function safeEqualPassword(input: string, expected: string): boolean {
+function safeEqualText(input: string, expected: string): boolean {
   const a = hashPw(input);
   const b = hashPw(expected);
   return a.length === b.length && timingSafeEqual(a, b);
@@ -30,14 +41,19 @@ export async function superadminLoginAction(
   _prev: SuperadminLoginState,
   formData: FormData,
 ): Promise<SuperadminLoginState> {
+  const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const expected = process.env.SUPERADMIN_PASSWORD ?? "";
+  const expectedUser = (process.env.SUPERADMIN_USERNAME ?? "admin").trim();
+  const expectedPassword = process.env.SUPERADMIN_PASSWORD ?? "";
 
-  if (!expected) {
+  if (!expectedPassword) {
     return { error: "Sunucuda SUPERADMIN_PASSWORD tanımlı değil." };
   }
-  if (!password || !safeEqualPassword(password, expected)) {
-    return { error: "Şifre hatalı." };
+  if (!username || !safeEqualText(username, expectedUser)) {
+    return { error: "Kullanıcı adı veya şifre hatalı." };
+  }
+  if (!password || !safeEqualText(password, expectedPassword)) {
+    return { error: "Kullanıcı adı veya şifre hatalı." };
   }
 
   const token = mintSuperadminToken();
@@ -82,7 +98,7 @@ export async function superadminUpdateSubdomain(tenantId: string, subdomainRaw: 
 
   const { error } = await svc.from("tenants").update({ subdomain }).eq("id", tenantId);
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   return {};
 }
 
@@ -92,7 +108,7 @@ export async function superadminSetPlan(tenantId: string, plan: TenantPlan): Pro
   const svc = await guardAndService();
   const { error } = await svc.from("tenants").update({ plan }).eq("id", tenantId);
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   return {};
 }
 
@@ -101,7 +117,7 @@ export async function superadminSetPublicMenu(tenantId: string, enabled: boolean
   const svc = await guardAndService();
   const { error } = await svc.from("tenants").update({ public_menu_enabled: enabled }).eq("id", tenantId);
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   return {};
 }
 
@@ -110,7 +126,7 @@ export async function superadminSetMarketplace(tenantId: string, enabled: boolea
   const svc = await guardAndService();
   const { error } = await svc.from("tenants").update({ marketplace_enabled: enabled }).eq("id", tenantId);
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   revalidatePath("/kesfet");
   revalidatePath("/");
   return {};
@@ -121,7 +137,7 @@ export async function superadminSetDashboard(tenantId: string, enabled: boolean)
   const svc = await guardAndService();
   const { error } = await svc.from("tenants").update({ dashboard_enabled: enabled }).eq("id", tenantId);
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   return {};
 }
 
@@ -145,8 +161,25 @@ export async function superadminSetOwnerAdminPin(
     .eq("id", tenantId);
 
   if (error) return { error: error.message };
-  revalidatePath("/superadmin");
+  revalidateSuperadminPaths();
   revalidatePath("/admin", "layout");
   return {};
 }
 
+export async function superadminUpsertAccountingEntry(
+  input: AccountingEntryInput,
+): Promise<{ error?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await upsertAccountingEntry(input);
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminDeleteAccountingEntry(entryId: string): Promise<{ error?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await deleteAccountingEntry(entryId);
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}

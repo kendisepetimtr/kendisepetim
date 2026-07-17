@@ -1,33 +1,10 @@
-import SuperadminDashboard from "@/components/superadmin/superadmin-dashboard";
+import SuperadminTenantCards from "@/components/superadmin/superadmin-tenant-cards";
 import { requireSuperadminOrRedirect } from "@/lib/superadmin/guard";
+import { SUPERADMIN_TENANT_SELECT } from "@/lib/superadmin/tenant-select";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 
-const SUPERADMIN_TENANT_SELECT = `
-  id,
-  created_at,
-  updated_at,
-  business_name,
-  subdomain,
-  owner_name,
-  email,
-  phone,
-  owner_user_id,
-  logo_url,
-  hours_day_mode,
-  open_time,
-  close_time,
-  payment_cash,
-  payment_door_card,
-  payment_meal_card,
-  plan,
-  public_menu_enabled,
-  dashboard_enabled,
-  marketplace_enabled,
-  owner_admin_pin_set_at
-`;
-
-export default async function SuperadminPage() {
+export default async function SuperadminTenantsPage() {
   await requireSuperadminOrRedirect();
 
   let tenants: TenantRow[] = [];
@@ -51,5 +28,5 @@ export default async function SuperadminPage() {
     loadError = e instanceof Error ? e.message : "Bağlantı hatası.";
   }
 
-  return <SuperadminDashboard initialTenants={tenants} loadError={loadError} />;
+  return <SuperadminTenantCards initialTenants={tenants} loadError={loadError} />;
 }
