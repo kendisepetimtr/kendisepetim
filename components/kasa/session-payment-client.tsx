@@ -12,6 +12,7 @@ import {
   type MealCardBrandId,
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
+import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -30,6 +31,7 @@ type SessionPaymentClientProps = {
 export default function SessionPaymentClient({
   tableNumber,
   businessName,
+  subdomain,
   initialSession,
   paymentFlags,
   onAddItems,
@@ -43,6 +45,7 @@ export default function SessionPaymentClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paidAtLabel, setPaidAtLabel] = useState<string | null>(null);
+  const { printSession, printSessionIfAuto } = useKasaReceiptPrint(businessName, subdomain);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -116,6 +119,16 @@ export default function SessionPaymentClient({
       }
       const when = data.paidAt ? new Date(data.paidAt).toLocaleString("tr-TR") : new Date().toLocaleString("tr-TR");
       setPaidAtLabel(when);
+      const paymentClose = {
+        method: payMethod,
+        mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
+      };
+      await printSessionIfAuto(
+        session.orders,
+        tableNumber,
+        data.sessionTotal ?? session.sessionTotal,
+        paymentClose,
+      );
       window.alert(`Ödeme alındı (${label})\n${when}\nMasa ${tableNumber} kapatıldı.`);
       window.location.href = "/kasa";
     } catch {
@@ -160,6 +173,24 @@ export default function SessionPaymentClient({
               Ürün
             </Link>
           )}
+          <button
+            type="button"
+            disabled={!payMethod || session.orders.length === 0}
+            onClick={() => {
+              if (!payMethod) {
+                window.alert("Önce ödeme yöntemi seçin.");
+                return;
+              }
+              void printSession(session.orders, tableNumber, session.sessionTotal, {
+                method: payMethod,
+                mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
+              });
+            }}
+            className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[20px]">print</span>
+            Fiş
+          </button>
           <button
             type="button"
             onClick={() => void refresh()}

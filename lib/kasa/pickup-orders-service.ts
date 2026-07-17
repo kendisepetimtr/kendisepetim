@@ -67,6 +67,82 @@ export async function loadKasaPickupOrders(
   }
 }
 
+/** Son kapanan gel-al siparişleri (kasa tahtası geçmişi). */
+export async function loadKasaClosedPickupOrders(
+  tenantId: string,
+  limit = 24,
+): Promise<{ ok: true; orders: AdminOrder[] } | { ok: false; error: string }> {
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data: rows, error } = await svc
+      .from("orders")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("fulfillment_type", "pickup")
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+
+    const orderRows = (rows ?? []) as OrderRow[];
+    if (orderRows.length === 0) {
+      return { ok: true, orders: [] };
+    }
+
+    // En son kapananlar üstte (paid_at varsa ona göre)
+    orderRows.sort((a, b) => {
+      const aAt = a.paid_at ?? a.created_at;
+      const bAt = b.paid_at ?? b.created_at;
+      return bAt.localeCompare(aAt);
+    });
+
+    const orderIds = orderRows.map((o) => o.id);
+    const { data: lineRows, error: lineErr } = await svc
+      .from("order_lines")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .in("order_id", orderIds);
+
+    if (lineErr) {
+      return { ok: false, error: lineErr.message };
+    }
+
+    return { ok: true, orders: buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Gel-al geçmişi yüklenemedi." };
+  }
+}
+
+/** Kapanmış gel-al — salt okunur. */
+export async function loadKasaPickupOrderHistoryDetail(
+  tenantId: string,
+  orderId: string,
+): Promise<{ ok: true; order: AdminOrder } | { ok: false; error: string }> {
+  if (!orderId) {
+    return { ok: false, error: "Geçersiz sipariş." };
+  }
+
+  try {
+    const order = await loadOrderWithLines(tenantId, orderId);
+    if (!order) {
+      return { ok: false, error: "Sipariş bulunamadı." };
+    }
+    if (order.fulfillmentType !== "pickup") {
+      return { ok: false, error: "Bu sipariş gel-al değil." };
+    }
+    if (order.status !== "completed" && order.status !== "cancelled") {
+      return { ok: false, error: "Sipariş hâlâ açık." };
+    }
+
+    return { ok: true, order };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Sipariş yüklenemedi." };
+  }
+}
+
 export async function loadKasaPickupOrderDetail(
   tenantId: string,
   orderId: string,

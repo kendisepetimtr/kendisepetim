@@ -254,7 +254,10 @@ export function printThermalReceipt(
 
 export async function fetchKasaReceiptPrintOptions(): Promise<ReceiptPrintOptions | null> {
   try {
-    const res = await fetch("/api/kasa/receipt-settings", { cache: "no-store" });
+    const res = await fetch("/api/kasa/receipt-settings", {
+      cache: "no-store",
+      credentials: "include",
+    });
     const data = (await res.json()) as {
       ok?: boolean;
       settings?: ReceiptPrintOptions["settings"];

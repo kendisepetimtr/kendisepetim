@@ -1,5 +1,6 @@
 "use client";
 
+import { receiptSettingsForKasaChannel } from "@/lib/kasa/receipt-channel";
 import { adminOrderToReceiptData, sessionOrdersToReceiptData } from "@/lib/receipt-order-map";
 import type { AdminOrder } from "@/lib/orders";
 import {
@@ -30,31 +31,54 @@ async function fetchDashboardOrderById(orderId: string): Promise<AdminOrder | nu
   }
 }
 
+/** Kasa: panel ayarlarından bağımsız yazdırabilir; kanal bazlı fiş seti uygulanır. */
+function optionsForKasaOrder(
+  base: ReceiptPrintOptions,
+  order: AdminOrder,
+): ReceiptPrintOptions {
+  return {
+    ...base,
+    settings: receiptSettingsForKasaChannel(base.settings, order.fulfillmentType),
+  };
+}
+
 export function useKasaReceiptPrint(businessName: string, subdomain: string) {
   const optionsRef = useRef<ReceiptPrintOptions | null>(null);
 
-  const loadOptions = useCallback(async () => {
-    if (!optionsRef.current) {
+  const loadOptions = useCallback(async (force = false) => {
+    if (!optionsRef.current || force) {
       optionsRef.current = await fetchKasaReceiptPrintOptions();
     }
     return optionsRef.current;
   }, []);
 
   const printOrder = useCallback(
-    async (order: AdminOrder, paymentAtClose?: PaymentClose) => {
-      const options = await loadOptions();
-      if (!options) return false;
+    async (order: AdminOrder, paymentAtClose?: PaymentClose, opts?: { silent?: boolean }) => {
+      const base = await loadOptions();
+      if (!base) {
+        if (!opts?.silent) {
+          window.alert("Fiş ayarları yüklenemedi. Kasa oturumunu kontrol edin.");
+        }
+        return false;
+      }
+      const options = optionsForKasaOrder(base, order);
       const data = adminOrderToReceiptData(order, businessName, subdomain, paymentAtClose);
-      return printThermalReceipt(data, options);
+      const ok = printThermalReceipt(data, options);
+      if (!ok && !opts?.silent) {
+        window.alert("Fiş yazdırılamadı. Açılır pencere engelini kontrol edin.");
+      }
+      return ok;
     },
     [businessName, subdomain, loadOptions],
   );
 
   const printOrderIfAuto = useCallback(
     async (order: AdminOrder, paymentAtClose?: PaymentClose) => {
-      const options = await loadOptions();
-      if (!options?.settings.enabled || !options.settings.autoPrintOnPayment) return false;
-      return printOrder(order, paymentAtClose);
+      const base = await loadOptions();
+      // Kasa kapanışında: panelde autoPrintOnPayment kapalı olsa bile kasiyer yazdırabilsin diye
+      // manuel buton ayrı; otomatik yalnızca ayar açıksa.
+      if (!base?.settings.autoPrintOnPayment) return false;
+      return printOrder(order, paymentAtClose, { silent: true });
     },
     [loadOptions, printOrder],
   );
@@ -65,9 +89,19 @@ export function useKasaReceiptPrint(businessName: string, subdomain: string) {
       tableNumber: number,
       sessionTotal: number,
       paymentAtClose: PaymentClose,
+      opts?: { silent?: boolean },
     ) => {
-      const options = await loadOptions();
-      if (!options) return false;
+      const base = await loadOptions();
+      if (!base) {
+        if (!opts?.silent) {
+          window.alert("Fiş ayarları yüklenemedi. Kasa oturumunu kontrol edin.");
+        }
+        return false;
+      }
+      const options: ReceiptPrintOptions = {
+        ...base,
+        settings: receiptSettingsForKasaChannel(base.settings, "dine_in"),
+      };
       const data = sessionOrdersToReceiptData(
         orders,
         tableNumber,
@@ -76,7 +110,11 @@ export function useKasaReceiptPrint(businessName: string, subdomain: string) {
         sessionTotal,
         paymentAtClose,
       );
-      return printThermalReceipt(data, options);
+      const ok = printThermalReceipt(data, options);
+      if (!ok && !opts?.silent) {
+        window.alert("Fiş yazdırılamadı. Açılır pencere engelini kontrol edin.");
+      }
+      return ok;
     },
     [businessName, subdomain, loadOptions],
   );
@@ -88,9 +126,9 @@ export function useKasaReceiptPrint(businessName: string, subdomain: string) {
       sessionTotal: number,
       paymentAtClose: PaymentClose,
     ) => {
-      const options = await loadOptions();
-      if (!options?.settings.enabled || !options.settings.autoPrintOnPayment) return false;
-      return printSession(orders, tableNumber, sessionTotal, paymentAtClose);
+      const base = await loadOptions();
+      if (!base?.settings.autoPrintOnPayment) return false;
+      return printSession(orders, tableNumber, sessionTotal, paymentAtClose, { silent: true });
     },
     [loadOptions, printSession],
   );

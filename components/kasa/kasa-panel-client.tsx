@@ -12,6 +12,7 @@ import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import type { LocalMenuState } from "@/lib/local-menu";
 import type { FulfillmentType } from "@/lib/fulfillment";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { paymentMethodLabel } from "@/lib/tenant-payment";
 
 const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
@@ -148,8 +149,8 @@ export default function KasaPanelClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Boş masaya / Gel-Al’a dokunun → sipariş. Dolu masaya dokunun → ödeme (üstten ürün de eklenir). Paket
-          listesinden kurye seçip kapatın.
+          Boş masaya dokunun → sipariş. Dolu masaya → ödeme. Gel-Al: ürün + ödeme; kapananlar gri kartta kalır.
+          Paket listesinden kurye seçip kapatın.
         </p>
 
         {features.dineIn && tables.length > 0 ? (
@@ -206,11 +207,52 @@ export default function KasaPanelClient({
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-secondary">
               Gel-Al{" "}
               <span className="font-normal normal-case tracking-normal text-secondary/80">
-                (açık sipariş + 1 boş)
+                (açık + yeni + kapanan)
               </span>
             </h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {pickupSlots.map((slot) => {
+                if (slot.status === "closed") {
+                  return (
+                    <button
+                      key={`gel-al-closed-${slot.orderId}`}
+                      type="button"
+                      onClick={() => {
+                        window.location.href = `/kasa/gel-al/${slot.orderId}?view=history`;
+                      }}
+                      className="relative flex min-h-[132px] flex-col rounded-2xl border border-slate-400/40 bg-slate-500/10 p-4 text-left shadow-sm transition hover:border-slate-500/55 active:scale-[0.98]"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-headline text-lg font-black text-on-background">
+                          {slot.orderCode ?? `Gel-Al ${slot.slotNumber}`}
+                        </span>
+                        <span className="rounded-full bg-slate-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-800">
+                          Kapalı
+                        </span>
+                      </div>
+                      <p className="mt-2 truncate text-xs font-semibold text-on-background">
+                        {slot.customerLabel}
+                      </p>
+                      {slot.paymentMethodAtClose ? (
+                        <p className="mt-1 text-[11px] text-secondary">
+                          {paymentMethodLabel(slot.paymentMethodAtClose)}
+                        </p>
+                      ) : null}
+                      <p className="mt-auto pt-2 font-headline text-sm font-bold text-on-background">
+                        {formatTry(slot.total)}
+                      </p>
+                      {slot.paidAt ? (
+                        <p className="mt-1 text-[10px] text-secondary">
+                          {new Date(slot.paidAt).toLocaleString("tr-TR", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      ) : null}
+                    </button>
+                  );
+                }
+
                 const occupied = slot.status === "active";
                 return (
                   <div
@@ -261,7 +303,7 @@ export default function KasaPanelClient({
                             Yeni
                           </span>
                         </div>
-                        <p className="mt-auto pt-3 text-xs text-secondary">Dokun → gel-al siparişi</p>
+                        <p className="mt-auto pt-3 text-xs text-secondary">Dokun → ürün + ödeme</p>
                       </button>
                     )}
                   </div>

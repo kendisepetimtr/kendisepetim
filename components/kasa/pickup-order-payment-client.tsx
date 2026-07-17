@@ -13,6 +13,7 @@ import {
   type MealCardBrandId,
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
+import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -21,21 +22,26 @@ function formatTry(n: number): string {
 type PickupOrderPaymentClientProps = {
   order: AdminOrder;
   businessName: string;
+  subdomain: string;
   paymentFlags: TenantPaymentFlags;
+  readOnly?: boolean;
 };
 
 export default function PickupOrderPaymentClient({
   order,
   businessName,
+  subdomain,
   paymentFlags,
+  readOnly = false,
 }: PickupOrderPaymentClientProps) {
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
-    pickDefaultPaymentMethod(paymentFlags, order.paymentMethod),
+    pickDefaultPaymentMethod(paymentFlags, order.paymentMethodAtClose ?? order.paymentMethod),
   );
   const [mealBrand, setMealBrand] = useState<MealCardBrandId | "">(
     order.paymentMethod === "meal_card" && order.mealCardBrandId ? order.mealCardBrandId : "",
   );
   const [submitting, setSubmitting] = useState(false);
+  const { printOrder, printOrderIfAuto } = useKasaReceiptPrint(businessName, subdomain);
 
   async function handleClosePayment() {
     if (!payMethod) {
@@ -49,7 +55,7 @@ export default function PickupOrderPaymentClient({
 
     const label = paymentMethodLabel(payMethod, mealBrand || undefined);
     const ok = window.confirm(
-      `${order.orderCode} — ${formatTry(order.total)}\nÖdeme: ${label}\n\nGel-Al kapatılsın mı? Slot boşalacak.`,
+      `${order.orderCode} — ${formatTry(order.total)}\nÖdeme: ${label}\n\nGel-Al kapatılsın mı?`,
     );
     if (!ok) return;
 
@@ -78,12 +84,88 @@ export default function PickupOrderPaymentClient({
         ? new Date(data.paidAt).toLocaleString("tr-TR")
         : new Date().toLocaleString("tr-TR");
       window.alert(`Teslim edildi.\nÖdeme: ${label}\n${when}\nSipariş: ${data.orderCode ?? order.orderCode}`);
+      await printOrderIfAuto(order, {
+        method: payMethod,
+        mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
+      });
       window.location.href = "/kasa";
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (readOnly) {
+    const closedPay = order.paymentMethodAtClose ?? order.paymentMethod;
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+            <Link
+              href="/kasa"
+              className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
+              aria-label="Geri"
+            >
+              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+            </Link>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Gel-Al · Kapalı</p>
+              <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const closePay = order.paymentMethodAtClose
+                  ? { method: order.paymentMethodAtClose, mealCardBrandId: order.mealCardBrandId }
+                  : undefined;
+                void printOrder(order, closePay);
+              }}
+              className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[20px]">print</span>
+              Fiş
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
+          <div className="rounded-2xl border border-slate-400/40 bg-slate-500/10 px-4 py-3 text-sm font-semibold text-slate-800">
+            Sipariş kapatıldı — salt okunur
+          </div>
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+            <div>
+              <p className="font-mono text-2xl font-black text-on-background">{order.orderCode}</p>
+              <p className="mt-2 text-xs text-secondary">
+                {order.paidAt
+                  ? new Date(order.paidAt).toLocaleString("tr-TR")
+                  : new Date(order.createdAt).toLocaleString("tr-TR")}{" "}
+                · {ORDER_STATUS_LABELS[order.status]}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-on-background">
+                Tahsilat: {paymentMethodLabel(closedPay, order.mealCardBrandId)}
+              </p>
+            </div>
+            <p className="font-headline text-3xl font-black text-primary">{formatTry(order.total)}</p>
+          </div>
+          <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
+            <h2 className="font-headline text-lg font-bold text-on-background">Ürünler</h2>
+            <ul className="mt-4 space-y-2 text-sm">
+              {order.lines.map((line) => (
+                <li key={line.id} className="flex justify-between gap-2 text-on-background">
+                  <span>
+                    {line.qty}× {line.name}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-secondary">
+                    {formatTry(line.unitPrice * line.qty)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -97,10 +179,18 @@ export default function PickupOrderPaymentClient({
           >
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wide text-primary">Gel-Al · Ödeme</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => void printOrder(order)}
+            className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">print</span>
+            Fiş
+          </button>
         </div>
       </header>
 
@@ -108,10 +198,6 @@ export default function PickupOrderPaymentClient({
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
           <div>
             <p className="font-mono text-2xl font-black text-on-background">{order.orderCode}</p>
-            <p className="mt-1 text-sm text-on-background">
-              {order.firstName} {order.lastName}
-            </p>
-            <p className="text-xs text-secondary">{order.phone}</p>
             <p className="mt-2 text-xs text-secondary">
               {new Date(order.createdAt).toLocaleString("tr-TR")} · {ORDER_STATUS_LABELS[order.status]}
             </p>
@@ -142,9 +228,7 @@ export default function PickupOrderPaymentClient({
         </section>
 
         <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
-          <p className="mb-4 text-xs text-secondary">
-            Müşteri beyanı: {paymentMethodLabel(order.paymentMethod, order.mealCardBrandId)}
-          </p>
+          <p className="mb-3 text-sm text-secondary">Ödeme yöntemini seçip siparişi kapatın.</p>
           <CheckoutPaymentSelector
             options={paymentFlags}
             method={payMethod}
@@ -168,7 +252,7 @@ export default function PickupOrderPaymentClient({
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[22px]">payments</span>
-            {submitting ? "Kaydediliyor…" : `Ödemeyi al · Gel-Al kapat (${formatTry(order.total)})`}
+            {submitting ? "Kaydediliyor…" : `Ödemeyi al · Kapat (${formatTry(order.total)})`}
           </button>
         </div>
       </div>

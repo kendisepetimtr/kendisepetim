@@ -35,6 +35,7 @@ export default async function KasaDeliveryOrderPage({ params, searchParams }: Pr
       order={detail.order}
       couriers={detail.couriers}
       businessName={auth.tenant.business_name}
+      subdomain={auth.tenant.subdomain}
       paymentFlags={tenantPaymentFlagsFromRow(auth.tenant)}
       readOnly={historyView || !detail.open}
       courierName={detail.courierName}

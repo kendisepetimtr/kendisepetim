@@ -21,6 +21,7 @@ import {
   type MealCardBrandId,
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
+import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -30,6 +31,7 @@ type DeliveryOrderDetailClientProps = {
   order: AdminOrder;
   couriers: CourierRow[];
   businessName: string;
+  subdomain: string;
   paymentFlags: TenantPaymentFlags;
   readOnly?: boolean;
   courierName?: string | null;
@@ -39,6 +41,7 @@ export default function DeliveryOrderDetailClient({
   order: initialOrder,
   couriers,
   businessName,
+  subdomain,
   paymentFlags,
   readOnly = false,
   courierName = null,
@@ -52,6 +55,7 @@ export default function DeliveryOrderDetailClient({
     order.paymentMethod === "meal_card" && order.mealCardBrandId ? order.mealCardBrandId : "",
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const { printOrder, printOrderIfAuto } = useKasaReceiptPrint(businessName, subdomain);
 
   const currentDeliveryStatus = order.deliveryStatus ?? "pending";
   const assignedCourier = couriers.find((c) => c.id === (selectedCourierId || order.courierId));
@@ -77,10 +81,23 @@ export default function DeliveryOrderDetailClient({
             >
               <span className="material-symbols-outlined text-[24px]">arrow_back</span>
             </Link>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-wide text-primary">Paket · Geçmiş</p>
               <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const closePay = order.paymentMethodAtClose
+                  ? { method: order.paymentMethodAtClose, mealCardBrandId: order.mealCardBrandId }
+                  : undefined;
+                void printOrder(order, closePay);
+              }}
+              className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[20px]">print</span>
+              Fiş
+            </button>
           </div>
         </header>
 
@@ -245,10 +262,10 @@ export default function DeliveryOrderDetailClient({
       return;
     }
 
-    const courierName = assignedCourier ? courierDisplayName(assignedCourier) : "Kurye";
+    const closingCourierName = assignedCourier ? courierDisplayName(assignedCourier) : "Kurye";
     const label = paymentMethodLabel(payMethod, mealBrand || undefined);
     const ok = window.confirm(
-      `${order.orderCode} — ${formatTry(order.total)}\nKurye: ${courierName}\nÖdeme: ${label}\n\nTeslim + tahsilat onaylansın mı?`,
+      `${order.orderCode} — ${formatTry(order.total)}\nKurye: ${closingCourierName}\nÖdeme: ${label}\n\nTeslim + tahsilat onaylansın mı?`,
     );
     if (!ok) return;
 
@@ -279,8 +296,12 @@ export default function DeliveryOrderDetailClient({
         ? new Date(data.paidAt).toLocaleString("tr-TR")
         : new Date().toLocaleString("tr-TR");
       window.alert(
-        `Teslim edildi.\nKurye: ${courierName}\nÖdeme: ${label}\n${when}\nSipariş: ${data.orderCode ?? order.orderCode}`,
+        `Teslim edildi.\nKurye: ${closingCourierName}\nÖdeme: ${label}\n${when}\nSipariş: ${data.orderCode ?? order.orderCode}`,
       );
+      await printOrderIfAuto(order, {
+        method: payMethod,
+        mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
+      });
       window.location.href = "/kasa/paket";
     } catch {
       window.alert("Bağlantı hatası.");
@@ -300,10 +321,22 @@ export default function DeliveryOrderDetailClient({
           >
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wide text-primary">Paket · Ödeme</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
           </div>
+          <button
+            type="button"
+            disabled={busy === "print"}
+            onClick={() => {
+              setBusy("print");
+              void printOrder(order).finally(() => setBusy(null));
+            }}
+            className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95 disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-[20px]">print</span>
+            Fiş
+          </button>
         </div>
       </header>
 
