@@ -9,6 +9,7 @@ const NAV = [
   { href: "/superadmin", label: "Genel bakış", icon: "dashboard" },
   { href: "/superadmin/isletmeler", label: "İşletmeler", icon: "storefront" },
   { href: "/superadmin/muhasebe", label: "Muhasebe", icon: "account_balance" },
+  { href: "/superadmin/hesap", label: "Hesap", icon: "manage_accounts" },
 ] as const;
 
 type SuperadminShellProps = {

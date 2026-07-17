@@ -12,17 +12,17 @@ export default function SuperadminLoginForm() {
       className="space-y-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-8 shadow-sm"
     >
       <div className="space-y-2">
-        <label htmlFor="sa-username" className="block text-sm font-semibold text-on-background">
-          Kullanıcı adı
+        <label htmlFor="sa-email" className="block text-sm font-semibold text-on-background">
+          E-posta
         </label>
         <input
-          id="sa-username"
-          name="username"
-          type="text"
+          id="sa-email"
+          name="email"
+          type="email"
           autoComplete="username"
           required
           className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-on-background shadow-sm outline-none transition-[box-shadow,border-color] focus:border-primary focus:ring-2 focus:ring-primary/20"
-          placeholder="admin"
+          placeholder="ks@admin.com"
         />
       </div>
 

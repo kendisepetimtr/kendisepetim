@@ -1,6 +1,5 @@
 "use server";
 
-import { createHash, timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -10,12 +9,13 @@ import {
   upsertAccountingEntry,
   type AccountingEntryInput,
 } from "@/lib/superadmin/accounting-service";
+import { signInSuperadminWithPassword, signOutSuperadmin } from "@/lib/superadmin/auth";
 import { requireSuperadminOrRedirect } from "@/lib/superadmin/guard";
 import {
   isReservedSubdomain,
   isValidSubdomainFormat,
 } from "@/lib/superadmin/reserved-subdomains";
-import { mintSuperadminToken, SUPERADMIN_COOKIE, superadminCookieOptions } from "@/lib/superadmin/session";
+import { SUPERADMIN_COOKIE } from "@/lib/superadmin/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantPlan } from "@/lib/supabase/tenant-types";
 
@@ -25,47 +25,28 @@ function revalidateSuperadminPaths() {
   revalidatePath("/superadmin");
   revalidatePath("/superadmin/isletmeler");
   revalidatePath("/superadmin/muhasebe");
-}
-
-function hashPw(s: string): Buffer {
-  return createHash("sha256").update(s, "utf8").digest();
-}
-
-function safeEqualText(input: string, expected: string): boolean {
-  const a = hashPw(input);
-  const b = hashPw(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  revalidatePath("/superadmin/hesap");
 }
 
 export async function superadminLoginAction(
   _prev: SuperadminLoginState,
   formData: FormData,
 ): Promise<SuperadminLoginState> {
-  const username = String(formData.get("username") ?? "").trim();
+  const email = String(formData.get("email") ?? formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const expectedUser = (process.env.SUPERADMIN_USERNAME ?? "admin").trim();
-  const expectedPassword = process.env.SUPERADMIN_PASSWORD ?? "";
 
-  if (!expectedPassword) {
-    return { error: "Sunucuda SUPERADMIN_PASSWORD tanımlı değil." };
-  }
-  if (!username || !safeEqualText(username, expectedUser)) {
-    return { error: "Kullanıcı adı veya şifre hatalı." };
-  }
-  if (!password || !safeEqualText(password, expectedPassword)) {
-    return { error: "Kullanıcı adı veya şifre hatalı." };
-  }
+  const result = await signInSuperadminWithPassword(email, password);
+  if (!result.ok) return { error: result.error };
 
-  const token = mintSuperadminToken();
-  if (!token) {
-    return { error: "SUPERADMIN_SESSION_SECRET eksik veya çok kısa (en az 16 karakter)." };
-  }
+  // Eski HMAC çerezini temizle (geçiş)
   const jar = await cookies();
-  jar.set(SUPERADMIN_COOKIE, token, superadminCookieOptions());
+  jar.delete(SUPERADMIN_COOKIE);
+
   redirect("/superadmin");
 }
 
 export async function superadminLogoutAction(): Promise<void> {
+  await signOutSuperadmin();
   const jar = await cookies();
   jar.delete(SUPERADMIN_COOKIE);
   redirect("/superadmin/giris");

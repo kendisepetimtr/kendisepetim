@@ -1,16 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SUPERADMIN_COOKIE, verifySuperadminToken } from "@/lib/superadmin/session";
+import { getSuperadminAuthUser } from "@/lib/superadmin/auth";
 
 export async function requireSuperadminOrRedirect(): Promise<void> {
-  const jar = await cookies();
-  const raw = jar.get(SUPERADMIN_COOKIE)?.value;
-  if (!verifySuperadminToken(raw)) {
+  const user = await getSuperadminAuthUser();
+  if (!user) {
     redirect("/superadmin/giris");
   }
 }
 
 export async function getSuperadminSessionValid(): Promise<boolean> {
-  const jar = await cookies();
-  return verifySuperadminToken(jar.get(SUPERADMIN_COOKIE)?.value);
+  return (await getSuperadminAuthUser()) != null;
 }

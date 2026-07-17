@@ -18,7 +18,7 @@ export default async function SuperadminLoginPage() {
         <div className="mb-10 text-center">
           <p className="font-headline text-xs font-bold uppercase tracking-widest text-primary">KendiSepetim</p>
           <h1 className="mt-2 font-headline text-2xl font-extrabold tracking-tight">Süperadmin</h1>
-          <p className="mt-2 text-sm text-secondary">Yalnızca yetkili erişim</p>
+          <p className="mt-2 text-sm text-secondary">Supabase hesabınızla giriş yapın</p>
         </div>
         <SuperadminLoginForm />
       </div>
