@@ -18,10 +18,18 @@ export default async function TenantKasaPanelPage({ params }: { params: Promise<
     redirect(getDefaultKasaPath(features));
   }
 
+  const reportDayConfig = {
+    hoursDayMode: (auth.tenant.hours_day_mode === "shift" ? "shift" : "calendar") as "calendar" | "shift",
+    openTime: auth.tenant.open_time,
+    closeTime: auth.tenant.close_time,
+  };
+
   const [board, menu] = await Promise.all([
     loadKasaBoard(auth.tenant.id, auth.tenant.table_count ?? 0, {
       dineInEnabled: features.dineIn,
       pickupEnabled: features.pickup,
+      dayOffset: 0,
+      reportDayConfig,
     }),
     loadVisibleMenuForTenant(auth.tenant.id),
   ]);
@@ -34,6 +42,9 @@ export default async function TenantKasaPanelPage({ params }: { params: Promise<
       features={features}
       initialTables={board.ok ? board.board.tables : []}
       initialPickupSlots={board.ok ? board.board.pickupSlots : []}
+      initialClosedOrders={board.ok ? board.board.closedOrders : []}
+      initialDayStrip={board.ok ? board.board.dayStrip : []}
+      initialDayModeLabel={board.ok ? board.board.dayModeLabel : "Takvim günü"}
       menu={menu}
       paymentFlags={tenantPaymentFlagsFromRow(auth.tenant)}
     />

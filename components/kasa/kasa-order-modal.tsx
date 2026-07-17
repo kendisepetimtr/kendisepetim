@@ -86,7 +86,7 @@ export default function KasaOrderModal({
     [menu.categories],
   );
   const products = useMemo(() => menu.products.filter((p) => !p.hidden), [menu.products]);
-  const needsDeclaredPayment = channel === "delivery" || channel === "pickup";
+  const needsDeclaredPayment = channel === "delivery";
   const resolvedPaymentFlags = useMemo<TenantPaymentFlags>(
     () =>
       paymentFlags ?? {
@@ -778,25 +778,17 @@ export default function KasaOrderModal({
           </div>
 
           <div className="shrink-0 space-y-3 border-t border-surface-container-highest p-4">
-            {channel === "pickup" ? (
-              <CheckoutPaymentSelector
-                options={resolvedPaymentFlags}
-                method={payMethod}
-                mealCardBrandId={mealBrand}
-                onMethodChange={(m) => {
-                  setPayMethod(m);
-                  if (m !== "meal_card") setMealBrand("");
-                }}
-                onMealCardBrandChange={setMealBrand}
-                labelVariant="counter"
-              />
-            ) : null}
             {channel === "delivery" && step === "customer" && payMethod ? (
               <p className="text-xs text-secondary">
                 Ödeme:{" "}
                 <span className="font-semibold text-on-background">
                   {paymentMethodLabel(payMethod, mealBrand || undefined)}
                 </span>
+              </p>
+            ) : null}
+            {channel === "pickup" ? (
+              <p className="text-xs text-secondary">
+                Sipariş açık kalır; müşteri gelince kasada ödeme alınır.
               </p>
             ) : null}
             <label className="block">

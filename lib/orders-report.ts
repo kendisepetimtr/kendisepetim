@@ -49,19 +49,91 @@ export function getReportDayKey(d: Date, config?: ReportDayConfig): string {
   return localDayKey(getReportDayStart(d, config));
 }
 
+export type ReportDayRange = {
+  start: Date;
+  end: Date;
+  dayKey: string;
+  offsetDays: number;
+};
+
+/** offsetDays=0 bugünkü iş günü, 1 dün, … */
+export function getReportDayRange(
+  offsetDays: number,
+  config?: ReportDayConfig,
+  now: Date = new Date(),
+): ReportDayRange {
+  const start = getReportDayStart(now, config);
+  start.setDate(start.getDate() - offsetDays);
+  const end = new Date(start.getTime());
+  end.setDate(end.getDate() + 1);
+  return { start, end, dayKey: localDayKey(start), offsetDays };
+}
+
+export type ReportDayStripItem = {
+  offsetDays: number;
+  dayKey: string;
+  label: string;
+  shortLabel: string;
+};
+
+/** Tarih çubuğu: Bugün / Dün / … (seçili gün sonu moduna göre). */
+export function buildReportDayStrip(
+  dayCount = 7,
+  config?: ReportDayConfig,
+  now: Date = new Date(),
+): ReportDayStripItem[] {
+  const count = Math.max(1, Math.min(31, dayCount));
+  const items: ReportDayStripItem[] = [];
+  for (let offset = 0; offset < count; offset++) {
+    const { start, dayKey } = getReportDayRange(offset, config, now);
+    const shortLabel =
+      offset === 0 ? "Bugün" : offset === 1 ? "Dün" : start.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+    const weekday = start.toLocaleDateString("tr-TR", { weekday: "short" });
+    const datePart = start.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+    const label =
+      offset === 0
+        ? `Bugün · ${datePart}`
+        : offset === 1
+          ? `Dün · ${datePart}`
+          : `${weekday} · ${datePart}`;
+    items.push({ offsetDays: offset, dayKey, label, shortLabel });
+  }
+  return items;
+}
+
+export function reportDayModeLabel(config?: ReportDayConfig): string {
+  return config?.hoursDayMode === "shift" ? "Vardiya / mesai" : "Takvim günü";
+}
+
+/** Kapanış ödemesi varsa onu kullan (ciro / ödeme dağılımı). */
+export function effectivePaymentMethod(order: AdminOrder): CheckoutPaymentMethod {
+  return order.paymentMethodAtClose ?? order.paymentMethod;
+}
+
 export function getOrdersForRelativeReportDay(
   orders: AdminOrder[],
   offsetDays: number,
   config?: ReportDayConfig,
   now: Date = new Date(),
 ): AdminOrder[] {
-  const start = getReportDayStart(now, config);
-  start.setDate(start.getDate() - offsetDays);
-  const end = new Date(start.getTime());
-  end.setDate(end.getDate() + 1);
+  const { start, end } = getReportDayRange(offsetDays, config, now);
   return orders.filter((order) => {
     const createdAt = orderAt(order);
     return createdAt >= start && createdAt < end;
+  });
+}
+
+/** Kapanış anına (paid_at) göre iş günü filtresi; yoksa created_at. */
+export function filterOrdersByPaidReportDay(
+  orders: AdminOrder[],
+  offsetDays: number,
+  config?: ReportDayConfig,
+  now: Date = new Date(),
+): AdminOrder[] {
+  const { start, end } = getReportDayRange(offsetDays, config, now);
+  return orders.filter((order) => {
+    const at = new Date(order.paidAt || order.createdAt);
+    return at >= start && at < end;
   });
 }
 
@@ -109,10 +181,31 @@ export type OrdersReportSummary = {
   byDay: DaySeriesRow[];
 };
 
-const PAYMENT_ORDER: CheckoutPaymentMethod[] = ["cash", "door_card", "meal_card"];
+const PAYMENT_ORDER: CheckoutPaymentMethod[] = ["cash", "door_card", "meal_card", "havale"];
 
 function lineRevenue(qty: number, unitPrice: number): number {
   return Math.round(qty * unitPrice * 100) / 100;
+}
+
+export type ChannelRevenueBucket = { count: number; revenue: number };
+export type ChannelRevenueSummary = Record<"pickup" | "delivery" | "dine_in", ChannelRevenueBucket>;
+
+export function buildChannelRevenueSummary(orders: AdminOrder[]): ChannelRevenueSummary {
+  const buckets: ChannelRevenueSummary = {
+    pickup: { count: 0, revenue: 0 },
+    delivery: { count: 0, revenue: 0 },
+    dine_in: { count: 0, revenue: 0 },
+  };
+  for (const order of orders) {
+    if (order.status === "cancelled") continue;
+    const bucket = buckets[order.fulfillmentType];
+    bucket.count += 1;
+    bucket.revenue += Number.isFinite(order.total) ? order.total : 0;
+  }
+  for (const key of Object.keys(buckets) as (keyof ChannelRevenueSummary)[]) {
+    buckets[key].revenue = Math.round(buckets[key].revenue * 100) / 100;
+  }
+  return buckets;
 }
 
 export function buildOrdersReportSummary(orders: AdminOrder[], config?: ReportDayConfig): OrdersReportSummary {
@@ -126,10 +219,12 @@ export function buildOrdersReportSummary(orders: AdminOrder[], config?: ReportDa
     paymentMap.set(method, { orderCount: 0, revenue: 0 });
   }
   for (const order of orders) {
-    const current = paymentMap.get(order.paymentMethod) ?? { orderCount: 0, revenue: 0 };
+    if (order.status === "cancelled") continue;
+    const method = effectivePaymentMethod(order);
+    const current = paymentMap.get(method) ?? { orderCount: 0, revenue: 0 };
     current.orderCount += 1;
     current.revenue += Number.isFinite(order.total) ? order.total : 0;
-    paymentMap.set(order.paymentMethod, current);
+    paymentMap.set(method, current);
   }
 
   const byPayment = PAYMENT_ORDER.map((method) => {

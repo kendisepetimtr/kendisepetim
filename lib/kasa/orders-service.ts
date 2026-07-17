@@ -135,7 +135,7 @@ export async function placeCashierOrder(
   let paymentMethod: CheckoutPaymentMethod = "cash";
   let mealCardBrandId: MealCardBrandId | null = null;
 
-  if (fulfillmentType === "delivery" || fulfillmentType === "pickup") {
+  if (fulfillmentType === "delivery") {
     const requested = input.paymentMethod;
     if (requested !== "cash" && requested !== "door_card" && requested !== "meal_card" && requested !== "havale") {
       return { ok: false, error: "Ödeme yöntemi seçin." };
@@ -159,6 +159,9 @@ export async function placeCashierOrder(
       mealCardBrandId = input.mealCardBrandId!;
     }
     paymentMethod = requested;
+  } else if (fulfillmentType === "pickup") {
+    // Gel-al: sipariş açık kalır; tahsilat kasa kapatırken belirlenir.
+    paymentMethod = "cash";
   }
 
   try {

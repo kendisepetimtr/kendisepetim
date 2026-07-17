@@ -7,10 +7,15 @@ import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import {
+  buildChannelRevenueSummary,
   buildOrdersReportSummary,
+  buildReportDayStrip,
+  effectivePaymentMethod,
+  filterOrdersByPaidReportDay,
   filterOrdersByPeriod,
   formatTry,
   getOrdersForRelativeReportDay,
+  reportDayModeLabel,
   type ReportPeriod,
   type ReportDayConfig,
 } from "@/lib/orders-report";
@@ -25,8 +30,9 @@ import {
   ACTIVITY_ACTOR_LABELS,
   formatActivityLogSummary,
 } from "@/lib/dashboard/activity-log-labels";
-import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { fulfillmentTypeLabel, type FulfillmentType } from "@/lib/fulfillment";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
+import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 
 const PERIODS: { id: ReportPeriod; label: string }[] = [
   { id: "7d", label: "Son 7 gün" },
@@ -41,6 +47,13 @@ const STATUS_FILTERS: { id: "all" | OrderStatus; label: string }[] = [
   { id: "preparing", label: "Hazırlanıyor" },
   { id: "completed", label: "Tamamlandı" },
   { id: "cancelled", label: "İptal" },
+];
+
+const CHANNEL_FILTERS: { id: "all" | FulfillmentType; label: string }[] = [
+  { id: "all", label: "Tümü" },
+  { id: "pickup", label: "Gel-al" },
+  { id: "dine_in", label: "Masa" },
+  { id: "delivery", label: "Paket" },
 ];
 
 const STATUS_LABELS = ORDER_STATUS_LABELS;
@@ -312,6 +325,7 @@ function OverviewSection({
                       {order.orderCode} · {order.firstName} {order.lastName}
                     </p>
                     <p className="mt-1 text-xs text-secondary">
+                      {fulfillmentTypeLabel(order.fulfillmentType)} ·{" "}
                       {new Date(order.createdAt).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" })}
                     </p>
                   </div>
@@ -411,21 +425,6 @@ function OverviewSection({
   );
 }
 
-function channelRevenueSummary(orders: AdminOrder[]) {
-  const buckets = {
-    pickup: { count: 0, revenue: 0 },
-    delivery: { count: 0, revenue: 0 },
-    dine_in: { count: 0, revenue: 0 },
-  };
-  for (const order of orders) {
-    if (order.status === "cancelled") continue;
-    const bucket = buckets[order.fulfillmentType];
-    bucket.count += 1;
-    bucket.revenue += order.total;
-  }
-  return buckets;
-}
-
 function LogsSection({ logs }: { logs: ActivityLogRow[] }) {
   const [actionFilter, setActionFilter] = useState<string>("all");
 
@@ -501,6 +500,7 @@ function LogsSection({ logs }: { logs: ActivityLogRow[] }) {
 }
 
 export default function OwnerAdminPanel({
+  tenantId,
   businessName,
   subdomain,
   logoUrl,
@@ -511,6 +511,7 @@ export default function OwnerAdminPanel({
   initialOrders,
   initialLogs,
 }: {
+  tenantId: string;
   businessName: string;
   subdomain: string;
   logoUrl: string | null;
@@ -526,6 +527,8 @@ export default function OwnerAdminPanel({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>("7d");
   const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const [channelFilter, setChannelFilter] = useState<"all" | FulfillmentType>("all");
+  const [ordersDayOffset, setOrdersDayOffset] = useState(0);
   const [openId, setOpenId] = useState<string | null>(initialOrders[0]?.id ?? null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -536,14 +539,73 @@ export default function OwnerAdminPanel({
     [hoursDayMode, openTime, closeTime],
   );
 
+  useTenantOpsRealtime({
+    tenantId,
+    actions: [
+      "order_created",
+      "bill_requested",
+      "payment_closed",
+      "order_cancelled",
+      "order_status_updated",
+      "delivery_completed",
+      "delivery_status_updated",
+    ],
+    onEvent: () => {
+      router.refresh();
+    },
+  });
+
   const filteredByPeriod = useMemo(
     () => filterOrdersByPeriod(initialOrders, period, new Date(), reportDayConfig),
     [initialOrders, period, reportDayConfig],
   );
-  const filteredOrders = useMemo(
-    () => (statusFilter === "all" ? filteredByPeriod : filteredByPeriod.filter((order) => order.status === statusFilter)),
-    [filteredByPeriod, statusFilter],
+
+  const dayStrip = useMemo(() => buildReportDayStrip(7, reportDayConfig), [reportDayConfig]);
+  const dayModeHint = reportDayModeLabel(reportDayConfig);
+
+  const openOrdersLive = useMemo(
+    () => initialOrders.filter((order) => ["new", "confirmed", "preparing"].includes(order.status)),
+    [initialOrders],
   );
+  const closedOrdersForDay = useMemo(
+    () =>
+      filterOrdersByPaidReportDay(
+        initialOrders.filter((order) => order.status === "completed"),
+        ordersDayOffset,
+        reportDayConfig,
+      ),
+    [initialOrders, ordersDayOffset, reportDayConfig],
+  );
+
+  const ordersTabPool = useMemo(() => {
+    const closedIds = new Set(closedOrdersForDay.map((o) => o.id));
+    const openPart = openOrdersLive;
+    const closedPart = closedOrdersForDay;
+    const cancelledSameDay = filterOrdersByPaidReportDay(
+      initialOrders.filter((o) => o.status === "cancelled"),
+      ordersDayOffset,
+      reportDayConfig,
+    ).filter((o) => !closedIds.has(o.id));
+    return [...openPart, ...closedPart, ...cancelledSameDay];
+  }, [openOrdersLive, closedOrdersForDay, initialOrders, ordersDayOffset, reportDayConfig]);
+
+  const filteredOrders = useMemo(() => {
+    let list = ordersTabPool;
+    if (channelFilter !== "all") list = list.filter((order) => order.fulfillmentType === channelFilter);
+    if (statusFilter !== "all") list = list.filter((order) => order.status === statusFilter);
+    return list;
+  }, [ordersTabPool, channelFilter, statusFilter]);
+
+  const ordersDaySummary = useMemo(() => {
+    const completed = closedOrdersForDay;
+    return {
+      channel: buildChannelRevenueSummary(completed),
+      payment: buildOrdersReportSummary(completed, reportDayConfig).byPayment,
+      openCount: openOrdersLive.length,
+      closedCount: completed.length,
+    };
+  }, [closedOrdersForDay, openOrdersLive.length, reportDayConfig]);
+
   const summary = useMemo(
     () => buildOrdersReportSummary(filteredByPeriod, reportDayConfig),
     [filteredByPeriod, reportDayConfig],
@@ -575,7 +637,7 @@ export default function OwnerAdminPanel({
     });
   }
 
-  const channelSummary = useMemo(() => channelRevenueSummary(filteredByPeriod), [filteredByPeriod]);
+  const channelSummary = useMemo(() => buildChannelRevenueSummary(filteredByPeriod), [filteredByPeriod]);
 
   const headerTitle = getNavLabel(activeNav);
   const headerSubtitle =
@@ -812,7 +874,7 @@ export default function OwnerAdminPanel({
 
                   <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
                     <h2 className="font-headline text-lg font-bold text-on-background">Günlük ciro</h2>
-                    <p className="mt-1 text-xs text-secondary">Yerel güne göre hesaplanır</p>
+                    <p className="mt-1 text-xs text-secondary">Yerel / iş gününe göre ({reportDayModeLabel(reportDayConfig)})</p>
                     {summary.byDay.length === 0 ? (
                       <p className="mt-6 text-sm text-secondary">Bu aralıkta gün kaydı yok.</p>
                     ) : (
@@ -880,15 +942,116 @@ export default function OwnerAdminPanel({
 
             {activeNav === "orders" ? (
               <div className="space-y-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">
                       Siparişler
                     </h1>
                     <p className="mt-2 max-w-2xl text-sm text-secondary">
-                      Salt okunur sipariş görünümü. Admin panelinde yalnızca iptal yapılabilir; operasyon dashboard
-                      ve personel panellerinden yönetilir.
+                      Açık siparişler anlık; kapananlar seçili iş gününe göre. Canlı yenilenir (bildirim yok). Gün
+                      bölümü: {dayModeHint}.
                     </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {dayStrip.map((day) => {
+                    const active = day.offsetDays === ordersDayOffset;
+                    return (
+                      <button
+                        key={day.dayKey}
+                        type="button"
+                        onClick={() => setOrdersDayOffset(day.offsetDays)}
+                        className={[
+                          "shrink-0 rounded-xl border px-3 py-2 text-left transition",
+                          active
+                            ? "border-on-background bg-on-background text-white"
+                            : "border-surface-container-highest bg-surface-container-lowest text-secondary hover:border-primary/40",
+                        ].join(" ")}
+                      >
+                        <span className="block text-xs font-bold">{day.shortLabel}</span>
+                        <span className={["mt-0.5 block text-[10px]", active ? "text-white/70" : ""].join(" ")}>
+                          {day.label.replace(/^Bugün · |^Dün · /, "")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Açık</p>
+                    <p className="mt-1 font-headline text-2xl font-extrabold text-on-background">
+                      {ordersDaySummary.openCount}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Kapanan (gün)</p>
+                    <p className="mt-1 font-headline text-2xl font-extrabold text-on-background">
+                      {ordersDaySummary.closedCount}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Gel-al</p>
+                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
+                      {formatTry(ordersDaySummary.channel.pickup.revenue)}
+                    </p>
+                    <p className="text-xs text-secondary">{ordersDaySummary.channel.pickup.count} sipariş</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Masa</p>
+                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
+                      {formatTry(ordersDaySummary.channel.dine_in.revenue)}
+                    </p>
+                    <p className="text-xs text-secondary">{ordersDaySummary.channel.dine_in.count} sipariş</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Paket</p>
+                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
+                      {formatTry(ordersDaySummary.channel.delivery.revenue)}
+                    </p>
+                    <p className="text-xs text-secondary">{ordersDaySummary.channel.delivery.count} sipariş</p>
+                  </div>
+                  {ordersDaySummary.payment.map((row) => (
+                    <div
+                      key={row.method}
+                      className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
+                        {paymentMethodLabel(row.method)}
+                      </p>
+                      <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
+                        {formatTry(row.revenue)}
+                      </p>
+                      <p className="text-xs text-secondary">{row.orderCount} sipariş</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div
+                    className="inline-flex flex-wrap rounded-xl border border-surface-container-highest bg-surface-container-low p-1"
+                    role="group"
+                    aria-label="Kanal filtresi"
+                  >
+                    {CHANNEL_FILTERS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setChannelFilter(item.id)}
+                        className={[
+                          "rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:text-sm",
+                          channelFilter === item.id
+                            ? "bg-primary text-white shadow-sm"
+                            : "text-secondary hover:bg-white hover:text-on-background",
+                        ].join(" ")}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
                   </div>
                   <div
                     className="inline-flex flex-wrap rounded-xl border border-surface-container-highest bg-surface-container-low p-1"
@@ -917,7 +1080,9 @@ export default function OwnerAdminPanel({
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="font-headline text-xl font-bold text-on-background">Sipariş listesi</h2>
-                      <p className="mt-1 text-sm text-secondary">Filtreye uyan toplam {filteredOrders.length} kayıt</p>
+                      <p className="mt-1 text-sm text-secondary">
+                        Filtreye uyan {filteredOrders.length} kayıt · açıklar her zaman + seçili günün kapananları
+                      </p>
                     </div>
                     {pending ? <p className="text-xs font-semibold text-primary">İşlem yapılıyor…</p> : null}
                   </div>
@@ -932,10 +1097,21 @@ export default function OwnerAdminPanel({
                     <ul className="mt-6 space-y-3">
                       {filteredOrders.map((order) => {
                         const expanded = openId === order.id;
+                        const payMethod = effectivePaymentMethod(order);
+                        const isOpen = ["new", "confirmed", "preparing"].includes(order.status);
                         return (
                           <li
                             key={order.id}
-                            className="overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest"
+                            className={[
+                              "overflow-hidden rounded-2xl border bg-surface-container-lowest",
+                              isOpen
+                                ? "border-primary/25"
+                                : order.fulfillmentType === "pickup"
+                                  ? "border-sky-500/30"
+                                  : order.fulfillmentType === "delivery"
+                                    ? "border-amber-500/30"
+                                    : "border-emerald-500/30",
+                            ].join(" ")}
                           >
                             <button
                               type="button"
@@ -947,12 +1123,17 @@ export default function OwnerAdminPanel({
                                   {order.orderCode} · {order.firstName} {order.lastName}
                                 </p>
                                 <p className="mt-1 text-xs text-secondary">
-                                  {fulfillmentTypeLabel(order.fulfillmentType)} ·{" "}
+                                  {fulfillmentTypeLabel(order.fulfillmentType)}
+                                  {order.fulfillmentType === "dine_in" && order.tableNumber != null
+                                    ? ` ${order.tableNumber}`
+                                    : ""}{" "}
+                                  ·{" "}
                                   {new Date(order.createdAt).toLocaleString("tr-TR", {
                                     dateStyle: "short",
                                     timeStyle: "short",
                                   })}{" "}
-                                  · {paymentMethodLabel(order.paymentMethod, order.mealCardBrandId)}
+                                  · {paymentMethodLabel(payMethod, order.mealCardBrandId)}
+                                  {order.paymentMethodAtClose && order.status === "completed" ? " (tahsilat)" : ""}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3">

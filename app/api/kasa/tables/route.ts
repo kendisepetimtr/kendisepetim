@@ -5,7 +5,7 @@ import { getKasaFeatures } from "@/lib/kasa/kasa-access";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await getAuthenticatedCashierTenantByCookie();
   if (!auth.ok) {
     const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
@@ -20,13 +20,27 @@ export async function GET() {
       tableCount: 0,
       tables: [],
       pickupSlots: [],
+      closedOrders: [],
+      closedDayOffset: 0,
+      dayStrip: [],
+      dayModeLabel: "Takvim günü",
       features,
     });
   }
 
+  const url = new URL(request.url);
+  const dayOffsetRaw = Number(url.searchParams.get("dayOffset") ?? "0");
+  const dayOffset = Number.isFinite(dayOffsetRaw) ? Math.max(0, Math.min(30, Math.floor(dayOffsetRaw))) : 0;
+
   const result = await loadKasaBoard(auth.tenant.id, auth.tenant.table_count ?? 0, {
     dineInEnabled: features.dineIn,
     pickupEnabled: features.pickup,
+    dayOffset,
+    reportDayConfig: {
+      hoursDayMode: auth.tenant.hours_day_mode === "shift" ? "shift" : "calendar",
+      openTime: auth.tenant.open_time,
+      closeTime: auth.tenant.close_time,
+    },
   });
 
   if (!result.ok) {
@@ -39,6 +53,10 @@ export async function GET() {
     tableCount: auth.tenant.table_count ?? 0,
     tables: result.board.tables,
     pickupSlots: result.board.pickupSlots,
+    closedOrders: result.board.closedOrders,
+    closedDayOffset: result.board.closedDayOffset,
+    dayStrip: result.board.dayStrip,
+    dayModeLabel: result.board.dayModeLabel,
     features,
   });
 }

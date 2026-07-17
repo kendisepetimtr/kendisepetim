@@ -5,14 +5,16 @@ import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
 import type { GarsonTableCell } from "@/lib/garson/tables-service";
-import type { KasaPickupSlot } from "@/lib/kasa/board-service";
+import type { KasaClosedOrderCard, KasaPickupSlot } from "@/lib/kasa/board-service";
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
 import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
 import type { LocalMenuState } from "@/lib/local-menu";
 import type { FulfillmentType } from "@/lib/fulfillment";
+import { fulfillmentTypeLabel } from "@/lib/fulfillment";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
+import type { ReportDayStripItem } from "@/lib/orders-report";
 
 const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
@@ -46,6 +48,27 @@ const STATUS_COPY: Record<
   },
 };
 
+const CLOSED_CHANNEL_STYLE: Record<
+  FulfillmentType,
+  { card: string; chip: string; chipLabel: string }
+> = {
+  dine_in: {
+    card: "border-emerald-600/35 bg-emerald-600/10 hover:border-emerald-600/55",
+    chip: "bg-emerald-700/15 text-emerald-950",
+    chipLabel: "Masa",
+  },
+  pickup: {
+    card: "border-sky-600/40 bg-sky-600/10 hover:border-sky-600/60",
+    chip: "bg-sky-700/15 text-sky-950",
+    chipLabel: "Gel-Al",
+  },
+  delivery: {
+    card: "border-amber-600/35 bg-amber-600/10 hover:border-amber-600/55",
+    chip: "bg-amber-700/15 text-amber-950",
+    chipLabel: "Paket",
+  },
+};
+
 type OrderTarget =
   | { channel: "dine_in"; tableNumber: number }
   | { channel: "pickup" }
@@ -58,9 +81,18 @@ type KasaPanelClientProps = {
   features: KasaFeatures;
   initialTables: GarsonTableCell[];
   initialPickupSlots: KasaPickupSlot[];
+  initialClosedOrders: KasaClosedOrderCard[];
+  initialDayStrip: ReportDayStripItem[];
+  initialDayModeLabel: string;
   menu: LocalMenuState;
   paymentFlags: TenantPaymentFlags;
 };
+
+function closedOrderHref(card: KasaClosedOrderCard): string | null {
+  if (card.fulfillmentType === "pickup") return `/kasa/gel-al/${card.orderId}?view=history`;
+  if (card.fulfillmentType === "delivery") return `/kasa/paket/${card.orderId}?view=history`;
+  return null;
+}
 
 export default function KasaPanelClient({
   businessName,
@@ -69,23 +101,37 @@ export default function KasaPanelClient({
   features,
   initialTables,
   initialPickupSlots,
+  initialClosedOrders,
+  initialDayStrip,
+  initialDayModeLabel,
   menu,
   paymentFlags,
 }: KasaPanelClientProps) {
   const [tables, setTables] = useState(initialTables);
   const [pickupSlots, setPickupSlots] = useState(initialPickupSlots);
+  const [closedOrders, setClosedOrders] = useState(initialClosedOrders);
+  const [dayStrip, setDayStrip] = useState(initialDayStrip);
+  const [dayModeLabel, setDayModeLabel] = useState(initialDayModeLabel);
+  const [dayOffset, setDayOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [orderTarget, setOrderTarget] = useState<OrderTarget | null>(null);
   const [channelPickerOpen, setChannelPickerOpen] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (offset = dayOffset) => {
     setError(null);
     try {
-      const res = await fetch("/api/kasa/tables", { cache: "no-store", credentials: "include" });
+      const res = await fetch(`/api/kasa/tables?dayOffset=${offset}`, {
+        cache: "no-store",
+        credentials: "include",
+      });
       const data = (await res.json()) as {
         ok?: boolean;
         tables?: GarsonTableCell[];
         pickupSlots?: KasaPickupSlot[];
+        closedOrders?: KasaClosedOrderCard[];
+        dayStrip?: ReportDayStripItem[];
+        dayModeLabel?: string;
+        closedDayOffset?: number;
         error?: string;
       };
       if (!res.ok || !data.ok) {
@@ -94,15 +140,19 @@ export default function KasaPanelClient({
       }
       setTables(data.tables ?? []);
       setPickupSlots(data.pickupSlots ?? []);
+      setClosedOrders(data.closedOrders ?? []);
+      setDayStrip(data.dayStrip ?? []);
+      setDayModeLabel(data.dayModeLabel ?? "Takvim günü");
+      if (typeof data.closedDayOffset === "number") setDayOffset(data.closedDayOffset);
     } catch {
       setError("Bağlantı hatası.");
     }
-  }, []);
+  }, [dayOffset]);
 
   const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
     streamUrl: "/api/kasa/notifications/stream",
     refreshOnActions: REFRESH_ON_ACTIONS,
-    onRefresh: refresh,
+    onRefresh: () => void refresh(),
     crossClientPresence: { role: "kasa", scope: subdomain },
   });
 
@@ -111,6 +161,11 @@ export default function KasaPanelClient({
     actions: REFRESH_ON_ACTIONS,
     onEvent: () => void refresh(),
   });
+
+  function selectClosedDay(offset: number) {
+    setDayOffset(offset);
+    void refresh(offset);
+  }
 
   function openBasket() {
     const options: FulfillmentType[] = [];
@@ -149,8 +204,8 @@ export default function KasaPanelClient({
         ) : null}
 
         <p className="mb-5 text-sm text-secondary">
-          Boş masaya dokunun → sipariş. Dolu masaya → ödeme. Gel-Al: ürün + ödeme; kapananlar gri kartta kalır.
-          Paket listesinden kurye seçip kapatın.
+          Boş masaya dokunun → sipariş. Dolu masaya → ödeme. Gel-Al: sipariş açılır, fiş basılır; müşteri gelince
+          ödeme alınır ve kapatılır. Kapananlar aşağıda, seçili iş gününe göre listelenir.
         </p>
 
         {features.dineIn && tables.length > 0 ? (
@@ -203,56 +258,15 @@ export default function KasaPanelClient({
         ) : null}
 
         {features.pickup ? (
-          <section>
+          <section className="mb-10">
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-secondary">
               Gel-Al{" "}
               <span className="font-normal normal-case tracking-normal text-secondary/80">
-                (açık + yeni + kapanan)
+                (açık siparişler — ödeme sonra)
               </span>
             </h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {pickupSlots.map((slot) => {
-                if (slot.status === "closed") {
-                  return (
-                    <button
-                      key={`gel-al-closed-${slot.orderId}`}
-                      type="button"
-                      onClick={() => {
-                        window.location.href = `/kasa/gel-al/${slot.orderId}?view=history`;
-                      }}
-                      className="relative flex min-h-[132px] flex-col rounded-2xl border border-slate-400/40 bg-slate-500/10 p-4 text-left shadow-sm transition hover:border-slate-500/55 active:scale-[0.98]"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-headline text-lg font-black text-on-background">
-                          {slot.orderCode ?? `Gel-Al ${slot.slotNumber}`}
-                        </span>
-                        <span className="rounded-full bg-slate-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-800">
-                          Kapalı
-                        </span>
-                      </div>
-                      <p className="mt-2 truncate text-xs font-semibold text-on-background">
-                        {slot.customerLabel}
-                      </p>
-                      {slot.paymentMethodAtClose ? (
-                        <p className="mt-1 text-[11px] text-secondary">
-                          {paymentMethodLabel(slot.paymentMethodAtClose)}
-                        </p>
-                      ) : null}
-                      <p className="mt-auto pt-2 font-headline text-sm font-bold text-on-background">
-                        {formatTry(slot.total)}
-                      </p>
-                      {slot.paidAt ? (
-                        <p className="mt-1 text-[10px] text-secondary">
-                          {new Date(slot.paidAt).toLocaleString("tr-TR", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })}
-                        </p>
-                      ) : null}
-                    </button>
-                  );
-                }
-
                 const occupied = slot.status === "active";
                 return (
                   <div
@@ -303,7 +317,7 @@ export default function KasaPanelClient({
                             Yeni
                           </span>
                         </div>
-                        <p className="mt-auto pt-3 text-xs text-secondary">Dokun → ürün + ödeme</p>
+                        <p className="mt-auto pt-3 text-xs text-secondary">Dokun → sipariş + fiş</p>
                       </button>
                     )}
                   </div>
@@ -312,6 +326,97 @@ export default function KasaPanelClient({
             </div>
           </section>
         ) : null}
+
+        <section>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-secondary">Kapanan siparişler</h2>
+              <p className="mt-1 text-xs text-secondary">
+                {dayModeLabel} · masa yeşil, gel-al mavi, paket turuncu
+              </p>
+            </div>
+          </div>
+
+          {dayStrip.length > 0 ? (
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              {dayStrip.map((day) => {
+                const active = day.offsetDays === dayOffset;
+                return (
+                  <button
+                    key={day.dayKey}
+                    type="button"
+                    onClick={() => selectClosedDay(day.offsetDays)}
+                    className={[
+                      "shrink-0 rounded-xl border px-3 py-2 text-left transition",
+                      active
+                        ? "border-on-background bg-on-background text-white"
+                        : "border-surface-container-highest bg-surface-container-lowest text-secondary hover:border-primary/40 hover:text-on-background",
+                    ].join(" ")}
+                  >
+                    <span className="block text-xs font-bold">{day.shortLabel}</span>
+                    <span className={["mt-0.5 block text-[10px]", active ? "text-white/70" : "text-secondary"].join(" ")}>
+                      {day.label.replace(/^Bugün · |^Dün · /, "")}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {closedOrders.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/50 px-5 py-10 text-center text-sm text-secondary">
+              Bu iş gününde kapanan sipariş yok.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {closedOrders.map((card) => {
+                const style = CLOSED_CHANNEL_STYLE[card.fulfillmentType];
+                const href = closedOrderHref(card);
+                return (
+                  <button
+                    key={`closed-${card.orderId}`}
+                    type="button"
+                    disabled={!href}
+                    onClick={() => {
+                      if (!href) return;
+                      window.location.href = href;
+                    }}
+                    className={[
+                      "relative flex min-h-[132px] flex-col rounded-2xl border p-4 text-left shadow-sm transition",
+                      style.card,
+                      href ? "active:scale-[0.98]" : "cursor-default",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-headline text-lg font-black text-on-background">{card.orderCode}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${style.chip}`}>
+                        {style.chipLabel}
+                      </span>
+                    </div>
+                    <p className="mt-2 truncate text-xs font-semibold text-on-background">{card.customerLabel}</p>
+                    <p className="mt-0.5 text-[10px] text-secondary">{fulfillmentTypeLabel(card.fulfillmentType)}</p>
+                    {card.paymentMethodAtClose ? (
+                      <p className="mt-1 text-[11px] text-secondary">
+                        {paymentMethodLabel(card.paymentMethodAtClose)}
+                      </p>
+                    ) : null}
+                    <p className="mt-auto pt-2 font-headline text-sm font-bold text-on-background">
+                      {formatTry(card.total)}
+                    </p>
+                    {card.paidAt ? (
+                      <p className="mt-1 text-[10px] text-secondary">
+                        {new Date(card.paidAt).toLocaleString("tr-TR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </p>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </main>
 
       {channelPickerOpen ? (

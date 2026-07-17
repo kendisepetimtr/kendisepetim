@@ -33,6 +33,7 @@ export default async function TenantAdminDashboardPage({ params }: { params: Pro
 
   return (
     <OwnerAdminPanel
+      tenantId={tenant.id}
       businessName={tenant.business_name}
       subdomain={tenant.subdomain}
       logoUrl={tenant.logo_url}
