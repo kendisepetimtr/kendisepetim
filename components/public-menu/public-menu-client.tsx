@@ -326,349 +326,488 @@ export default function PublicMenuClient({
 
   const activeCategory = effectiveTab !== "all" ? visibleCategories.find((c) => c.id === effectiveTab) : null;
   const sectionHeading = activeCategory?.name ?? "Sizin İçin Seçtiklerimiz";
+  /** Public / masa QR: web'de sol marka + sağ ızgara. Kasa/garson dar mobil kabukta kalır. */
+  const desktopSplit = !staffChrome;
 
-  return (
-    <div className="relative mx-auto min-h-screen max-w-md bg-background pb-28 font-body text-on-background">
-      <header className="bg-surface-container-lowest px-6 pb-6 pt-10">
-        {businessCoverImageUrl ? (
-          <div className="-mx-6 mb-6 overflow-hidden">
-            <div className="relative h-44">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={businessCoverImageUrl} alt="" className="h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
-            </div>
-          </div>
-        ) : null}
-        <div className="mb-6 flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            {businessLogoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={businessLogoUrl}
-                alt=""
-                className="h-16 w-16 shrink-0 rounded-2xl border border-surface-container-high bg-white object-contain shadow-sm"
-              />
-            ) : null}
-            <div className="min-w-0">
-              <h1 className="font-headline text-3xl font-extrabold tracking-tighter text-primary">{title}</h1>
-              {isTableMenu && !waiterMode && !cashierMode ? (
-                <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                  <span className="material-symbols-outlined text-[16px]">table_restaurant</span>
-                  Masa {tableNumber}
-                </p>
-              ) : null}
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                {openStatus === null ? (
-                  <>
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-secondary/40" aria-hidden />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
-                      Çalışma saati bilgisi yok
-                    </span>
-                  </>
-                ) : openStatus ? (
-                  <>
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
-                      Şu an açık
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-amber-800">
-                      Şu an kapalı
-                    </span>
-                  </>
-                )}
-                {hoursRangeLabel ? (
-                  <span className="rounded-full bg-surface-container-low px-2 py-1 text-[11px] font-semibold text-secondary">
-                    {hoursRangeLabel}
-                  </span>
-                ) : null}
-              </div>
-              {publicDescription ? (
-                <p className="mt-2 max-w-xs text-sm leading-relaxed text-secondary">{publicDescription}</p>
-              ) : null}
-              {openStatus === false ? (
-                <p className="mt-2 max-w-xs text-xs leading-relaxed text-amber-900">
-                  {closedMessage}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            {googleMapsUrl ? (
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex rounded-2xl bg-surface-container-high p-3 text-on-surface transition-transform active:scale-95"
-                aria-label="Konumu Google Maps'te ac"
-                title="Konum"
-              >
-                <span className="material-symbols-outlined">location_on</span>
-              </a>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => void pwaInstall.handleInstallClick()}
-              disabled={pwaInstall.isInstalled}
-              className={[
-                "inline-flex min-h-11 items-center justify-center rounded-2xl border px-3 py-2 text-xs font-bold transition",
-                pwaInstall.isInstalled
-                  ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-primary/15 bg-primary/8 text-primary hover:bg-primary/12",
-              ].join(" ")}
-              aria-label={pwaInstall.buttonLabel}
-              title={pwaInstall.buttonLabel}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
-              </span>
-            </button>
-          </div>
-        </div>
-        <div className="relative mt-4">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
-            search
-          </span>
-          <input
-            className="w-full rounded-2xl border-none bg-surface-container-low py-4 pl-12 pr-4 font-medium text-on-surface placeholder:text-secondary focus:ring-2 focus:ring-primary/20"
-            placeholder="Lezzet keşfine çık..."
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
-      </header>
+  const searchField = (
+    <div className="relative">
+      <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+        search
+      </span>
+      <input
+        className="w-full rounded-2xl border-none bg-surface-container-low py-4 pl-12 pr-4 font-medium text-on-surface placeholder:text-secondary focus:ring-2 focus:ring-primary/20"
+        placeholder="Lezzet keşfine çık..."
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        autoComplete="off"
+      />
+    </div>
+  );
 
-      {visibleCategories.length > 0 ? (
-        <nav className="sticky top-0 z-50 border-b border-surface-container-highest bg-surface-container-lowest/95 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-surface-container-lowest/80">
-          <div className="flex space-x-6 overflow-x-auto scroll-smooth px-6 py-4">
-            <button
-              type="button"
-              onClick={() => setTab("all")}
-              className={[
-                "flex-shrink-0 pb-1 font-headline text-lg tracking-tight",
-                effectiveTab === "all"
-                  ? "border-b-2 border-primary font-bold text-primary"
-                  : "font-medium text-secondary transition-colors hover:text-primary",
-              ].join(" ")}
-            >
-              Popüler
-            </button>
-            {visibleCategories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setTab(c.id)}
-                className={[
-                  "flex-shrink-0 pb-1 font-headline text-lg tracking-tight",
-                  effectiveTab === c.id
-                    ? "border-b-2 border-primary font-bold text-primary"
-                    : "font-medium text-secondary transition-colors hover:text-primary",
-                ].join(" ")}
-              >
-                {categoryLabel(c)}
-              </button>
-            ))}
-          </div>
-        </nav>
-      ) : null}
-
-      <main className="space-y-8 overflow-x-hidden px-6 pt-6">
-        {heroProduct ? (
-          <section className="grid grid-cols-1 gap-4">
-            <div className="group relative h-64 overflow-hidden rounded-3xl">
-              {heroProduct.imageDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  className="absolute inset-0 h-full w-full object-cover"
-                  src={heroProduct.imageDataUrl}
-                  alt=""
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary-container/40" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6">
-                <span className="mb-2 inline-block rounded-md bg-primary px-2 py-1 text-[10px] font-black uppercase text-white">
-                  İmza lezzet
-                </span>
-                <h2 className="font-headline text-2xl font-extrabold leading-tight text-white">{heroProduct.name}</h2>
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="text-sm font-medium text-white/80 line-clamp-2">
-                    {heroProduct.description ||
-                      parseIngredientLines(heroProduct.ingredients).slice(0, 2).join(" · ")}
-                  </p>
-                  <span className="text-xl font-black text-white">{formatTry(getPrimaryMenuDisplayPrice(heroProduct, fulfillmentFlags))}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section>
-          <h3
+  const categoryNav = visibleCategories.length > 0 ? (
+    <nav
+      className={[
+        "z-50 border-b border-surface-container-highest bg-surface-container-lowest/95 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-surface-container-lowest/80",
+        desktopSplit ? "sticky top-0 lg:static lg:border-0 lg:bg-transparent lg:shadow-none lg:backdrop-blur-none" : "sticky top-0",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "flex space-x-6 overflow-x-auto scroll-smooth px-6 py-4",
+          desktopSplit ? "lg:px-0 lg:pb-3 lg:pt-0" : "",
+        ].join(" ")}
+      >
+        <button
+          type="button"
+          onClick={() => setTab("all")}
+          className={[
+            "flex-shrink-0 pb-1 font-headline text-lg tracking-tight",
+            effectiveTab === "all"
+              ? "border-b-2 border-primary font-bold text-primary"
+              : "font-medium text-secondary transition-colors hover:text-primary",
+          ].join(" ")}
+        >
+          Popüler
+        </button>
+        {visibleCategories.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setTab(c.id)}
             className={[
-              "flex items-center gap-2 font-headline text-xl font-bold",
-              activeCategory?.description ? "mb-2" : "mb-6",
+              "flex-shrink-0 pb-1 font-headline text-lg tracking-tight",
+              effectiveTab === c.id
+                ? "border-b-2 border-primary font-bold text-primary"
+                : "font-medium text-secondary transition-colors hover:text-primary",
             ].join(" ")}
           >
-            {sectionHeading}
-            <span className="h-1 w-12 rounded-full bg-primary" />
-          </h3>
-          {activeCategory?.description ? (
-            <p className="mb-6 text-sm leading-relaxed text-secondary">{activeCategory.description}</p>
+            {categoryLabel(c)}
+          </button>
+        ))}
+      </div>
+    </nav>
+  ) : null;
+
+  return (
+    <div
+      className={[
+        "relative min-h-screen bg-background font-body text-on-background",
+        desktopSplit
+          ? "mx-auto max-w-md pb-28 lg:max-w-7xl lg:px-6 lg:pb-12 lg:pt-8"
+          : "mx-auto max-w-md pb-28",
+      ].join(" ")}
+    >
+      <div
+        className={
+          desktopSplit
+            ? "lg:grid lg:grid-cols-[minmax(280px,22rem)_minmax(0,1fr)] lg:items-start lg:gap-10"
+            : undefined
+        }
+      >
+        <header
+          className={[
+            "bg-surface-container-lowest px-6 pb-6 pt-10",
+            desktopSplit
+              ? "lg:sticky lg:top-8 lg:self-start lg:overflow-hidden lg:rounded-3xl lg:border lg:border-surface-container-highest lg:px-0 lg:pb-6 lg:pt-0 lg:shadow-sm"
+              : "",
+          ].join(" ")}
+        >
+          {businessCoverImageUrl ? (
+            <div
+              className={[
+                "mb-6 overflow-hidden",
+                desktopSplit ? "-mx-6 lg:mx-0 lg:mb-0" : "-mx-6",
+              ].join(" ")}
+            >
+              <div className={desktopSplit ? "relative h-44 lg:h-52" : "relative h-44"}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={businessCoverImageUrl} alt="" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
+              </div>
+            </div>
           ) : null}
-          {gridProducts.length === 0 ? (
-            <p className="rounded-2xl bg-surface-container-low px-4 py-6 text-center text-sm text-secondary">
-              {visibleProducts.length === 0
-                ? "Bu işletme için henüz görünür ürün yok. Panelden menü ekleyebilirsiniz."
-                : "Aramanızla eşleşen ürün yok."}
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {gridProducts.map((p) => (
-                <div
-                  key={p.id}
-                  className="group rounded-3xl bg-surface-container-lowest p-3 transition-transform duration-200 active:scale-95"
+          <div
+            className={[
+              "mb-6 flex items-start justify-between gap-3",
+              desktopSplit ? "lg:mb-0 lg:flex-col lg:px-6 lg:pt-6" : "",
+            ].join(" ")}
+          >
+            <div
+              className={[
+                "flex min-w-0 flex-1 items-start gap-3",
+                desktopSplit ? "lg:flex-col lg:items-stretch lg:gap-4" : "",
+              ].join(" ")}
+            >
+              {businessLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={businessLogoUrl}
+                  alt=""
+                  className={[
+                    "shrink-0 rounded-2xl border border-surface-container-high bg-white object-contain shadow-sm",
+                    desktopSplit ? "h-16 w-16 lg:h-20 lg:w-20" : "h-16 w-16",
+                  ].join(" ")}
+                />
+              ) : null}
+              <div className="min-w-0">
+                <h1
+                  className={[
+                    "font-headline font-extrabold tracking-tighter text-primary",
+                    desktopSplit ? "text-3xl lg:text-4xl" : "text-3xl",
+                  ].join(" ")}
                 >
-                  <div className="relative mb-3 h-40 overflow-hidden rounded-2xl">
-                    <button
-                      type="button"
-                      className="block h-full w-full text-left"
-                      aria-label={`${p.name} detaylarını aç`}
-                      onClick={() => setPreviewProduct(p)}
-                    >
-                      {p.imageDataUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="h-full w-full object-cover" src={p.imageDataUrl} alt="" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-surface-container-low text-secondary">
-                          <span className="material-symbols-outlined text-4xl opacity-40">restaurant</span>
-                        </div>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow-sm backdrop-blur"
-                      aria-label={favorites.has(p.id) ? "Favoriden çıkar" : "Favorilere ekle"}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewProduct(null);
-                        toggleFavorite(p.id);
-                      }}
-                    >
-                      <span
-                        className={[
-                          "material-symbols-outlined text-lg",
-                          favorites.has(p.id) ? "text-primary" : "text-secondary",
-                        ].join(" ")}
-                        style={favorites.has(p.id) ? { fontVariationSettings: "'FILL' 1" } : undefined}
-                      >
-                        favorite
-                      </span>
-                    </button>
-                    <ProductWarningIcons product={p} />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewProduct(p)}
-                    className="block w-full text-left"
-                  >
-                    <h4 className="line-clamp-1 text-sm font-bold text-on-surface">{p.name}</h4>
-                  </button>
-                  <p className="mb-3 min-h-[4.5rem] text-[13px] leading-relaxed text-secondary line-clamp-4">
-                    {p.description ||
-                      parseIngredientLines(p.ingredients)
-                        .slice(0, 3)
-                        .join(" · ")}
+                  {title}
+                </h1>
+                {isTableMenu && !waiterMode && !cashierMode ? (
+                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                    <span className="material-symbols-outlined text-[16px]">table_restaurant</span>
+                    Masa {tableNumber}
                   </p>
-                  <div className="flex items-center justify-between">
-                    <span className="font-black text-primary">{formatTry(getPrimaryMenuDisplayPrice(p, fulfillmentFlags))}</span>
-                    <button
-                      type="button"
+                ) : null}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {openStatus === null ? (
+                    <>
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-secondary/40" aria-hidden />
+                      <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
+                        Çalışma saati bilgisi yok
+                      </span>
+                    </>
+                  ) : openStatus ? (
+                    <>
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                      <span className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                        Şu an açık
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                      <span className="text-xs font-semibold uppercase tracking-widest text-amber-800">
+                        Şu an kapalı
+                      </span>
+                    </>
+                  )}
+                  {hoursRangeLabel ? (
+                    <span className="rounded-full bg-surface-container-low px-2 py-1 text-[11px] font-semibold text-secondary">
+                      {hoursRangeLabel}
+                    </span>
+                  ) : null}
+                </div>
+                {publicDescription ? (
+                  <p
+                    className={[
+                      "mt-2 text-sm leading-relaxed text-secondary",
+                      desktopSplit ? "max-w-xs lg:max-w-none" : "max-w-xs",
+                    ].join(" ")}
+                  >
+                    {publicDescription}
+                  </p>
+                ) : null}
+                {openStatus === false ? (
+                  <p
+                    className={[
+                      "mt-2 text-xs leading-relaxed text-amber-900",
+                      desktopSplit ? "max-w-xs lg:max-w-none" : "max-w-xs",
+                    ].join(" ")}
+                  >
+                    {closedMessage}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div
+              className={[
+                "flex shrink-0 flex-col items-end gap-2",
+                desktopSplit ? "lg:mt-5 lg:w-full lg:flex-row lg:items-stretch lg:justify-start" : "",
+              ].join(" ")}
+            >
+              {googleMapsUrl ? (
+                <a
+                  href={googleMapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={[
+                    "inline-flex rounded-2xl bg-surface-container-high p-3 text-on-surface transition-transform active:scale-95",
+                    desktopSplit ? "lg:flex-1 lg:items-center lg:justify-center lg:gap-2 lg:px-4" : "",
+                  ].join(" ")}
+                  aria-label="Konumu Google Maps'te ac"
+                  title="Konum"
+                >
+                  <span className="material-symbols-outlined">location_on</span>
+                  {desktopSplit ? (
+                    <span className="hidden text-xs font-bold lg:inline">Harita</span>
+                  ) : null}
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void pwaInstall.handleInstallClick()}
+                disabled={pwaInstall.isInstalled}
+                className={[
+                  "inline-flex min-h-11 items-center justify-center rounded-2xl border px-3 py-2 text-xs font-bold transition",
+                  pwaInstall.isInstalled
+                    ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-primary/15 bg-primary/8 text-primary hover:bg-primary/12",
+                  desktopSplit ? "lg:flex-1 lg:gap-2" : "",
+                ].join(" ")}
+                aria-label={pwaInstall.buttonLabel}
+                title={pwaInstall.buttonLabel}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
+                </span>
+                {desktopSplit ? (
+                  <span className="hidden lg:inline">
+                    {pwaInstall.isInstalled ? "Yüklü" : "Uygulama"}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+          </div>
+          <div className={desktopSplit ? "mt-4 lg:hidden" : "relative mt-4"}>{searchField}</div>
+        </header>
+
+        <div className={desktopSplit ? "lg:min-w-0" : undefined}>
+          {desktopSplit ? <div className="mb-4 hidden px-0 pt-0 lg:block">{searchField}</div> : null}
+          {categoryNav}
+
+          <main
+            className={[
+              "space-y-8 overflow-x-hidden px-6 pt-6",
+              desktopSplit ? "lg:px-0 lg:pt-4" : "",
+            ].join(" ")}
+          >
+            {heroProduct ? (
+              <section className="grid grid-cols-1 gap-4">
+                <div
+                  className={[
+                    "group relative overflow-hidden rounded-3xl",
+                    desktopSplit ? "h-64 lg:h-72" : "h-64",
+                  ].join(" ")}
+                >
+                  {heroProduct.imageDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className="absolute inset-0 h-full w-full object-cover"
+                      src={heroProduct.imageDataUrl}
+                      alt=""
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary-container/40" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <span className="mb-2 inline-block rounded-md bg-primary px-2 py-1 text-[10px] font-black uppercase text-white">
+                      İmza lezzet
+                    </span>
+                    <h2
                       className={[
-                        "rounded-xl p-2 text-white",
-                        orderingEnabled ? "bg-primary-container" : "cursor-not-allowed bg-surface-container-high text-secondary",
+                        "font-headline font-extrabold leading-tight text-white",
+                        desktopSplit ? "text-2xl lg:text-3xl" : "text-2xl",
                       ].join(" ")}
-                      aria-label={`Sepete ekle: ${p.name}`}
-                      aria-disabled={!orderingEnabled}
-                      title={orderingEnabled ? undefined : "Restoran kapalı"}
-                      disabled={!orderingEnabled}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestAddToCart(p);
-                      }}
                     >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                    </button>
+                      {heroProduct.name}
+                    </h2>
+                    <div className="mt-2 flex items-center justify-between gap-4">
+                      <p className="text-sm font-medium text-white/80 line-clamp-2">
+                        {heroProduct.description ||
+                          parseIngredientLines(heroProduct.ingredients).slice(0, 2).join(" · ")}
+                      </p>
+                      <span className="shrink-0 text-xl font-black text-white">
+                        {formatTry(getPrimaryMenuDisplayPrice(heroProduct, fulfillmentFlags))}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-        {googleMapsUrl ? (
-          <section className="rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-on-background">Konum</p>
-                <p className="mt-1 text-xs leading-relaxed text-secondary">
-                  Restoran konumunu Google Maps uzerinde acabilir ve yol tarifi alabilirsiniz.
-                </p>
-              </div>
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/12"
+              </section>
+            ) : null}
+
+            <section>
+              <h3
+                className={[
+                  "flex items-center gap-2 font-headline text-xl font-bold",
+                  activeCategory?.description ? "mb-2" : "mb-6",
+                ].join(" ")}
               >
-                Haritada ac
-                <span className="material-symbols-outlined text-[16px]">north_east</span>
-              </a>
-            </div>
-          </section>
-        ) : null}
-        {!staffChrome && !isTableMenu ? (
-        <PublicMenuPwaCard businessName={title} controller={pwaInstall} showAction={false} />
-        ) : null}
-        {!isOnline ? (
-          <section className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
-            <p className="text-sm font-semibold text-amber-900">Cevrimdisi gorunum</p>
-            <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
-              Son gorulen menu icerigi acildi. Yeni siparis gondermek ve guncel degisiklikleri almak icin internet
-              baglantisi gereklidir.
-            </p>
-          </section>
-        ) : null}
-        {staffChrome ? null : (
-        <footer className="rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="pointer-events-none origin-left scale-[0.56]">
-                <SiteLogo variant="compact" />
+                {sectionHeading}
+                <span className="h-1 w-12 rounded-full bg-primary" />
+              </h3>
+              {activeCategory?.description ? (
+                <p className="mb-6 text-sm leading-relaxed text-secondary">{activeCategory.description}</p>
+              ) : null}
+              {gridProducts.length === 0 ? (
+                <p className="rounded-2xl bg-surface-container-low px-4 py-6 text-center text-sm text-secondary">
+                  {visibleProducts.length === 0
+                    ? "Bu işletme için henüz görünür ürün yok. Panelden menü ekleyebilirsiniz."
+                    : "Aramanızla eşleşen ürün yok."}
+                </p>
+              ) : (
+                <div
+                  className={[
+                    "grid grid-cols-2 gap-4",
+                    desktopSplit ? "lg:grid-cols-3 lg:gap-5 xl:grid-cols-4" : "",
+                  ].join(" ")}
+                >
+                  {gridProducts.map((p) => (
+                    <div
+                      key={p.id}
+                      className="group rounded-3xl bg-surface-container-lowest p-3 transition-transform duration-200 active:scale-95"
+                    >
+                      <div
+                        className={[
+                          "relative mb-3 overflow-hidden rounded-2xl",
+                          desktopSplit ? "h-40 lg:h-44" : "h-40",
+                        ].join(" ")}
+                      >
+                        <button
+                          type="button"
+                          className="block h-full w-full text-left"
+                          aria-label={`${p.name} detaylarını aç`}
+                          onClick={() => setPreviewProduct(p)}
+                        >
+                          {p.imageDataUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="h-full w-full object-cover" src={p.imageDataUrl} alt="" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-surface-container-low text-secondary">
+                              <span className="material-symbols-outlined text-4xl opacity-40">restaurant</span>
+                            </div>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow-sm backdrop-blur"
+                          aria-label={favorites.has(p.id) ? "Favoriden çıkar" : "Favorilere ekle"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewProduct(null);
+                            toggleFavorite(p.id);
+                          }}
+                        >
+                          <span
+                            className={[
+                              "material-symbols-outlined text-lg",
+                              favorites.has(p.id) ? "text-primary" : "text-secondary",
+                            ].join(" ")}
+                            style={favorites.has(p.id) ? { fontVariationSettings: "'FILL' 1" } : undefined}
+                          >
+                            favorite
+                          </span>
+                        </button>
+                        <ProductWarningIcons product={p} />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewProduct(p)}
+                        className="block w-full text-left"
+                      >
+                        <h4 className="line-clamp-1 text-sm font-bold text-on-surface">{p.name}</h4>
+                      </button>
+                      <p className="mb-3 min-h-[4.5rem] text-[13px] leading-relaxed text-secondary line-clamp-4">
+                        {p.description ||
+                          parseIngredientLines(p.ingredients)
+                            .slice(0, 3)
+                            .join(" · ")}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-primary">
+                          {formatTry(getPrimaryMenuDisplayPrice(p, fulfillmentFlags))}
+                        </span>
+                        <button
+                          type="button"
+                          className={[
+                            "rounded-xl p-2 text-white",
+                            orderingEnabled
+                              ? "bg-primary-container"
+                              : "cursor-not-allowed bg-surface-container-high text-secondary",
+                          ].join(" ")}
+                          aria-label={`Sepete ekle: ${p.name}`}
+                          aria-disabled={!orderingEnabled}
+                          title={orderingEnabled ? undefined : "Restoran kapalı"}
+                          disabled={!orderingEnabled}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            requestAddToCart(p);
+                          }}
+                        >
+                          <span className="material-symbols-outlined text-sm">add</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            {googleMapsUrl ? (
+              <section
+                className={[
+                  "rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm",
+                  desktopSplit ? "lg:hidden" : "",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-on-background">Konum</p>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      Restoran konumunu Google Maps uzerinde acabilir ve yol tarifi alabilirsiniz.
+                    </p>
+                  </div>
+                  <a
+                    href={googleMapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/12"
+                  >
+                    Haritada ac
+                    <span className="material-symbols-outlined text-[16px]">north_east</span>
+                  </a>
+                </div>
+              </section>
+            ) : null}
+            {!staffChrome && !isTableMenu ? (
+              <div className={desktopSplit ? "lg:hidden" : undefined}>
+                <PublicMenuPwaCard businessName={title} controller={pwaInstall} showAction={false} />
               </div>
-              <p className="-mt-5 text-sm font-semibold text-on-background">Bu menü KendiSepetim ile oluşturuldu.</p>
-              <p className="mt-1 text-xs leading-relaxed text-secondary">
-                Kendi sepetini yapmak için hemen göz at.
-              </p>
-            </div>
-            <a
-              href="https://kendisepetim.com"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/12"
-            >
-              İncele
-              <span className="material-symbols-outlined text-[16px]">north_east</span>
-            </a>
-          </div>
-        </footer>
-        )}
-      </main>
+            ) : null}
+            {!isOnline ? (
+              <section className="rounded-3xl border border-amber-200 bg-amber-50 px-4 py-4 shadow-sm">
+                <p className="text-sm font-semibold text-amber-900">Cevrimdisi gorunum</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
+                  Son gorulen menu icerigi acildi. Yeni siparis gondermek ve guncel degisiklikleri almak icin internet
+                  baglantisi gereklidir.
+                </p>
+              </section>
+            ) : null}
+            {staffChrome ? null : (
+              <footer className="rounded-3xl border border-surface-container-highest bg-surface-container-lowest px-4 py-4 shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="pointer-events-none origin-left scale-[0.56]">
+                      <SiteLogo variant="compact" />
+                    </div>
+                    <p className="-mt-5 text-sm font-semibold text-on-background">
+                      Bu menü KendiSepetim ile oluşturuldu.
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-secondary">
+                      Kendi sepetini yapmak için hemen göz at.
+                    </p>
+                  </div>
+                  <a
+                    href="https://kendisepetim.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/12"
+                  >
+                    İncele
+                    <span className="material-symbols-outlined text-[16px]">north_east</span>
+                  </a>
+                </div>
+              </footer>
+            )}
+          </main>
+        </div>
+      </div>
 
       {cartCount > 0 ? (
         <div className="fixed bottom-6 right-6 z-50">
