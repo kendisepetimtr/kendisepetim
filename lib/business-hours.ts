@@ -7,6 +7,7 @@ export type BusinessHoursDayMode = "calendar" | "shift";
 
 export const DEFAULT_OPEN_TIME = "09:00";
 export const DEFAULT_CLOSE_TIME = "22:00";
+export const BUSINESS_TIME_ZONE = "Europe/Istanbul";
 
 /** "9:00" veya "09:00" → dakika; geçersizse null */
 export function parseTimeToMinutes(s: string): number | null {
@@ -29,6 +30,23 @@ export function normalizeTimeString(s: string, fallback: string = DEFAULT_OPEN_T
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function minutesInTimeZone(now: Date, timeZone: string = BUSINESS_TIME_ZONE): number {
+  try {
+    const parts = new Intl.DateTimeFormat("tr-TR", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(now);
+    const h = Number(parts.find((p) => p.type === "hour")?.value);
+    const m = Number(parts.find((p) => p.type === "minute")?.value);
+    if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
+  } catch {
+    /* fallback below */
+  }
+  return now.getHours() * 60 + now.getMinutes();
+}
+
 /**
  * Şu an açık mı? Kapanış açılıştan küçükse (örn. 03:00 < 09:00) gece sarkan vardiya kabul edilir.
  * Açılış === kapanış → 24 saat açık kabul edilir.
@@ -37,11 +55,12 @@ export function isBusinessOpenNow(
   openTime: string,
   closeTime: string,
   now: Date = new Date(),
+  timeZone: string = BUSINESS_TIME_ZONE,
 ): boolean {
   const o = parseTimeToMinutes(openTime);
   const c = parseTimeToMinutes(closeTime);
   if (o === null || c === null) return true;
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = minutesInTimeZone(now, timeZone);
   if (c === o) return true;
   if (c > o) return cur >= o && cur < c;
   return cur >= o || cur < c;
@@ -55,6 +74,7 @@ export function getBusinessClosedMessage(
   openTime: string,
   closeTime: string,
   now: Date = new Date(),
+  timeZone: string = BUSINESS_TIME_ZONE,
 ): string {
   const o = parseTimeToMinutes(openTime);
   const c = parseTimeToMinutes(closeTime);
@@ -67,7 +87,7 @@ export function getBusinessClosedMessage(
     return "Restoran 24 saat acik.";
   }
 
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const cur = minutesInTimeZone(now, timeZone);
   if (c > o) {
     return cur < o
       ? `Bugun ${openLabel}'da acilir. Servis saatleri: ${rangeLabel}`
