@@ -1,0 +1,35 @@
+/** Türkiye cep telefonu doğrulama ve biçimlendirme. */
+
+/** Girişten yalnızca rakamları alır. */
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/**
+ * TR cep numarasını normalize eder. Geçerliyse `+90XXXXXXXXXX` (E.164) döner, değilse null.
+ * Kabul edilen girişler: "05xx...", "5xx...", "905xx...", "+90 5xx ...".
+ */
+export function normalizeTrPhone(input: string): string | null {
+  let d = digitsOnly(input);
+
+  // Ülke kodu / baştaki sıfır temizliği
+  if (d.startsWith("90")) d = d.slice(2);
+  else if (d.startsWith("0")) d = d.slice(1);
+
+  // Geriye 10 hane kalmalı ve cep numarası 5 ile başlamalı
+  if (d.length !== 10 || d[0] !== "5") return null;
+
+  return `+90${d}`;
+}
+
+export function isValidTrPhone(input: string): boolean {
+  return normalizeTrPhone(input) !== null;
+}
+
+/** Görsel biçim: "+90 5XX XXX XX XX". Geçersizse girişi olduğu gibi döndürür. */
+export function formatTrPhoneDisplay(input: string): string {
+  const normalized = normalizeTrPhone(input);
+  if (!normalized) return input;
+  const d = normalized.slice(3); // +90 sonrası 10 hane
+  return `+90 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8, 10)}`;
+}

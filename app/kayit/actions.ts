@@ -6,6 +6,7 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 import { getOAuthSiteUrl, getRequestSiteUrl } from "@/lib/site-url";
 import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
+import { normalizeTrPhone } from "@/lib/phone-tr";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -42,6 +43,10 @@ export async function registerTenantAction(
 
   if (!businessName || !ownerName || !phone) {
     return { error: "Zorunlu alanları doldurun." };
+  }
+  const normalizedPhone = normalizeTrPhone(phone);
+  if (!normalizedPhone) {
+    return { error: "Geçerli bir Türkiye cep telefonu girin (örn. 05XX XXX XX XX)." };
   }
   const subErr = validateSubdomain(subdomain);
   if (subErr) return { error: subErr };
@@ -88,7 +93,7 @@ export async function registerTenantAction(
       subdomain,
       owner_name: ownerName,
       email,
-      phone,
+      phone: normalizedPhone,
       owner_user_id: existingUser.id,
       logo_url: null,
       hours_day_mode: "calendar",
@@ -148,7 +153,7 @@ export async function registerTenantAction(
     subdomain,
     owner_name: ownerName,
     email: emailFromForm,
-    phone,
+    phone: normalizedPhone,
     owner_user_id: userId,
     logo_url: null,
     hours_day_mode: "calendar",

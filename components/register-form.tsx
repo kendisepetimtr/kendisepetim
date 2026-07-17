@@ -5,6 +5,7 @@ import LegalSummaryModal, { type LegalModalKind } from "@/components/legal-summa
 import GoogleAuthButton from "@/components/google-auth-button";
 import Link from "next/link";
 import { getLocalTenant, saveLocalTenant } from "@/lib/local-tenant";
+import { normalizeTrPhone, formatTrPhoneDisplay } from "@/lib/phone-tr";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
 
@@ -76,6 +77,12 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       return;
     }
 
+    const normalizedPhone = normalizeTrPhone(phone);
+    if (!normalizedPhone) {
+      setError("Geçerli bir Türkiye cep telefonu girin (örn. 05XX XXX XX XX).");
+      return;
+    }
+
     if (!oauthMode) {
       if (password.length < 8) {
         setError("Şifre en az 8 karakter olmalıdır.");
@@ -93,7 +100,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       fd.set("subdomain", subdomain.trim().toLowerCase());
       fd.set("ownerName", ownerName.trim());
       fd.set("email", email.trim().toLowerCase());
-      fd.set("phone", phone.trim());
+      fd.set("phone", normalizedPhone);
       fd.set("password", password);
       fd.set("passwordAgain", passwordAgain);
       fd.set("acceptedTerms", acceptedTerms ? "on" : "off");
@@ -130,7 +137,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       subdomain: subdomain.trim(),
       ownerName: ownerName.trim(),
       email: email.trim(),
-      phone: phone.trim(),
+      phone: normalizedPhone,
       logoDataUrl: "",
       coverImageUrl: "",
       publicDescription: "",
@@ -298,9 +305,13 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
             required
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => {
+              if (normalizeTrPhone(phone)) setPhone(formatTrPhoneDisplay(phone));
+            }}
             className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-3 text-on-background shadow-sm outline-none transition-[box-shadow,border-color] focus:border-primary focus:ring-2 focus:ring-primary/20"
-            placeholder="+90 5xx xxx xx xx"
+            placeholder="0(5XX) XXX XX XX"
           />
+          <p className="text-xs text-secondary">Türkiye cep numarası. Örn. 0532 123 45 67</p>
         </div>
       </div>
 
