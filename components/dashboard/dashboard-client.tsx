@@ -198,6 +198,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   } = useDashboardOrderNotifications({
     enabled: remoteAuthEnabled,
     ordersTabActive: activeNav === "orders",
+    presenceScope: tenant?.subdomain,
     onOrderCreated: handleOrderCreated,
   });
 

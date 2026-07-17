@@ -1,6 +1,7 @@
 "use client";
 
 import { useNotificationStream } from "@/lib/hooks/use-notification-stream";
+import { shouldSuppressCrossClientOrderAlert } from "@/lib/ops-client-presence";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import {
   startRepeatingNotificationSound,
@@ -23,12 +24,15 @@ const PERSISTENT_ALERT_ACTIONS = new Set(["order_created", "bill_requested"]);
 type UseDashboardOrderNotificationsOptions = {
   enabled: boolean;
   ordersTabActive: boolean;
+  /** İşletme subdomain — kasa sekmesiyle presence paylaşımı */
+  presenceScope?: string | null;
   onOrderCreated?: (log: ActivityLogRow) => void;
 };
 
 export function useDashboardOrderNotifications({
   enabled,
   ordersTabActive,
+  presenceScope,
   onOrderCreated,
 }: UseDashboardOrderNotificationsOptions) {
   const [pendingOrderAlert, setPendingOrderAlert] = useState(false);
@@ -36,6 +40,7 @@ export function useDashboardOrderNotifications({
   const [activityLogs, setActivityLogs] = useState<ActivityLogRow[]>([]);
   const ordersTabActiveRef = useRef(ordersTabActive);
   const onOrderCreatedRef = useRef(onOrderCreated);
+  const peerOpenRef = useRef(false);
 
   ordersTabActiveRef.current = ordersTabActive;
   onOrderCreatedRef.current = onOrderCreated;
@@ -61,7 +66,11 @@ export function useDashboardOrderNotifications({
     if (log.action === "order_created") {
       onOrderCreatedRef.current?.(log);
     }
-    if (PERSISTENT_ALERT_ACTIONS.has(log.action) && !ordersTabActiveRef.current) {
+    if (
+      PERSISTENT_ALERT_ACTIONS.has(log.action) &&
+      !ordersTabActiveRef.current &&
+      !shouldSuppressCrossClientOrderAlert(log, "panel", peerOpenRef.current)
+    ) {
       setPendingOrderAlert(true);
     }
   }, []);
@@ -73,7 +82,13 @@ export function useDashboardOrderNotifications({
     onRefresh: bumpOrdersRefresh,
     onActivity: handleActivity,
     onSoundAlert: handleSoundAlert,
+    crossClientPresence: {
+      role: "panel",
+      scope: presenceScope,
+    },
   });
+
+  peerOpenRef.current = stream.peerOpen;
 
   useEffect(() => {
     if (!ordersTabActive) return;

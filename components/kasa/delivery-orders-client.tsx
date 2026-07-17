@@ -65,6 +65,7 @@ export default function DeliveryOrdersClient({
     streamUrl: "/api/kasa/notifications/stream",
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: refresh,
+    crossClientPresence: { role: "kasa", scope: subdomain },
   });
 
   useTenantOpsRealtime({

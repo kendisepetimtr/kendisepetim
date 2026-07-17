@@ -4,6 +4,11 @@ import {
   ACTIVITY_ACTION_LABELS,
   formatActivityLogSummary,
 } from "@/lib/dashboard/activity-log-labels";
+import { useOpsClientPresence } from "@/lib/hooks/use-ops-client-presence";
+import {
+  shouldSuppressCrossClientOrderAlert,
+  type OpsClientRole,
+} from "@/lib/ops-client-presence";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import {
   parseNotificationSettings,
@@ -28,6 +33,14 @@ type UseNotificationStreamOptions = {
   onActivity?: (log: ActivityLogRow) => void;
   /** true dönerse varsayılan tek seferlik ses atlanır */
   onSoundAlert?: (log: ActivityLogRow, settings: TenantNotificationSettings) => boolean | void;
+  /**
+   * Kasa/panel aynı tarayıcıda açıksa, karşı taraftan oluşturulan
+   * siparişlerde ses/toast bastırılır (liste yenilemesi devam eder).
+   */
+  crossClientPresence?: {
+    role: OpsClientRole;
+    scope: string | null | undefined;
+  };
 };
 
 function formatToastTitle(log: ActivityLogRow): string {
@@ -41,6 +54,7 @@ export function useNotificationStream({
   onRefresh,
   onActivity,
   onSoundAlert,
+  crossClientPresence,
 }: UseNotificationStreamOptions) {
   const settingsRef = useRef<TenantNotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const onRefreshRef = useRef(onRefresh);
@@ -49,6 +63,15 @@ export function useNotificationStream({
   const refreshActionsRef = useRef(refreshOnActions);
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
   const [connected, setConnected] = useState(false);
+
+  const presenceRole = crossClientPresence?.role ?? "kasa";
+  const presenceScope = crossClientPresence?.scope;
+  const presenceEnabled = Boolean(enabled && crossClientPresence && presenceScope);
+  const { peerOpen } = useOpsClientPresence(presenceRole, presenceScope, presenceEnabled);
+  const peerOpenRef = useRef(peerOpen);
+  const presenceRoleRef = useRef(presenceRole);
+  peerOpenRef.current = peerOpen;
+  presenceRoleRef.current = presenceRole;
 
   onRefreshRef.current = onRefresh;
   onActivityRef.current = onActivity;
@@ -84,7 +107,13 @@ export function useNotificationStream({
       }
 
       const settings = settingsRef.current;
-      if (shouldAlertForAction(log.action, settings)) {
+      const suppressAlert = shouldSuppressCrossClientOrderAlert(
+        log,
+        presenceRoleRef.current,
+        peerOpenRef.current,
+      );
+
+      if (!suppressAlert && shouldAlertForAction(log.action, settings)) {
         if (settings.soundEnabled) {
           const skipDefaultSound = onSoundAlertRef.current?.(log, settings) === true;
           if (!skipDefaultSound) {
@@ -113,5 +142,12 @@ export function useNotificationStream({
     };
   }, [streamUrl, enabled, dismissToast]);
 
-  return { toasts, dismissToast, connected, formatToastTitle, formatActivityLogSummary };
+  return {
+    toasts,
+    dismissToast,
+    connected,
+    formatToastTitle,
+    formatActivityLogSummary,
+    peerOpen,
+  };
 }

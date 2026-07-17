@@ -25,6 +25,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 type PickupOrdersClientProps = {
   businessName: string;
+  subdomain: string;
   tenantId: string;
   features: KasaFeatures;
   initialOrders: AdminOrder[];
@@ -32,6 +33,7 @@ type PickupOrdersClientProps = {
 
 export default function PickupOrdersClient({
   businessName,
+  subdomain,
   tenantId,
   features,
   initialOrders,
@@ -58,6 +60,7 @@ export default function PickupOrdersClient({
     streamUrl: "/api/kasa/notifications/stream",
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: refresh,
+    crossClientPresence: { role: "kasa", scope: subdomain },
   });
 
   useTenantOpsRealtime({

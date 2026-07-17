@@ -6,6 +6,7 @@ import CheckoutPaymentSelector from "@/components/customer/checkout-payment-sele
 import PublicMenuClient from "@/components/public-menu/public-menu-client";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { FulfillmentType, TenantFulfillmentFlags } from "@/lib/fulfillment";
+import { useOpsClientPresence } from "@/lib/hooks/use-ops-client-presence";
 import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { KasaSessionDetail } from "@/lib/kasa/sessions-service";
 import type { LocalMenuState } from "@/lib/local-menu";
@@ -107,6 +108,9 @@ export default function KasaPosClient({
       if (res.ok && data.ok && data.order) setOrder(data.order);
     }
   }, [channel, order?.id]);
+
+  // POS bildirim dinlemez ama kasa açık sayılır; panel sesi bastırılsın.
+  useOpsClientPresence("kasa", slug, true);
 
   useTenantOpsRealtime({
     tenantId,
