@@ -63,13 +63,17 @@ export function useDashboardOrderNotifications({
       if (prev.some((entry) => entry.id === log.id)) return prev;
       return [log, ...prev].slice(0, 30);
     });
-    if (log.action === "order_created") {
+
+    const suppressAlert = shouldSuppressCrossClientOrderAlert(log, "panel", peerOpenRef.current);
+
+    // Kasa açıkken QR gel-al/paket fişi kasada basılır; panel otomatik yazdırmaz.
+    if (log.action === "order_created" && !suppressAlert) {
       onOrderCreatedRef.current?.(log);
     }
     if (
       PERSISTENT_ALERT_ACTIONS.has(log.action) &&
       !ordersTabActiveRef.current &&
-      !shouldSuppressCrossClientOrderAlert(log, "panel", peerOpenRef.current)
+      !suppressAlert
     ) {
       setPendingOrderAlert(true);
     }

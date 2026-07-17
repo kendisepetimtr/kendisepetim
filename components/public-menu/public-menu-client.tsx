@@ -1115,20 +1115,37 @@ function ProductCustomizeModal({
                 <h3 className="mb-2 font-headline text-sm font-bold text-on-background">Malzeme çıkar</h3>
               ) : null}
               <div className="space-y-2">
-                {removableIngredients.map((ingredient) => (
-                  <label
-                    key={ingredient}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-surface-container-high bg-white px-3 py-3"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={removedIngredients.includes(ingredient)}
-                      onChange={() => onToggleIngredient(ingredient)}
-                      className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
-                    />
-                    <span className="text-sm text-on-background">{ingredient}</span>
-                  </label>
-                ))}
+                {removableIngredients.map((ingredient) => {
+                  const removed = removedIngredients.includes(ingredient);
+                  return (
+                    <label
+                      key={ingredient}
+                      className={[
+                        "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition",
+                        removed
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-surface-container-high bg-white",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={removed}
+                        onChange={() => onToggleIngredient(ingredient)}
+                        className="h-4 w-4 rounded border-surface-container-highest text-primary focus:ring-primary/30"
+                      />
+                      <span
+                        className={[
+                          "text-sm transition",
+                          removed
+                            ? "text-secondary line-through decoration-primary decoration-2"
+                            : "text-on-background",
+                        ].join(" ")}
+                      >
+                        {ingredient}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ) : null}

@@ -12,6 +12,25 @@ export function peerOpsClientRole(self: OpsClientRole): OpsClientRole {
   return self === "kasa" ? "panel" : "kasa";
 }
 
+/** QR / marketplace gel-al + paket — kasa açıkken panele bildirim düşmez. */
+function isRemotePickupOrDeliveryOrder(log: {
+  action: string;
+  actor_type: string;
+  metadata?: Record<string, unknown> | null;
+}): boolean {
+  if (log.action !== "order_created") return false;
+  const source = typeof log.metadata?.source === "string" ? log.metadata.source : "";
+  const fulfillment =
+    typeof log.metadata?.fulfillment_type === "string" ? log.metadata.fulfillment_type : "";
+  if (fulfillment !== "pickup" && fulfillment !== "delivery") return false;
+
+  const fromCustomerChannel =
+    log.actor_type === "customer" ||
+    source === "qr_menu" ||
+    source === "marketplace";
+  return fromCustomerChannel;
+}
+
 export function shouldSuppressCrossClientOrderAlert(
   log: {
     action: string;
@@ -31,6 +50,9 @@ export function shouldSuppressCrossClientOrderAlert(
     source === "panel" ||
     source === "owner" ||
     source === "panel_manual";
+
+  // Gel-al / paket (QR): kasa sekmesi açıksa yalnızca kasa uyarır; panel sessiz kalır.
+  if (self === "panel" && isRemotePickupOrDeliveryOrder(log)) return true;
 
   if (self === "panel") return fromCashier;
   if (self === "kasa") return fromPanel;
