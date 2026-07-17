@@ -5,6 +5,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import {
   getMenuImageExtension,
   isAllowedMenuImageType,
+  MAX_COVER_IMAGE_FILE_BYTES,
   MAX_MENU_IMAGE_FILE_BYTES,
   MENU_IMAGES_BUCKET,
 } from "@/lib/menu-images";
@@ -23,9 +24,11 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (file.size > MAX_MENU_IMAGE_FILE_BYTES) {
+  const maxFileBytes =
+    kind === "cover" ? MAX_COVER_IMAGE_FILE_BYTES : MAX_MENU_IMAGE_FILE_BYTES;
+  if (file.size > maxFileBytes) {
     return NextResponse.json(
-      { error: `Görsel çok büyük (en fazla ${Math.round(MAX_MENU_IMAGE_FILE_BYTES / 1024)} KB).` },
+      { error: `Görsel çok büyük (en fazla ${Math.round(maxFileBytes / 1024)} KB).` },
       { status: 400 },
     );
   }

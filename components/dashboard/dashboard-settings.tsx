@@ -7,7 +7,7 @@ import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { isValidGoogleMapsUrl } from "@/lib/google-maps";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
-import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
+import { MAX_COVER_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
 import { MEAL_CARD_BRANDS, type MealCardBrandId } from "@/lib/tenant-payment";
 import DashboardOperationsSettings from "@/components/dashboard/dashboard-operations-settings";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
@@ -273,8 +273,8 @@ export default function DashboardSettings({
       window.alert("Yalnızca JPG, PNG veya WebP görseller yüklenebilir.");
       return;
     }
-    if (file.size > MAX_MENU_IMAGE_FILE_BYTES) {
-      window.alert(`Kapak görseli çok büyük (en fazla ~${Math.round(MAX_MENU_IMAGE_FILE_BYTES / 1024)} KB).`);
+    if (file.size > MAX_COVER_IMAGE_FILE_BYTES) {
+      window.alert(`Kapak görseli çok büyük (en fazla ~${Math.round(MAX_COVER_IMAGE_FILE_BYTES / 1024)} KB).`);
       return;
     }
 
@@ -392,7 +392,7 @@ export default function DashboardSettings({
                   aria-labelledby={`${baseId}-cover-label`}
                 />
                 <p className="text-[11px] text-secondary">
-                  Header alaninda buyuk kapak olarak kullanilir. Yaklasik {Math.round(MAX_MENU_IMAGE_FILE_BYTES / 1024)} KB&apos;a kadar.
+                  Header alaninda buyuk kapak olarak kullanilir. Yaklasik {Math.round(MAX_COVER_IMAGE_FILE_BYTES / 1024)} KB&apos;a kadar.
                 </p>
                 {coverUploading ? (
                   <p className="text-xs font-medium text-primary">Kapak gorseli yukleniyor...</p>

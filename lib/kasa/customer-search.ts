@@ -34,6 +34,22 @@ function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
+/** Kasa önerilerinde okunabilir telefon: 535 354 6274 */
+export function formatCashierPhonePreview(phone: string): string {
+  const digits = digitsOnly(phone);
+  const local =
+    digits.length >= 11 && digits.startsWith("90")
+      ? digits.slice(-10)
+      : digits.length === 11 && digits.startsWith("0")
+        ? digits.slice(1)
+        : digits.length > 10
+          ? digits.slice(-10)
+          : digits;
+  if (local.length <= 3) return local;
+  if (local.length <= 6) return `${local.slice(0, 3)} ${local.slice(3)}`;
+  return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
+}
+
 function normalizeAddress(raw: unknown): CustomerAddress {
   if (!raw || typeof raw !== "object") return emptyCustomerAddress();
   const a = raw as Record<string, unknown>;
@@ -127,7 +143,16 @@ export async function searchCashierCustomers(
     }
 
     const matches = Array.from(byPhone.values())
-      .sort((a, b) => b.lastOrderAt.localeCompare(a.lastOrderAt))
+      .sort((a, b) => {
+        if (isPhoneQuery) {
+          const aDigits = digitsOnly(a.phone);
+          const bDigits = digitsOnly(b.phone);
+          const aPrefix = aDigits.startsWith(digits) || aDigits.slice(-10).startsWith(digits) ? 0 : 1;
+          const bPrefix = bDigits.startsWith(digits) || bDigits.slice(-10).startsWith(digits) ? 0 : 1;
+          if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+        }
+        return b.lastOrderAt.localeCompare(a.lastOrderAt);
+      })
       .slice(0, 8);
 
     return { ok: true, matches };

@@ -1,7 +1,7 @@
 "use client";
 
 import type { CustomerFormValues } from "@/lib/customer-address";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 
 type CustomerIdentityAddressFormProps = {
   idPrefix?: string;
@@ -13,6 +13,10 @@ type CustomerIdentityAddressFormProps = {
   showCourierNote?: boolean;
   showLocationButton?: boolean;
   hideAddress?: boolean;
+  /** Kasa: telefonu en üste al (canlı arama için) */
+  phoneFirst?: boolean;
+  /** Telefon alanının hemen altına ek içerik (öneri listesi vb.) */
+  phoneFieldSlot?: ReactNode;
   locationLoading?: boolean;
   locationMessage?: string | null;
   onRequestLocation?: () => void;
@@ -31,6 +35,8 @@ export default function CustomerIdentityAddressForm({
   showCourierNote = false,
   showLocationButton = false,
   hideAddress = false,
+  phoneFirst = false,
+  phoneFieldSlot = null,
   locationLoading = false,
   locationMessage = null,
   onRequestLocation,
@@ -40,6 +46,75 @@ export default function CustomerIdentityAddressForm({
 
   const inputCls =
     "mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+
+  const phoneField = (
+    <div>
+      <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-ph`}>
+        Telefon <span className="text-error">*</span>
+      </label>
+      <input
+        id={`${base}-ph`}
+        type="tel"
+        inputMode="tel"
+        value={values.phone}
+        onChange={(e) => onChange(patch(values, { phone: e.target.value }))}
+        required
+        autoComplete="tel"
+        autoFocus={phoneFirst}
+        placeholder={phoneFirst ? "Örn. 535…" : undefined}
+        className={inputCls}
+      />
+      {phoneFieldSlot}
+    </div>
+  );
+
+  const nameFields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-fn`}>
+          Ad <span className="text-error">*</span>
+        </label>
+        <input
+          id={`${base}-fn`}
+          value={values.firstName}
+          onChange={(e) => onChange(patch(values, { firstName: e.target.value }))}
+          required
+          autoComplete="given-name"
+          className={inputCls}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-ln`}>
+          Soyad <span className="text-error">*</span>
+        </label>
+        <input
+          id={`${base}-ln`}
+          value={values.lastName}
+          onChange={(e) => onChange(patch(values, { lastName: e.target.value }))}
+          required
+          autoComplete="family-name"
+          className={inputCls}
+        />
+      </div>
+    </div>
+  );
+
+  const emailField = (
+    <div>
+      <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-em`}>
+        E-posta
+      </label>
+      <input
+        id={`${base}-em`}
+        type="email"
+        value={values.email}
+        onChange={(e) => onChange(patch(values, { email: e.target.value }))}
+        autoComplete="email"
+        className={inputCls}
+      />
+      <p className="mt-1 text-[11px] text-secondary">İsteğe bağlı.</p>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -51,64 +126,19 @@ export default function CustomerIdentityAddressForm({
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-fn`}>
-            Ad <span className="text-error">*</span>
-          </label>
-          <input
-            id={`${base}-fn`}
-            value={values.firstName}
-            onChange={(e) => onChange(patch(values, { firstName: e.target.value }))}
-            required
-            autoComplete="given-name"
-            className={inputCls}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-ln`}>
-            Soyad <span className="text-error">*</span>
-          </label>
-          <input
-            id={`${base}-ln`}
-            value={values.lastName}
-            onChange={(e) => onChange(patch(values, { lastName: e.target.value }))}
-            required
-            autoComplete="family-name"
-            className={inputCls}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-ph`}>
-          Telefon <span className="text-error">*</span>
-        </label>
-        <input
-          id={`${base}-ph`}
-          type="tel"
-          value={values.phone}
-          onChange={(e) => onChange(patch(values, { phone: e.target.value }))}
-          required
-          autoComplete="tel"
-          className={inputCls}
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-em`}>
-          E-posta
-        </label>
-        <input
-          id={`${base}-em`}
-          type="email"
-          value={values.email}
-          onChange={(e) => onChange(patch(values, { email: e.target.value }))}
-          autoComplete="email"
-          className={inputCls}
-        />
-        <p className="mt-1 text-[11px] text-secondary">İsteğe bağlı.</p>
-      </div>
+      {phoneFirst ? (
+        <>
+          {phoneField}
+          {nameFields}
+          {emailField}
+        </>
+      ) : (
+        <>
+          {nameFields}
+          {phoneField}
+          {emailField}
+        </>
+      )}
 
       {hideAddress ? null : (
       <div className="rounded-2xl border border-surface-container-high bg-surface-container-low/40 p-4">

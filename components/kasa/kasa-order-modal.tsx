@@ -10,7 +10,7 @@ import {
 } from "@/lib/customer-address";
 import type { FulfillmentType } from "@/lib/fulfillment";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
-import type { CashierCustomerMatch } from "@/lib/kasa/customer-search";
+import { formatCashierPhonePreview, type CashierCustomerMatch } from "@/lib/kasa/customer-search";
 import { receiptSettingsForKasaChannel } from "@/lib/kasa/receipt-channel";
 import {
   parseIngredientLines,
@@ -87,7 +87,9 @@ export default function KasaOrderModal({
   const [customer, setCustomer] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
   const [phoneSuggestions, setPhoneSuggestions] = useState<CashierCustomerMatch[]>([]);
   const [phoneSuggestOpen, setPhoneSuggestOpen] = useState(false);
-  const [showCustomerPanel, setShowCustomerPanel] = useState(channel === "delivery");
+  const [phoneSearching, setPhoneSearching] = useState(false);
+  /** Paket: ürün seç → müşteri bilgisi (üstte sabit form yok) */
+  const [step, setStep] = useState<"menu" | "customer">("menu");
 
   const headerTitle =
     title ??
@@ -106,7 +108,9 @@ export default function KasaOrderModal({
     setLineNoteDraft("");
     setCustomer(emptyCustomerFormValues());
     setPhoneSuggestions([]);
-    setShowCustomerPanel(channel === "delivery");
+    setPhoneSuggestOpen(false);
+    setPhoneSearching(false);
+    setStep("menu");
   }, [open, tableNumber, channel]);
 
   useEffect(() => {
@@ -119,12 +123,17 @@ export default function KasaOrderModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open || channel !== "delivery") return;
+    if (!open || channel !== "delivery" || step !== "customer") return;
     const phone = customer.phone.trim();
-    if (phone.length < 3) {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 3) {
       setPhoneSuggestions([]);
+      setPhoneSuggestOpen(false);
+      setPhoneSearching(false);
       return;
     }
+    let cancelled = false;
+    setPhoneSearching(true);
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
@@ -133,17 +142,54 @@ export default function KasaOrderModal({
             credentials: "include",
           });
           const data = (await res.json()) as { ok?: boolean; matches?: CashierCustomerMatch[] };
+          if (cancelled) return;
           if (res.ok && data.ok && data.matches) {
             setPhoneSuggestions(data.matches);
             setPhoneSuggestOpen(data.matches.length > 0);
+          } else {
+            setPhoneSuggestions([]);
+            setPhoneSuggestOpen(false);
           }
         } catch {
-          /* ignore */
+          if (!cancelled) {
+            setPhoneSuggestions([]);
+            setPhoneSuggestOpen(false);
+          }
+        } finally {
+          if (!cancelled) setPhoneSearching(false);
         }
       })();
-    }, 280);
-    return () => window.clearTimeout(timer);
-  }, [customer.phone, open, channel]);
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [customer.phone, open, channel, step]);
+
+  function applyCustomerMatch(m: CashierCustomerMatch) {
+    setCustomer((v) => ({
+      ...v,
+      phone: m.phone,
+      firstName: m.firstName || v.firstName,
+      lastName: m.lastName || v.lastName,
+      neighborhood: m.address.neighborhood || v.neighborhood,
+      street: m.address.street || v.street,
+      buildingNo: m.address.buildingNo || v.buildingNo,
+      buildingName: m.address.buildingName || v.buildingName,
+      floor: m.address.floor || v.floor,
+      apartmentNo: m.address.apartmentNo || v.apartmentNo,
+      livesInSite: m.address.livesInSite,
+      siteName: m.address.siteName || v.siteName,
+      block: m.address.block || v.block,
+    }));
+    setPhoneSuggestOpen(false);
+  }
+
+  function addressPreview(m: CashierCustomerMatch): string {
+    return [m.address.neighborhood, m.address.street, m.address.buildingNo && `No:${m.address.buildingNo}`]
+      .filter(Boolean)
+      .join(" · ");
+  }
 
   const visibleProducts = useMemo(() => {
     if (categoryId === "all") return products;
@@ -270,11 +316,15 @@ export default function KasaOrderModal({
       window.alert("Masa seçilmedi.");
       return;
     }
+    if (channel === "delivery" && step === "menu") {
+      setStep("customer");
+      return;
+    }
     if (channel === "delivery") {
       const err = validateCustomerFormForFulfillment(customer, "delivery");
       if (err) {
         window.alert(err);
-        setShowCustomerPanel(true);
+        setStep("customer");
         return;
       }
     }
@@ -412,22 +462,31 @@ export default function KasaOrderModal({
       <header className="flex shrink-0 items-center gap-3 border-b border-surface-container-highest bg-surface-container-lowest px-4 py-3">
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            if (channel === "delivery" && step === "customer") {
+              setStep("menu");
+              return;
+            }
+            onClose();
+          }}
           className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white text-on-background active:scale-95"
-          aria-label="Kapat"
+          aria-label={channel === "delivery" && step === "customer" ? "Ürünlere dön" : "Kapat"}
         >
-          <span className="material-symbols-outlined text-[28px]">close</span>
+          <span className="material-symbols-outlined text-[28px]">
+            {channel === "delivery" && step === "customer" ? "arrow_back" : "close"}
+          </span>
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
             {fulfillmentTypeLabel(channel)}
+            {channel === "delivery" ? (step === "customer" ? " · Müşteri" : " · Ürünler") : ""}
           </p>
           <h2 className="truncate font-headline text-xl font-extrabold text-on-background">{headerTitle}</h2>
         </div>
-        {channel === "delivery" ? (
+        {channel === "delivery" && step === "menu" ? (
           <button
             type="button"
-            onClick={() => setShowCustomerPanel((v) => !v)}
+            onClick={() => setStep("customer")}
             className="inline-flex h-12 items-center gap-1 rounded-2xl border border-surface-container-highest bg-white px-3 text-xs font-bold text-on-background active:scale-95"
           >
             <span className="material-symbols-outlined text-[20px]">person</span>
@@ -439,48 +498,14 @@ export default function KasaOrderModal({
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col border-b border-surface-container-highest lg:border-b-0 lg:border-r">
-          {channel === "delivery" && showCustomerPanel ? (
-            <div className="max-h-[40vh] shrink-0 overflow-y-auto border-b border-surface-container-highest bg-surface-container-lowest px-4 py-3">
-              {phoneSuggestOpen && phoneSuggestions.length > 0 ? (
-                <div className="mb-3 overflow-hidden rounded-xl border border-primary/25 bg-white">
-                  <p className="border-b border-surface-container-high px-3 py-2 text-[11px] font-bold uppercase text-secondary">
-                    Kayıtlı numaralar
-                  </p>
-                  <ul className="max-h-36 overflow-y-auto">
-                    {phoneSuggestions.map((m) => (
-                      <li key={`${m.phone}-${m.lastOrderAt}`}>
-                        <button
-                          type="button"
-                          className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-primary/5 active:bg-primary/10"
-                          onClick={() => {
-                            setCustomer((v) => ({
-                              ...v,
-                              phone: m.phone,
-                              firstName: m.firstName || v.firstName,
-                              lastName: m.lastName || v.lastName,
-                              neighborhood: m.address.neighborhood || v.neighborhood,
-                              street: m.address.street || v.street,
-                              buildingNo: m.address.buildingNo || v.buildingNo,
-                              buildingName: m.address.buildingName || v.buildingName,
-                              floor: m.address.floor || v.floor,
-                              apartmentNo: m.address.apartmentNo || v.apartmentNo,
-                              livesInSite: m.address.livesInSite,
-                              siteName: m.address.siteName || v.siteName,
-                              block: m.address.block || v.block,
-                            }));
-                            setPhoneSuggestOpen(false);
-                          }}
-                        >
-                          <span className="text-sm font-semibold">{m.phone}</span>
-                          <span className="text-xs text-secondary">
-                            {[m.firstName, m.lastName].filter(Boolean).join(" ") || "—"}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+          {channel === "delivery" && step === "customer" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto bg-surface-container-lowest px-4 py-4 sm:px-5">
+              <div className="mb-4">
+                <h3 className="font-headline text-lg font-extrabold text-on-background">Müşteri bilgileri</h3>
+                <p className="mt-1 text-sm text-secondary">
+                  Telefonun ilk rakamlarını yazın; kayıtlı müşteriler anında listelenir.
+                </p>
+              </div>
               <CustomerIdentityAddressForm
                 idPrefix="kasa-paket"
                 values={customer}
@@ -488,92 +513,136 @@ export default function KasaOrderModal({
                   setCustomer(next);
                   setPhoneSuggestOpen(true);
                 }}
+                phoneFirst
                 showPrefillNotice={false}
                 showOrderNote={false}
                 showCourierNote
                 hideAddress={false}
                 showLocationButton={false}
+                phoneFieldSlot={
+                  <div className="mt-2">
+                    {phoneSearching ? (
+                      <p className="text-[11px] font-medium text-primary">Müşteriler aranıyor…</p>
+                    ) : null}
+                    {phoneSuggestOpen && phoneSuggestions.length > 0 ? (
+                      <div className="overflow-hidden rounded-xl border border-primary/25 bg-white shadow-sm">
+                        <p className="border-b border-surface-container-high px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-secondary">
+                          Eşleşen müşteriler
+                        </p>
+                        <ul className="max-h-52 overflow-y-auto">
+                          {phoneSuggestions.map((m) => {
+                            const addr = addressPreview(m);
+                            return (
+                              <li key={`${m.phone}-${m.lastOrderAt}`}>
+                                <button
+                                  type="button"
+                                  className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-primary/5 active:bg-primary/10"
+                                  onClick={() => applyCustomerMatch(m)}
+                                >
+                                  <span className="font-mono text-sm font-bold tracking-wide text-on-background">
+                                    {formatCashierPhonePreview(m.phone)}
+                                  </span>
+                                  <span className="text-xs text-secondary">
+                                    {[m.firstName, m.lastName].filter(Boolean).join(" ") || "İsimsiz"}
+                                    {m.orderCount > 1 ? ` · ${m.orderCount} sipariş` : ""}
+                                  </span>
+                                  {addr ? (
+                                    <span className="line-clamp-1 text-[11px] text-secondary/80">{addr}</span>
+                                  ) : null}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : customer.phone.replace(/\D/g, "").length >= 3 && !phoneSearching ? (
+                      <p className="text-[11px] text-secondary">Eşleşen kayıtlı numara yok — yeni müşteri girin.</p>
+                    ) : null}
+                  </div>
+                }
               />
             </div>
-          ) : null}
-
-          <div className="shrink-0 overflow-x-auto border-b border-surface-container-highest bg-surface-container-lowest px-3 py-2">
-            <div className="flex w-max gap-2">
-              <button
-                type="button"
-                onClick={() => setCategoryId("all")}
-                className={[
-                  "rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-95",
-                  categoryId === "all"
-                    ? "bg-primary text-white"
-                    : "border border-surface-container-highest bg-white text-on-background",
-                ].join(" ")}
-              >
-                Tümü
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoryId(c.id)}
-                  className={[
-                    "rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-95",
-                    categoryId === c.id
-                      ? "bg-primary text-white"
-                      : "border border-surface-container-highest bg-white text-on-background",
-                  ].join(" ")}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-            {visibleProducts.length === 0 ? (
-              <p className="py-16 text-center text-sm text-secondary">Bu kategoride ürün yok.</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-                {visibleProducts.map((p) => {
-                  const price = getProductPriceForFulfillmentWithVariations(p, channel, []);
-                  const detail =
-                    hasVariations(p.variationGroups) || parseIngredientLines(p.ingredients).length > 0;
-                  return (
+          ) : (
+            <>
+              <div className="shrink-0 overflow-x-auto border-b border-surface-container-highest bg-surface-container-lowest px-3 py-2">
+                <div className="flex w-max gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryId("all")}
+                    className={[
+                      "rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-95",
+                      categoryId === "all"
+                        ? "bg-primary text-white"
+                        : "border border-surface-container-highest bg-white text-on-background",
+                    ].join(" ")}
+                  >
+                    Tümü
+                  </button>
+                  {categories.map((c) => (
                     <button
-                      key={p.id}
+                      key={c.id}
                       type="button"
-                      onClick={() => openProduct(p)}
-                      className="flex min-h-[148px] flex-col overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest text-left shadow-sm transition active:scale-[0.98] active:border-primary/40"
+                      onClick={() => setCategoryId(c.id)}
+                      className={[
+                        "rounded-2xl px-4 py-3 text-sm font-bold transition active:scale-95",
+                        categoryId === c.id
+                          ? "bg-primary text-white"
+                          : "border border-surface-container-highest bg-white text-on-background",
+                      ].join(" ")}
                     >
-                      <div className="relative h-24 w-full bg-surface-container-low sm:h-28">
-                        {p.imageDataUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.imageDataUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-secondary/35">
-                            <span className="material-symbols-outlined text-4xl">restaurant</span>
-                          </div>
-                        )}
-                        {detail ? (
-                          <span className="absolute bottom-2 right-2 rounded-lg bg-on-background/75 px-2 py-0.5 text-[10px] font-bold text-white">
-                            Detay
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex flex-1 flex-col p-3">
-                        <p className="line-clamp-2 text-sm font-bold leading-snug text-on-background">
-                          {p.name}
-                        </p>
-                        <p className="mt-auto pt-2 font-headline text-base font-black text-primary">
-                          {formatTry(price)}
-                        </p>
-                      </div>
+                      {c.name}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+                {visibleProducts.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-secondary">Bu kategoride ürün yok.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+                    {visibleProducts.map((p) => {
+                      const price = getProductPriceForFulfillmentWithVariations(p, channel, []);
+                      const detail =
+                        hasVariations(p.variationGroups) || parseIngredientLines(p.ingredients).length > 0;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => openProduct(p)}
+                          className="flex min-h-[148px] flex-col overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest text-left shadow-sm transition active:scale-[0.98] active:border-primary/40"
+                        >
+                          <div className="relative h-24 w-full bg-surface-container-low sm:h-28">
+                            {p.imageDataUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.imageDataUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-secondary/35">
+                                <span className="material-symbols-outlined text-4xl">restaurant</span>
+                              </div>
+                            )}
+                            {detail ? (
+                              <span className="absolute bottom-2 right-2 rounded-lg bg-on-background/75 px-2 py-0.5 text-[10px] font-bold text-white">
+                                Detay
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-1 flex-col p-3">
+                            <p className="line-clamp-2 text-sm font-bold leading-snug text-on-background">
+                              {p.name}
+                            </p>
+                            <p className="mt-auto pt-2 font-headline text-base font-black text-primary">
+                              {formatTry(price)}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <aside className="flex max-h-[42vh] w-full shrink-0 flex-col bg-surface-container-lowest lg:max-h-none lg:w-[22rem] xl:w-96">
@@ -582,6 +651,13 @@ export default function KasaOrderModal({
             <p className="font-headline text-lg font-black text-on-background">
               {cartCount} ürün · {formatTry(cartTotal)}
             </p>
+            {channel === "delivery" && step === "customer" && customer.phone.trim() ? (
+              <p className="mt-1 truncate text-xs text-secondary">
+                {[customer.firstName, customer.lastName].filter(Boolean).join(" ") || "Müşteri"}
+                {" · "}
+                {formatCashierPhonePreview(customer.phone)}
+              </p>
+            ) : null}
           </div>
 
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
@@ -658,8 +734,14 @@ export default function KasaOrderModal({
               onClick={() => void handleComplete()}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-base font-bold text-white shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[22px]">print</span>
-              {submitting ? "Kaydediliyor…" : "Siparişi tamamla"}
+              <span className="material-symbols-outlined text-[22px]">
+                {channel === "delivery" && step === "menu" ? "arrow_forward" : "print"}
+              </span>
+              {submitting
+                ? "Kaydediliyor…"
+                : channel === "delivery" && step === "menu"
+                  ? "Müşteri bilgisine geç"
+                  : "Siparişi tamamla"}
             </button>
           </div>
         </aside>

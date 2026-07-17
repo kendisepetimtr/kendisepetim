@@ -1,5 +1,6 @@
 export const MENU_IMAGES_BUCKET = "menu-images";
 export const MAX_MENU_IMAGE_FILE_BYTES = 2 * 1024 * 1024;
+export const MAX_COVER_IMAGE_FILE_BYTES = 4 * 1024 * 1024;
 
 export const MENU_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
