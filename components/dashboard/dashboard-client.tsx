@@ -10,7 +10,13 @@ import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-setting
 import MenuManager from "@/components/dashboard/menu-manager";
 import type { DashboardTenantSyncResult } from "@/lib/dashboard/tenant-sync";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
-import { clearLocalCustomers, countLocalCustomers } from "@/lib/local-customers";
+import {
+  ACTIVITY_ACTION_LABELS,
+  ACTIVITY_ACTOR_LABELS,
+  formatActivityLogSummary as formatLogSummary,
+} from "@/lib/dashboard/activity-log-labels";
+import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { clearLocalCustomers, countLocalCustomers, getLocalCustomers } from "@/lib/local-customers";
 import { clearLocalOrders } from "@/lib/local-orders";
 import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
 import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
@@ -18,9 +24,18 @@ import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { getDashboardQuickLinks, getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
 import { useDashboardOrderNotifications } from "@/lib/hooks/use-dashboard-order-notifications";
 import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import type { AdminOrder } from "@/lib/orders";
+import {
+  buildOrdersReportSummary,
+  filterOrdersByPeriod,
+  formatTry,
+  getOrdersForRelativeReportDay,
+} from "@/lib/orders-report";
+import { ORDER_STATUS_LABELS } from "@/lib/order-status";
+import type { LocalMenuProduct } from "@/lib/local-menu";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const SIDEBAR_COLLAPSED_KEY = "kendisepetim_sidebar_collapsed_v1";
 
@@ -146,6 +161,103 @@ async function fetchDashboardMenuProductCount(): Promise<number> {
   }
 }
 
+async function fetchDashboardOrders(): Promise<AdminOrder[]> {
+  try {
+    const res = await fetch("/api/dashboard/orders?channel=all", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as { ok?: boolean; orders?: AdminOrder[] };
+    if (!res.ok || !data.ok) return [];
+    return data.orders ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function fetchDashboardActiveTables(): Promise<number> {
+  try {
+    const res = await fetch("/api/dashboard/tables", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as { ok?: boolean; activeCount?: number };
+    if (!res.ok || !data.ok) return 0;
+    return data.activeCount ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchDashboardMenuPreview(): Promise<LocalMenuProduct[]> {
+  try {
+    const res = await fetch("/api/dashboard/menu", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      state?: { products?: LocalMenuProduct[] };
+    };
+    if (!res.ok || !data.ok) return [];
+    const products = (data.state?.products ?? []).filter((p) => !p.hidden);
+    const featured = products.filter((p) => p.signatureDish);
+    return (featured.length > 0 ? [...featured, ...products.filter((p) => !p.signatureDish)] : products).slice(
+      0,
+      6,
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function fetchDashboardActivityLogs(): Promise<ActivityLogRow[]> {
+  try {
+    const res = await fetch("/api/dashboard/activity-logs", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const data = (await res.json()) as { ok?: boolean; logs?: ActivityLogRow[] };
+    if (!res.ok || !data.ok) return [];
+    return data.logs ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function phoneKey(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function countDistinctCustomers(orders: AdminOrder[], subdomain: string): number {
+  const keys = new Set<string>();
+  for (const c of getLocalCustomers(subdomain).customers) {
+    const k = phoneKey(c.phone);
+    if (k.length >= 7) keys.add(k);
+  }
+  for (const o of orders) {
+    const k = phoneKey(o.phone || "");
+    if (k.length >= 7) keys.add(k);
+  }
+  return keys.size > 0 ? keys.size : countLocalCustomers(subdomain);
+}
+
+function activityIcon(action: string): string {
+  if (action.includes("order")) return "receipt_long";
+  if (action.includes("payment") || action.includes("bill")) return "payments";
+  if (action.includes("courier") || action.includes("delivery")) return "delivery_dining";
+  if (action.includes("menu")) return "restaurant_menu";
+  if (action.includes("receipt") || action.includes("notification")) return "tune";
+  return "history";
+}
+
+function orderChannelLabel(order: AdminOrder): string {
+  if (order.fulfillmentType === "dine_in") {
+    return order.tableNumber != null ? `Masa ${order.tableNumber}` : "Masa";
+  }
+  return fulfillmentTypeLabel(order.fulfillmentType);
+}
+
 function DashboardPlaceholder({ navId }: { navId: string }) {
   const label = getNavLabel(navId);
   return (
@@ -171,6 +283,11 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   const [activeNav, setActiveNav] = useState<string>("overview");
   const [menuProductCount, setMenuProductCount] = useState(0);
   const [customerCount, setCustomerCount] = useState(0);
+  const [overviewOrders, setOverviewOrders] = useState<AdminOrder[]>([]);
+  const [activeTableCount, setActiveTableCount] = useState(0);
+  const [menuPreview, setMenuPreview] = useState<LocalMenuProduct[]>([]);
+  const [overviewLogs, setOverviewLogs] = useState<ActivityLogRow[]>([]);
+  const [overviewLoading, setOverviewLoading] = useState(false);
 
   const { printOrderIfAutoOnCreate } = useDashboardReceiptPrint(
     tenant?.businessName ?? "",
@@ -278,15 +395,91 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
 
   useEffect(() => {
     if (!tenant) return;
-    setCustomerCount(countLocalCustomers(tenant.subdomain));
     if (remoteAuthEnabled) {
       void fetchDashboardMenuProductCount()
         .then((count) => setMenuProductCount(count))
         .catch(() => setMenuProductCount(0));
     } else {
       setMenuProductCount(0);
+      setCustomerCount(countLocalCustomers(tenant.subdomain));
     }
   }, [tenant, activeNav, remoteAuthEnabled]);
+
+  useEffect(() => {
+    if (!tenant || activeNav !== "overview") return;
+
+    let cancelled = false;
+
+    async function loadOverview() {
+      setOverviewLoading(true);
+      try {
+        if (remoteAuthEnabled) {
+          const [orders, tables, preview, logs] = await Promise.all([
+            fetchDashboardOrders(),
+            fetchDashboardActiveTables(),
+            fetchDashboardMenuPreview(),
+            fetchDashboardActivityLogs(),
+          ]);
+          if (cancelled) return;
+          setOverviewOrders(orders);
+          setActiveTableCount(tables);
+          setMenuPreview(preview);
+          setOverviewLogs(logs.slice(0, 8));
+          setCustomerCount(countDistinctCustomers(orders, tenant.subdomain));
+        } else {
+          if (cancelled) return;
+          setOverviewOrders([]);
+          setActiveTableCount(0);
+          setMenuPreview([]);
+          setOverviewLogs([]);
+          setCustomerCount(countLocalCustomers(tenant.subdomain));
+        }
+      } finally {
+        if (!cancelled) setOverviewLoading(false);
+      }
+    }
+
+    void loadOverview();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant, activeNav, remoteAuthEnabled, ordersRefreshKey]);
+
+  // Canlı aktivite akışı overview listesini günceller
+  useEffect(() => {
+    if (activeNav !== "overview") return;
+    if (activityLogs.length === 0) return;
+    setOverviewLogs(activityLogs.slice(0, 8));
+  }, [activityLogs, activeNav]);
+
+  const reportDayConfig = useMemo(
+    () =>
+      tenant
+        ? {
+            hoursDayMode: tenant.hoursDayMode,
+            openTime: tenant.openTime,
+            closeTime: tenant.closeTime,
+          }
+        : undefined,
+    [tenant],
+  );
+
+  const todayOrderCount = useMemo(() => {
+    if (!tenant) return 0;
+    return getOrdersForRelativeReportDay(overviewOrders, 0, reportDayConfig).length;
+  }, [overviewOrders, reportDayConfig, tenant]);
+
+  const salesSummary = useMemo(() => {
+    const filtered = filterOrdersByPeriod(overviewOrders, "7d", new Date(), reportDayConfig);
+    return buildOrdersReportSummary(filtered, reportDayConfig);
+  }, [overviewOrders, reportDayConfig]);
+
+  const maxDayRevenue = useMemo(
+    () => salesSummary.byDay.reduce((max, row) => Math.max(max, row.revenue), 0),
+    [salesSummary.byDay],
+  );
+
+  const recentOrders = useMemo(() => overviewOrders.slice(0, 8), [overviewOrders]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -633,8 +826,18 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {[
-                { label: "Bugünkü sipariş", value: "—", hint: "Yakında", icon: "shopping_bag" },
-                { label: "Aktif masa", value: "—", hint: "Canlı", icon: "table_restaurant" },
+                {
+                  label: "Bugünkü sipariş",
+                  value: overviewLoading ? "…" : String(todayOrderCount),
+                  hint: reportDayConfig?.hoursDayMode === "shift" ? "İş günü" : "Takvim günü",
+                  icon: "shopping_bag",
+                },
+                {
+                  label: "Aktif masa",
+                  value: overviewLoading ? "…" : String(activeTableCount),
+                  hint: tenant.dineInEnabled ? "Açık oturum" : "Masa kapalı",
+                  icon: "table_restaurant",
+                },
                 {
                   label: "Menü ürünü",
                   value: String(menuProductCount),
@@ -644,10 +847,9 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 {
                   label: "Müşteri",
                   value: String(customerCount),
-                  hint: "Kayıtlı",
+                  hint: "Kayıtlı / sipariş veren",
                   icon: "group",
                 },
-                { label: "Ort. hazırlık", value: "—", hint: "dk", icon: "timer" },
               ].map((card) => (
                 <section
                   key={card.label}
@@ -667,44 +869,85 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
 
             <div className="mt-8 grid gap-6 lg:grid-cols-5">
               <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm lg:col-span-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-headline text-lg font-bold text-on-background">Satış özeti</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="font-headline text-lg font-bold text-on-background">Satış özeti</h2>
+                    <p className="mt-1 text-xs text-secondary">
+                      {salesSummary.orderCount} sipariş · {formatTry(salesSummary.revenueTotal)}
+                    </p>
+                  </div>
                   <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-xs font-medium text-secondary">
                     Son 7 gün
                   </span>
                 </div>
-                <div
-                  className="mt-6 flex h-64 items-center justify-center rounded-xl border border-dashed border-outline/35 bg-gradient-to-br from-surface-container-low to-surface-container"
-                  role="img"
-                  aria-label="Grafik yer tutucu"
-                >
-                  <div className="text-center">
-                    <span className="material-symbols-outlined text-5xl text-secondary/50">show_chart</span>
-                    <p className="mt-2 text-sm font-medium text-secondary">Grafik alanı (placeholder)</p>
+                {salesSummary.byDay.length === 0 ? (
+                  <div className="mt-6 flex h-64 items-center justify-center rounded-xl border border-dashed border-outline/35 bg-surface-container-low/60">
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-5xl text-secondary/50">show_chart</span>
+                      <p className="mt-2 text-sm font-medium text-secondary">
+                        {overviewLoading ? "Yükleniyor…" : "Bu aralıkta satış yok."}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="mt-6 space-y-2">
+                    {salesSummary.byDay.map((row) => {
+                      const pct = maxDayRevenue > 0 ? Math.min(100, (row.revenue / maxDayRevenue) * 100) : 0;
+                      return (
+                        <div key={row.dayKey} className="flex items-center gap-3">
+                          <span className="w-28 shrink-0 text-xs font-medium text-secondary sm:w-32">
+                            {row.label}
+                          </span>
+                          <div className="h-7 min-w-0 flex-1 overflow-hidden rounded-lg bg-surface-container-high">
+                            <div
+                              className="h-full min-w-[4px] rounded-lg bg-gradient-to-r from-primary/80 to-primary-container/90"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="w-28 shrink-0 text-right text-xs">
+                            <span className="font-semibold text-on-background">{formatTry(row.revenue)}</span>
+                            <span className="ml-1 text-secondary">({row.orderCount})</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
 
               <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm lg:col-span-2">
                 <h2 className="font-headline text-lg font-bold text-on-background">Son aktiviteler</h2>
-                <ul className="mt-4 space-y-3">
-                  {["Menü senkronu", "QR menü görüntüleme", "Yeni sipariş"].map((label, i) => (
-                    <li
-                      key={label}
-                      className="flex items-center gap-3 rounded-xl border border-surface-container-high bg-surface-container-low/80 px-3 py-3"
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-secondary">
-                        <span className="material-symbols-outlined text-[20px]">
-                          {i === 0 ? "sync" : i === 1 ? "qr_code_scanner" : "receipt"}
+                {overviewLogs.length === 0 ? (
+                  <p className="mt-6 text-sm text-secondary">
+                    {overviewLoading ? "Yükleniyor…" : "Henüz aktivite kaydı yok."}
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {overviewLogs.slice(0, 6).map((log) => (
+                      <li
+                        key={log.id}
+                        className="flex items-center gap-3 rounded-xl border border-surface-container-high bg-surface-container-low/80 px-3 py-3"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-secondary">
+                          <span className="material-symbols-outlined text-[20px]">{activityIcon(log.action)}</span>
                         </span>
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-on-background">{label}</p>
-                        <p className="text-xs text-secondary">Veri bağlantısı sonrası doldurulacak</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-on-background">
+                            {ACTIVITY_ACTION_LABELS[log.action] ?? log.action}
+                          </p>
+                          <p className="truncate text-xs text-secondary">{formatLogSummary(log)}</p>
+                          <p className="mt-0.5 text-[10px] text-secondary/80">
+                            {ACTIVITY_ACTOR_LABELS[log.actor_type] ?? log.actor_type} ·{" "}
+                            {new Date(log.created_at).toLocaleString("tr-TR", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             </div>
 
@@ -712,23 +955,50 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <h2 className="font-headline text-lg font-bold text-on-background">Menü vitrin önizlemesi</h2>
-                  <p className="mt-1 text-sm text-secondary">Ürün görselleri için yer tutucular — içerik sonra bağlanacak.</p>
+                  <p className="mt-1 text-sm text-secondary">Menüdeki görünür ürünlerden seçki.</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveNav("menu")}
+                  className="text-sm font-semibold text-primary hover:text-primary-container"
+                >
+                  Menüyü düzenle
+                </button>
               </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    key={n}
-                    className="overflow-hidden rounded-2xl border border-surface-container-high bg-surface-container-low"
-                  >
-                    <div className="aspect-[4/3] bg-gradient-to-br from-surface-container to-surface-container-highest" />
-                    <div className="p-4">
-                      <p className="font-headline text-sm font-bold text-on-background">Ürün {n}</p>
-                      <p className="mt-1 text-xs text-secondary">Açıklama placeholder</p>
+              {menuPreview.length === 0 ? (
+                <p className="mt-6 rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/50 px-5 py-10 text-center text-sm text-secondary">
+                  {overviewLoading ? "Yükleniyor…" : "Henüz görünür ürün yok. Menü sekmesinden ekleyin."}
+                </p>
+              ) : (
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  {menuPreview.slice(0, 3).map((p) => (
+                    <div
+                      key={p.id}
+                      className="overflow-hidden rounded-2xl border border-surface-container-high bg-surface-container-low"
+                    >
+                      <div className="aspect-[4/3] bg-surface-container">
+                        {p.imageDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.imageDataUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-secondary/40">
+                            <span className="material-symbols-outlined text-4xl">restaurant</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className="font-headline text-sm font-bold text-on-background">{p.name}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-secondary">
+                          {p.description || "Açıklama yok"}
+                        </p>
+                        <p className="mt-2 text-sm font-black text-primary">
+                          {formatTry(p.usePackagePrice ? p.packagePrice : p.price)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="mt-8 overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm">
@@ -736,8 +1006,8 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 <h2 className="font-headline text-lg font-bold text-on-background">Son siparişler</h2>
                 <button
                   type="button"
+                  onClick={() => setActiveNav("orders")}
                   className="text-sm font-semibold text-primary hover:text-primary-container"
-                  title="Yakında"
                 >
                   Tümünü gör
                 </button>
@@ -747,28 +1017,39 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                   <thead>
                     <tr className="border-b border-surface-container-high bg-surface-container-low/50 text-xs font-semibold uppercase tracking-wider text-secondary">
                       <th className="px-6 py-3">Sipariş</th>
-                      <th className="px-6 py-3">Masa</th>
+                      <th className="px-6 py-3">Kanal</th>
                       <th className="px-6 py-3">Durum</th>
                       <th className="px-6 py-3 text-right">Tutar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-surface-container-high">
-                    {[
-                      { id: "#1001", table: "M3", status: "Hazırlanıyor", amount: "—" },
-                      { id: "#1002", table: "T2", status: "Serviste", amount: "—" },
-                      { id: "#1003", table: "M1", status: "Ödendi", amount: "—" },
-                    ].map((row) => (
-                      <tr key={row.id} className="bg-white/50">
-                        <td className="px-6 py-3 font-medium text-on-background">{row.id}</td>
-                        <td className="px-6 py-3 text-secondary">{row.table}</td>
-                        <td className="px-6 py-3">
-                          <span className="inline-flex rounded-full bg-surface-container-low px-2.5 py-0.5 text-xs font-medium text-secondary">
-                            {row.status}
-                          </span>
+                    {recentOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-10 text-center text-sm text-secondary">
+                          {overviewLoading ? "Yükleniyor…" : "Henüz sipariş yok."}
                         </td>
-                        <td className="px-6 py-3 text-right font-mono text-on-background">{row.amount}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      recentOrders.map((order) => (
+                        <tr key={order.id} className="bg-white/50">
+                          <td className="px-6 py-3 font-medium text-on-background">
+                            <span className="font-mono">{order.orderCode}</span>
+                            <span className="mt-0.5 block text-xs font-normal text-secondary">
+                              {order.firstName} {order.lastName}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-secondary">{orderChannelLabel(order)}</td>
+                          <td className="px-6 py-3">
+                            <span className="inline-flex rounded-full bg-surface-container-low px-2.5 py-0.5 text-xs font-medium text-secondary">
+                              {ORDER_STATUS_LABELS[order.status]}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-right font-mono text-on-background">
+                            {formatTry(order.total)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
