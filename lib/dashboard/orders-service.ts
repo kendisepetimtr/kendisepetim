@@ -170,3 +170,33 @@ export async function updateDashboardOrderStatus(
     };
   }
 }
+
+/**
+ * Deneme / temiz kurulum için: siparişler, masa oturumları ve operasyon logları silinir.
+ * Menü, müşteri (yerel), kurye/garson ve işletme ayarları korunur.
+ */
+export async function clearAllOrdersData(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+
+  try {
+    const svc = createServiceSupabaseClient();
+
+    // order_lines → orders üzerinde cascade
+    const { error: ordersErr } = await svc.from("orders").delete().eq("tenant_id", tenant.id);
+    if (ordersErr) return { ok: false, error: ordersErr.message };
+
+    const { error: sessionsErr } = await svc.from("table_sessions").delete().eq("tenant_id", tenant.id);
+    if (sessionsErr) return { ok: false, error: sessionsErr.message };
+
+    const { error: logsErr } = await svc.from("activity_logs").delete().eq("tenant_id", tenant.id);
+    if (logsErr) return { ok: false, error: logsErr.message };
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Siparişler sıfırlanamadı.",
+    };
+  }
+}

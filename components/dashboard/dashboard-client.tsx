@@ -821,6 +821,14 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                     setMenuProductCount(0);
                   }
                 }}
+                onOrdersCleared={() => {
+                  clearLocalOrders(tenant.subdomain);
+                  setOverviewOrders([]);
+                  setActiveTableCount(0);
+                  setOverviewLogs([]);
+                  setActivityLogs([]);
+                  setCustomerCount(countLocalCustomers(tenant.subdomain));
+                }}
                 onSignOut={handleSignOut}
                 persistSettingsToSupabase={remoteAuthEnabled}
               />

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  clearAllOrdersData,
   loadDashboardOrderById,
   loadDashboardOrders,
   updateDashboardOrderStatus,
@@ -49,6 +50,27 @@ export async function PATCH(request: Request) {
   }
 
   const result = await updateDashboardOrderStatus(body.orderId, body.status);
+  if (!result.ok) {
+    const status = result.error === "Oturum bulunamadı." ? 401 : 400;
+    return NextResponse.json(result, { status });
+  }
+  return NextResponse.json(result);
+}
+
+/** Sipariş / oturum / log sıfırlama — menü ve müşteri verisine dokunulmaz. */
+export async function POST(request: Request) {
+  let body: { action?: string };
+  try {
+    body = (await request.json()) as { action?: string };
+  } catch {
+    return NextResponse.json({ ok: false, error: "Geçersiz istek gövdesi." }, { status: 400 });
+  }
+
+  if (body.action !== "clearAll") {
+    return NextResponse.json({ ok: false, error: "Geçersiz sipariş işlemi." }, { status: 400 });
+  }
+
+  const result = await clearAllOrdersData();
   if (!result.ok) {
     const status = result.error === "Oturum bulunamadı." ? 401 : 400;
     return NextResponse.json(result, { status });

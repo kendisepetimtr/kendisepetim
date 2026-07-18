@@ -33,6 +33,7 @@ type DashboardSettingsProps = {
   tenant: LocalTenantProfile;
   onTenantUpdate: (tenant: LocalTenantProfile) => void;
   onMenuCleared: () => void;
+  onOrdersCleared: () => void;
   onSignOut: () => void | Promise<void>;
   /** Supabase oturumu varsa ayarlar veritabanına yazılır */
   persistSettingsToSupabase?: boolean;
@@ -42,6 +43,7 @@ export default function DashboardSettings({
   tenant,
   onTenantUpdate,
   onMenuCleared,
+  onOrdersCleared,
   onSignOut,
   persistSettingsToSupabase = false,
 }: DashboardSettingsProps) {
@@ -228,6 +230,46 @@ export default function DashboardSettings({
       return;
     }
     window.alert("Menü artık veritabanında tutuluyor; bu işlem için sunucu bağlantısı gerekli.");
+  }
+
+  function handleClearOrders() {
+    if (
+      !window.confirm(
+        "Tüm siparişler, masa oturumları ve operasyon logları silinecek. Menü ve müşteri kayıtları kalır. Bu işlem geri alınamaz. Devam edilsin mi?",
+      )
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "Son onay: Sipariş verileri kalıcı olarak silinecek. Emin misiniz?",
+      )
+    ) {
+      return;
+    }
+    if (persistSettingsToSupabase) {
+      startSaveTransition(async () => {
+        try {
+          const res = await fetch("/api/dashboard/orders", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "clearAll" }),
+          });
+          const result = (await res.json()) as { ok: true } | { ok: false; error: string };
+          if (!result.ok) {
+            window.alert(result.error);
+            return;
+          }
+          onOrdersCleared();
+          window.alert("Sipariş verileri temizlendi.");
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : "Siparişler sıfırlanamadı.");
+        }
+      });
+      return;
+    }
+    window.alert("Bu işlem için sunucu bağlantısı gerekli.");
   }
 
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -770,16 +812,30 @@ export default function DashboardSettings({
             <div className="min-w-0 flex-1">
               <h2 className="font-headline text-lg font-bold text-on-background">Tehlikeli bölge</h2>
               <p className="mt-1 text-sm text-secondary">
-                Menü verisini sıfırlamak tüm kategorileri ve ürünleri bu cihazdan siler. İşletme kaydı (kayıt
-                bilgileriniz) silinmez.
+                Bu işlemler geri alınamaz. İşletme kaydı, menü dışı ayarlar ve personel (garson/kurye) silinmez.
               </p>
-              <button
-                type="button"
-                onClick={handleClearMenu}
-                className="mt-4 rounded-xl border border-error/40 bg-white px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/10"
-              >
-                Menü verisini sıfırla
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleClearMenu}
+                  disabled={savePending}
+                  className="rounded-xl border border-error/40 bg-white px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-60"
+                >
+                  Menü verisini sıfırla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearOrders}
+                  disabled={savePending}
+                  className="rounded-xl border border-error/40 bg-white px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-60"
+                >
+                  Siparişleri sıfırla
+                </button>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-secondary">
+                Siparişleri sıfırla: tüm siparişler, masa oturumları ve operasyon logları silinir. Menü ürünleri
+                ve müşteri kayıtları kalır (deneme sonrası temiz veri için).
+              </p>
             </div>
           </div>
         </section>
