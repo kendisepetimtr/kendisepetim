@@ -148,8 +148,14 @@ export default function SuperadminTenantCards({
                         </p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Badge
-                            active={t.plan === "premium"}
-                            label={t.plan === "premium" ? "Premium" : "Free"}
+                            active={t.plan === "premium" || t.plan === "lifetime"}
+                            label={
+                              t.plan === "lifetime"
+                                ? "Ömür boyu"
+                                : t.plan === "premium"
+                                  ? "Premium"
+                                  : "Free"
+                            }
                           />
                           <TrialBadge tenant={t} />
                           <Badge active={t.public_menu_enabled} label="QR" />
@@ -257,6 +263,9 @@ function toDateInputValue(iso: string | null | undefined): string {
 
 function TrialBadge({ tenant }: { tenant: TenantRow }) {
   const tier = getTenantAccessTier(tenant);
+  if (tier === "lifetime") {
+    return <Badge active label="Pilot / ömür boyu" />;
+  }
   if (tier === "premium") {
     return <Badge active label="Tam erişim" />;
   }
@@ -354,9 +363,11 @@ function TenantAccordionBody({
             >
               <option value="free">Free</option>
               <option value="premium">Premium</option>
+              <option value="lifetime">Ömür boyu (pilot)</option>
             </select>
             <p className="mt-1.5 text-xs text-secondary">
-              Premium = süresiz tam erişim. Free = deneme bitince yalnızca QR menü + menü düzenleme.
+              Premium = ücretli tam erişim. Ömür boyu = pilot/özel restoran, süresiz ücretsiz tam erişim.
+              Free = deneme bitince yalnızca QR menü + menü düzenleme.
             </p>
           </Field>
 
@@ -390,11 +401,13 @@ function TenantAccordionBody({
               </button>
             </div>
             <p className="mt-1.5 text-xs text-secondary">
-              {tier === "premium"
-                ? "Premium aktif — deneme tarihi erişimi etkilemez."
-                : tier === "trial"
-                  ? `Deneme aktif: ${daysLeft} gün kaldı.`
-                  : "Deneme yok veya bitti — Free kısıtları geçerli."}
+              {tier === "lifetime"
+                ? "Ömür boyu plan aktif — deneme tarihi erişimi etkilemez."
+                : tier === "premium"
+                  ? "Premium aktif — deneme tarihi erişimi etkilemez."
+                  : tier === "trial"
+                    ? `Deneme aktif: ${daysLeft} gün kaldı.`
+                    : "Deneme yok veya bitti — Free kısıtları geçerli."}
             </p>
           </Field>
 

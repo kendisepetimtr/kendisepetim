@@ -8,7 +8,17 @@ export type TenantEntitlementInput = {
   trialEndsAt?: string | null;
 };
 
-export type TenantAccessTier = "premium" | "trial" | "free";
+export type TenantAccessTier = "lifetime" | "premium" | "trial" | "free";
+
+export function normalizeTenantPlan(plan: string | null | undefined): TenantPlan {
+  if (plan === "premium" || plan === "lifetime") return plan;
+  return "free";
+}
+
+/** Premium veya ömür boyu — deneme tarihinden bağımsız tam erişim. */
+export function isUnlimitedPlan(plan: TenantPlan | string | null | undefined): boolean {
+  return plan === "premium" || plan === "lifetime";
+}
 
 export function defaultTrialEndsAt(from: Date = new Date()): string {
   const d = new Date(from.getTime());
@@ -23,15 +33,16 @@ function resolveTrialEndsAt(input: TenantEntitlementInput): string | null {
   return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
-/** Premium abonelik veya aktif deneme → tam özellikler. */
+/** Premium, ömür boyu veya aktif deneme → tam özellikler. */
 export function hasFullTenantAccess(input: TenantEntitlementInput, now: Date = new Date()): boolean {
-  if (input.plan === "premium") return true;
+  if (isUnlimitedPlan(input.plan)) return true;
   const ends = resolveTrialEndsAt(input);
   if (!ends) return false;
   return Date.parse(ends) > now.getTime();
 }
 
 export function getTenantAccessTier(input: TenantEntitlementInput, now: Date = new Date()): TenantAccessTier {
+  if (input.plan === "lifetime") return "lifetime";
   if (input.plan === "premium") return "premium";
   const ends = resolveTrialEndsAt(input);
   if (ends && Date.parse(ends) > now.getTime()) return "trial";
@@ -40,7 +51,7 @@ export function getTenantAccessTier(input: TenantEntitlementInput, now: Date = n
 
 /** Kalan tam gün sayısı (yukarı yuvarlama); bitmişse 0. */
 export function getTrialDaysRemaining(input: TenantEntitlementInput, now: Date = new Date()): number {
-  if (input.plan === "premium") return 0;
+  if (isUnlimitedPlan(input.plan)) return 0;
   const ends = resolveTrialEndsAt(input);
   if (!ends) return 0;
   const ms = Date.parse(ends) - now.getTime();

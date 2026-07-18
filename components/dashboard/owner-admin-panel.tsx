@@ -522,7 +522,7 @@ export default function OwnerAdminPanel({
   hoursDayMode: BusinessHoursDayMode;
   openTime: string;
   closeTime: string;
-  plan?: "free" | "premium";
+  plan?: "free" | "premium" | "lifetime";
   trialEndsAt?: string | null;
   initialOrders: AdminOrder[];
   initialLogs: ActivityLogRow[];

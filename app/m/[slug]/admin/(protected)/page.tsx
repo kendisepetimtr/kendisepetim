@@ -1,3 +1,4 @@
+import { normalizeTenantPlan } from "@/lib/tenant-entitlements";
 import OwnerAdminPanel from "@/components/dashboard/owner-admin-panel";
 import { requireOwnerTenantSlugMatch } from "@/lib/admin/tenant-slug-guard";
 import { loadActivityLogs } from "@/lib/dashboard/activity-logs-service";
@@ -41,7 +42,7 @@ export default async function TenantAdminDashboardPage({ params }: { params: Pro
       hoursDayMode={tenant.hours_day_mode}
       openTime={tenant.open_time}
       closeTime={tenant.close_time}
-      plan={tenant.plan === "premium" ? "premium" : "free"}
+      plan={normalizeTenantPlan(tenant.plan)}
       trialEndsAt={tenant.trial_ends_at ?? null}
       initialOrders={orders}
       initialLogs={logsResult.ok ? logsResult.logs : []}

@@ -7,6 +7,7 @@ import {
 import { currentYearMonth } from "@/lib/superadmin/accounting-types";
 import { SUPERADMIN_TENANT_SELECT } from "@/lib/superadmin/tenant-select";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
+import { normalizeTenantPlan } from "@/lib/tenant-entitlements";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 
 export default async function SuperadminOverviewPage() {
@@ -27,7 +28,7 @@ export default async function SuperadminOverviewPage() {
         ...row,
         owner_admin_pin_hash: null,
         marketplace_enabled: row.marketplace_enabled === true,
-        plan: row.plan === "premium" ? "premium" : "free",
+        plan: normalizeTenantPlan(row.plan),
         trial_ends_at: row.trial_ends_at ?? null,
       })) as TenantRow[];
     }

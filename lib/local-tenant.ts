@@ -7,6 +7,7 @@ import {
 import { DEFAULT_DELIVERY_RADIUS_KM } from "@/lib/fulfillment";
 import { writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
 import { parseMealCardBrandIds, type MealCardBrandId } from "@/lib/tenant-payment";
+import { normalizeTenantPlan } from "@/lib/tenant-entitlements";
 
 export const LOCAL_TENANT_STORAGE_KEY = "kendisepetim_tenant_v1";
 
@@ -51,8 +52,8 @@ export type LocalTenantProfile = {
   paymentMealCardBrands: MealCardBrandId[];
   /** Marketplace vitrininde listelenir (opt-in) */
   marketplaceEnabled: boolean;
-  /** free | premium — superadmin / ödeme */
-  plan: "free" | "premium";
+  /** free | premium | lifetime — superadmin / ödeme */
+  plan: "free" | "premium" | "lifetime";
   /** Ücretsiz deneme bitiş ISO; null = yok */
   trialEndsAt: string | null;
   city: string;
@@ -96,7 +97,7 @@ export function saveLocalTenant(
     paymentMealCard: data.paymentMealCard === true,
     paymentMealCardBrands: parseMealCardBrandIds(data.paymentMealCardBrands),
     marketplaceEnabled: data.marketplaceEnabled === true,
-    plan: data.plan === "premium" ? "premium" : "free",
+    plan: normalizeTenantPlan(data.plan),
     trialEndsAt:
       typeof data.trialEndsAt === "string" && data.trialEndsAt.trim()
         ? data.trialEndsAt
@@ -165,7 +166,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const paymentMealCardBrands = parseMealCardBrandIds(p.paymentMealCardBrands);
 
     const marketplaceEnabled = p.marketplaceEnabled === true;
-    const plan = p.plan === "premium" ? "premium" : "free";
+    const plan = normalizeTenantPlan(p.plan);
     const trialEndsAt =
       typeof p.trialEndsAt === "string" && p.trialEndsAt.trim() ? p.trialEndsAt : null;
     const city = typeof p.city === "string" ? p.city : "";

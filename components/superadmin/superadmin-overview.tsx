@@ -12,6 +12,7 @@ type Props = {
 export default function SuperadminOverview({ tenants, accountingSummary, accountingError }: Props) {
   const freeCount = tenants.filter((t) => t.plan === "free").length;
   const premCount = tenants.filter((t) => t.plan === "premium").length;
+  const lifetimeCount = tenants.filter((t) => t.plan === "lifetime").length;
   const menuOn = tenants.filter((t) => t.public_menu_enabled).length;
   const recent = tenants.slice(0, 5);
 
@@ -22,11 +23,12 @@ export default function SuperadminOverview({ tenants, accountingSummary, account
         <p className="mt-1 text-sm text-secondary">Platform özeti ve son işletmeler</p>
       </header>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 xl:grid-cols-5">
         <StatCard label="Toplam işletme" value={String(tenants.length)} icon="storefront" />
         <StatCard label="Premium" value={String(premCount)} icon="workspace_premium" accent="amber" />
+        <StatCard label="Ömür boyu" value={String(lifetimeCount)} icon="all_inclusive" accent="emerald" />
         <StatCard label="Free" value={String(freeCount)} icon="layers" />
-        <StatCard label="QR menü açık" value={String(menuOn)} icon="qr_code_2" accent="emerald" />
+        <StatCard label="QR menü açık" value={String(menuOn)} icon="qr_code_2" />
       </div>
 
       {accountingSummary ? (
@@ -79,10 +81,14 @@ export default function SuperadminOverview({ tenants, accountingSummary, account
                 <span
                   className={[
                     "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase",
-                    t.plan === "premium" ? "bg-amber-500/15 text-amber-900" : "bg-surface-container-high text-secondary",
+                    t.plan === "lifetime"
+                      ? "bg-emerald-500/15 text-emerald-900"
+                      : t.plan === "premium"
+                        ? "bg-amber-500/15 text-amber-900"
+                        : "bg-surface-container-high text-secondary",
                   ].join(" ")}
                 >
-                  {t.plan}
+                  {t.plan === "lifetime" ? "ömür boyu" : t.plan}
                 </span>
               </li>
             ))}

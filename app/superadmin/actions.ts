@@ -85,7 +85,7 @@ export async function superadminUpdateSubdomain(tenantId: string, subdomainRaw: 
 
 export async function superadminSetPlan(tenantId: string, plan: TenantPlan): Promise<{ error?: string }> {
   if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
-  if (plan !== "free" && plan !== "premium") return { error: "Geçersiz plan." };
+  if (plan !== "free" && plan !== "premium" && plan !== "lifetime") return { error: "Geçersiz plan." };
   const svc = await guardAndService();
   const { error } = await svc.from("tenants").update({ plan }).eq("id", tenantId);
   if (error) return { error: error.message };

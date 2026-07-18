@@ -17,7 +17,7 @@ export default function TenantTrialBanner({ tenant }: Props) {
     trialEndsAt: tenant.trialEndsAt,
   });
 
-  if (tier === "premium") return null;
+  if (tier === "lifetime" || tier === "premium") return null;
 
   if (tier === "trial") {
     const days = getTrialDaysRemaining({

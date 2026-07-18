@@ -8,6 +8,7 @@ import { clampDeliveryRadiusKm } from "@/lib/fulfillment";
 import type { LocalTenantProfile } from "@/lib/local-tenant";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { resolveEnabledMealCardBrands } from "@/lib/tenant-payment";
+import { normalizeTenantPlan } from "@/lib/tenant-entitlements";
 
 /** Supabase `tenants` satırını panelin kullandığı profile çevirir. */
 export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
@@ -37,7 +38,7 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
       row.payment_meal_card_brands,
     ),
     marketplaceEnabled: row.marketplace_enabled === true,
-    plan: row.plan === "premium" ? "premium" : "free",
+    plan: normalizeTenantPlan(row.plan),
     trialEndsAt: row.trial_ends_at?.trim() ? row.trial_ends_at : null,
     city: row.city ?? "",
     district: row.district ?? "",

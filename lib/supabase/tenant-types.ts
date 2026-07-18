@@ -2,7 +2,7 @@
  * public.tenants satırı — supabase/migrations ile uyumlu.
  * Şema değişince burayı ve migration'ı birlikte güncelleyin.
  */
-export type TenantPlan = "free" | "premium";
+export type TenantPlan = "free" | "premium" | "lifetime";
 
 export type TenantHoursDayMode = "calendar" | "shift";
 
