@@ -16,7 +16,7 @@ type Props = {
   initialTenants: TenantRow[];
   /** tenant_id → toplam sipariş (tüm kanallar) */
   orderCounts?: Record<string, number>;
-  /** tenant_id → benzersiz müşteri (sipariş telefonları) */
+  /** tenant_id → paket + gel-al/QR benzersiz müşteri */
   customerCounts?: Record<string, number>;
   loadError: string | null;
 };
@@ -161,7 +161,7 @@ export default function SuperadminTenantCards({
                         </div>
                         <div
                           className="text-right"
-                          title="Siparişlerdeki benzersiz telefon numarası"
+                          title="Paket ve gel-al / QR menü siparişlerindeki benzersiz müşteri"
                         >
                           <p className="font-headline text-xl font-extrabold tabular-nums leading-none text-on-background sm:text-2xl">
                             {(customerCounts[t.id] ?? 0).toLocaleString("tr-TR")}

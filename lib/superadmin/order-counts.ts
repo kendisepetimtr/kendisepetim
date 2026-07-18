@@ -41,16 +41,20 @@ async function countDistinctCustomersForTenant(
   let from = 0;
 
   for (;;) {
+    // Panel Müşteriler / kasa araması ile aynı: paket + gel-al (QR menü dahil), masa değil
     const { data, error } = await svc
       .from("orders")
       .select("customer_phone")
       .eq("tenant_id", tenantId)
+      .in("fulfillment_type", ["delivery", "pickup"])
       .range(from, from + pageSize - 1);
 
     if (error || !data || data.length === 0) break;
 
     for (const row of data) {
-      const key = phoneKey(String((row as { customer_phone?: string | null }).customer_phone ?? ""));
+      const raw = String((row as { customer_phone?: string | null }).customer_phone ?? "").trim();
+      if (!raw || raw === "-") continue;
+      const key = phoneKey(raw);
       if (key) keys.add(key);
     }
 
@@ -62,8 +66,8 @@ async function countDistinctCustomersForTenant(
 }
 
 /**
- * Tenant başına benzersiz müşteri (siparişlerdeki geçerli telefon).
- * Masa/garson placeholder ("-") sayılmaz.
+ * Tenant başına benzersiz müşteri — paket + gel-al/QR siparişlerindeki geçerli telefon.
+ * Masa siparişleri ve "-" placeholder sayılmaz (işletme paneli Müşteriler mantığına yakın).
  */
 export async function loadTenantCustomerCounts(
   tenantIds: string[],
