@@ -808,7 +808,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 refreshKey={ordersRefreshKey}
               />
             ) : activeNav === "customers" ? (
-              <CustomersManager subdomain={tenant.subdomain} />
+              <CustomersManager subdomain={tenant.subdomain} remoteEnabled={remoteAuthEnabled} />
             ) : activeNav === "qr" ? (
               <DashboardQrSubdomain tenant={tenant} />
             ) : activeNav === "reports" ? (
