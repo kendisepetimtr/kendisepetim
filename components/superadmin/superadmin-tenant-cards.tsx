@@ -371,45 +371,49 @@ function TenantAccordionBody({
             </p>
           </Field>
 
-          <Field label="Ücretsiz deneme bitiş">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <input
-                type="date"
-                value={trialValue}
-                disabled={pending}
-                onChange={(e) => onTrialChange(e.target.value)}
-                className="rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                disabled={pending || trialValue === savedTrial}
-                onClick={() => run(superadminSetTrialEndsAt(t.id, trialValue))}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-40"
-              >
-                Kaydet
-              </button>
-              <button
-                type="button"
-                disabled={pending || !t.trial_ends_at}
-                onClick={() => {
-                  onTrialChange("");
-                  run(superadminSetTrialEndsAt(t.id, ""));
-                }}
-                className="rounded-lg border border-surface-container-highest px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface-container-low disabled:opacity-40"
-              >
-                Denemeyi kaldır
-              </button>
-            </div>
-            <p className="mt-1.5 text-xs text-secondary">
-              {tier === "lifetime"
-                ? "Ömür boyu plan aktif — deneme tarihi erişimi etkilemez."
-                : tier === "premium"
-                  ? "Premium aktif — deneme tarihi erişimi etkilemez."
-                  : tier === "trial"
-                    ? `Deneme aktif: ${daysLeft} gün kaldı.`
-                    : "Deneme yok veya bitti — Free kısıtları geçerli."}
+          {t.plan === "free" ? (
+            <Field label="Ücretsiz deneme bitiş">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="date"
+                  value={trialValue}
+                  disabled={pending}
+                  onChange={(e) => onTrialChange(e.target.value)}
+                  className="rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={pending || trialValue === savedTrial}
+                  onClick={() => run(superadminSetTrialEndsAt(t.id, trialValue))}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-40"
+                >
+                  Kaydet
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || !t.trial_ends_at}
+                  onClick={() => {
+                    onTrialChange("");
+                    run(superadminSetTrialEndsAt(t.id, ""));
+                  }}
+                  className="rounded-lg border border-surface-container-highest px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface-container-low disabled:opacity-40"
+                >
+                  Denemeyi kaldır
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-secondary">
+                {tier === "trial"
+                  ? `Deneme aktif: ${daysLeft} gün kaldı.`
+                  : "Deneme yok veya bitti — Free kısıtları geçerli."}
+              </p>
+            </Field>
+          ) : (
+            <p className="rounded-lg border border-surface-container-high bg-surface-container-low/60 px-3 py-2 text-xs text-secondary">
+              {t.plan === "lifetime"
+                ? "Ömür boyu planda deneme tarihi gerekmez — süresiz tam erişim."
+                : "Premium planda deneme tarihi gerekmez — süresiz tam erişim."}
             </p>
-          </Field>
+          )}
 
           <Field label="Patron PIN (4 hane)">
             <div className="flex flex-wrap gap-2">
