@@ -69,3 +69,64 @@ button:focus-visible {
   outline: 2px solid #bc000c;
   outline-offset: 2px;
 }
+
+@keyframes land-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes land-url-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(188, 0, 12, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(188, 0, 12, 0);
+  }
+}
+
+@keyframes land-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.land-fade-up {
+  animation: land-fade-up 0.7s ease-out both;
+}
+
+.land-fade-up-delay-1 {
+  animation: land-fade-up 0.7s ease-out 0.12s both;
+}
+
+.land-fade-up-delay-2 {
+  animation: land-fade-up 0.7s ease-out 0.24s both;
+}
+
+.land-url-glow {
+  animation: land-url-pulse 3.2s ease-in-out infinite;
+}
+
+.land-live-dot {
+  animation: land-dot 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .land-fade-up,
+  .land-fade-up-delay-1,
+  .land-fade-up-delay-2,
+  .land-url-glow,
+  .land-live-dot {
+    animation: none;
+  }
+}

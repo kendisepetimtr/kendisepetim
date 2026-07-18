@@ -10,6 +10,54 @@ type SiteHomeProps = {
 
 const HOME_GRID_LIMIT = 12;
 
+const MENU_CAPABILITIES = [
+  {
+    icon: "link",
+    title: "Kendi menü adresiniz",
+    body: "restoranadiniz.kendisepetim.com — markanıza özel, paylaşılabilir QR menü adresi.",
+  },
+  {
+    icon: "travel_explore",
+    title: "Google’da öne çıkın",
+    body: "Menünüz arama motorlarında indexlenebilir; müşteriler sizi Google’da bulur.",
+  },
+  {
+    icon: "warning",
+    title: "Alerjen uyarıları",
+    body: "Gluten, süt, yumurta, kuruyemiş ve özel uyarı etiketleriyle şeffaf menü.",
+  },
+  {
+    icon: "local_fire_department",
+    title: "Kalori bilgisi",
+    body: "Ürün kalorilerini menüde gösterin; bilinçli seçimi kolaylaştırın.",
+  },
+  {
+    icon: "translate",
+    title: "Çoklu dil",
+    body: "Menünüzü birden fazla dilde sunun; yerli ve yabancı misafire hitap edin.",
+  },
+  {
+    icon: "qr_code_2",
+    title: "QR menü & sipariş",
+    body: "Masadan temassız sipariş; menüyü anında güncelleyin, yazdırma derdi yok.",
+  },
+  {
+    icon: "point_of_sale",
+    title: "Kasa paneli",
+    body: "Masa, gel-al ve paket siparişleri tek ekrandan yönetin, ödeme alın.",
+  },
+  {
+    icon: "person_pin",
+    title: "Garson uygulaması",
+    body: "Garson masadan sipariş alsın; fiş ve tahsilat kasada kalsın.",
+  },
+  {
+    icon: "restaurant_menu",
+    title: "Zengin ürün kartı",
+    body: "Görsel, içerik, varyasyonlar ve imza yemeklerle menünüzü öne çıkarın.",
+  },
+] as const;
+
 export default function SiteHome({ listings }: SiteHomeProps) {
   const visible = listings.slice(0, HOME_GRID_LIMIT);
   const hasMore = listings.length > HOME_GRID_LIMIT;
@@ -58,36 +106,57 @@ export default function SiteHome({ listings }: SiteHomeProps) {
       </header>
 
       <main className="pt-24">
-        {/* Hero — tek kompozisyon */}
-        <section className="relative overflow-hidden border-b border-surface-container-highest bg-gradient-to-br from-primary/[0.06] via-background to-surface-container-low/80">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_20%,rgba(188,0,12,0.08),transparent_50%)]" />
+        {/* Hero — marka + kendi adres vurgusu */}
+        <section className="relative overflow-hidden border-b border-surface-container-highest bg-gradient-to-br from-primary/[0.07] via-background to-surface-container-low/90">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_75%_15%,rgba(188,0,12,0.1),transparent_55%)]" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(26,28,30,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(26,28,30,0.04) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
           <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-8 lg:py-24">
-            <div className="max-w-2xl">
-              <p className="font-headline text-xs font-bold uppercase tracking-[0.28em] text-primary">
+            <div className="max-w-3xl">
+              <p className="land-fade-up font-headline text-xs font-bold uppercase tracking-[0.28em] text-primary">
                 KendiSepetim
               </p>
-              <h1 className="mt-4 font-headline text-4xl font-extrabold tracking-tight text-on-background sm:text-5xl lg:text-6xl">
-                Sipariş ve menü{" "}
-                <span className="text-primary">tek yerde</span>
+              <h1 className="land-fade-up-delay-1 mt-4 font-headline text-4xl font-extrabold tracking-tight text-on-background sm:text-5xl lg:text-6xl">
+                Menünüz kendi adresinde
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-relaxed text-secondary sm:text-lg">
-                Restoranınızın QR menüsü kendi adresinde yayınlanır; müşteriler yakınındaki
-                restoranlardan sipariş verir.
+              <p className="land-fade-up-delay-2 mt-5 max-w-xl text-base leading-relaxed text-secondary sm:text-lg">
+                QR menü, Google’da görünürlük, alerjen ve kalori bilgisi — restoranınız
+                tek platformda dijitalleşir.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <a
-                  href="#restoranlar"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-container"
-                >
-                  Restoranlara bak
-                  <span className="material-symbols-outlined text-[20px]">arrow_downward</span>
-                </a>
+
+              <div className="land-fade-up-delay-2 land-url-glow mt-8 max-w-xl overflow-hidden rounded-2xl border border-surface-container-highest bg-white/90 backdrop-blur-sm">
+                <div className="flex items-center gap-2 border-b border-surface-container-highest px-4 py-2.5">
+                  <span className="land-live-dot size-2.5 rounded-full bg-emerald-500" aria-hidden />
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-secondary">
+                    Canlı menü adresi
+                  </span>
+                </div>
+                <p className="px-4 py-4 font-mono text-base font-semibold tracking-tight text-on-background sm:text-lg">
+                  <span className="text-primary">restoranadiniz</span>
+                  <span className="text-secondary">.kendisepetim.com</span>
+                </p>
+              </div>
+
+              <div className="land-fade-up-delay-2 mt-8 flex flex-wrap gap-3">
                 <Link
                   href="/kayit"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-container"
+                >
+                  Ücretsiz başla
+                  <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+                </Link>
+                <a
+                  href="#ozellikler"
                   className="inline-flex items-center gap-2 rounded-2xl border border-surface-container-highest bg-white px-6 py-3.5 text-sm font-bold text-on-background transition hover:bg-surface-container-low"
                 >
-                  Restoranını kaydet
-                </Link>
+                  Özellikleri gör
+                </a>
               </div>
             </div>
           </div>
@@ -105,10 +174,7 @@ export default function SiteHome({ listings }: SiteHomeProps) {
                   {LAUNCH_CITY} {LAUNCH_DISTRICT} — menüye gidip sipariş verin
                 </p>
               </div>
-              <Link
-                href="/restoranlar"
-                className="text-sm font-bold text-primary hover:underline"
-              >
+              <Link href="/restoranlar" className="text-sm font-bold text-primary hover:underline">
                 Tüm restoranlar
               </Link>
             </div>
@@ -145,38 +211,31 @@ export default function SiteHome({ listings }: SiteHomeProps) {
           </div>
         </section>
 
-        {/* Ürün — kısa, homojen */}
-        <section id="ozellikler" className="scroll-mt-28 border-y border-surface-container-highest bg-surface-container-low/50 px-4 py-16 sm:px-8 lg:py-20">
+        {/* Özellikler */}
+        <section
+          id="ozellikler"
+          className="scroll-mt-28 border-y border-surface-container-highest bg-surface-container-low/50 px-4 py-16 sm:px-8 lg:py-20"
+        >
           <div className="mx-auto max-w-7xl">
-            <div className="mb-10 max-w-2xl">
+            <div className="mb-12 max-w-2xl">
               <h2 className="font-headline text-2xl font-extrabold tracking-tight sm:text-3xl">
-                QR menüden kasaya
+                Menüden operasyona, tek platform
               </h2>
-              <p className="mt-2 text-secondary">
-                Her restoran kendi markasıyla; müşteri ve işletme aynı ekosistemde.
+              <p className="mt-3 text-secondary">
+                Kendi alt alan adınız, arama görünürlüğü ve müşteriye şeffaf menü — kasa ve
+                garson aynı ekosistemde.
               </p>
             </div>
-            <div className="grid gap-6 md:grid-cols-3">
-              <ProductLine
-                icon="qr_code_2"
-                title="QR menü"
-                body="sizinadiniz.kendisepetim.com — temassız sipariş, anlık menü güncelleme."
-              />
-              <ProductLine
-                icon="point_of_sale"
-                title="Kasa"
-                body="Masa, gel-al ve paket siparişleri tek panelden yönetin."
-              />
-              <ProductLine
-                icon="person_pin"
-                title="Garson"
-                body="Masadan sipariş alın, hesabı kasaya iletin — fiş kasada."
-              />
+
+            <div className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {MENU_CAPABILITIES.map((item) => (
+                <FeatureItem key={item.title} icon={item.icon} title={item.title} body={item.body} />
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Planlar — ₺ yok */}
+        {/* Planlar */}
         <section id="planlar" className="scroll-mt-28 px-4 py-16 sm:px-8 lg:py-20">
           <div className="mx-auto max-w-7xl">
             <div className="mb-12 space-y-3 text-center">
@@ -191,11 +250,7 @@ export default function SiteHome({ listings }: SiteHomeProps) {
               <PlanCard
                 title="İlk 3 ay bedava"
                 subtitle="Tüm özellikler, deneme sonrası abonelik"
-                bullets={[
-                  "Tüm özellikler açık",
-                  "Limit yok",
-                  "Kredi kartı gerekmez",
-                ]}
+                bullets={["Tüm özellikler açık", "Limit yok", "Kredi kartı gerekmez"]}
                 cta="Kayda başla"
                 ctaHref="/kayit"
                 featured={false}
@@ -204,9 +259,10 @@ export default function SiteHome({ listings }: SiteHomeProps) {
                 title="Aylık"
                 subtitle="Esnek abonelik, dilediğinizde iptal"
                 bullets={[
-                  "Sınırsız QR menü",
-                  "Masa, garson ve kurye",
-                  "Raporlama",
+                  "Kendi menü adresiniz",
+                  "Google’da indexlenebilir menü",
+                  "Alerjen, kalori ve çoklu dil",
+                  "Kasa, garson ve QR sipariş",
                 ]}
                 cta="Ücretsiz başla"
                 ctaHref="/kayit"
@@ -232,11 +288,15 @@ export default function SiteHome({ listings }: SiteHomeProps) {
         {/* CTA band */}
         <section className="px-4 pb-20 sm:px-8">
           <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#bc000c] to-[#e71418] px-8 py-14 text-center text-white sm:px-12 lg:py-16">
-            <h2 className="font-headline text-3xl font-extrabold tracking-tight sm:text-4xl">
-              Restoranınızı bugün dijitalleştirin
+            <p className="font-mono text-sm font-semibold text-white/80 sm:text-base">
+              restoranadiniz.kendisepetim.com
+            </p>
+            <h2 className="mt-3 font-headline text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Adresiniz hazır. Menünüz sizi bekliyor.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-white/85">
-              İlk 3 ay bedava. QR menü, kasa ve garson tek platformda.
+              İlk 3 ay bedava. QR menü, Google görünürlüğü, alerjen ve kalori — hepsi tek
+              hesaptan.
             </p>
             <Link
               href="/kayit"
@@ -267,7 +327,7 @@ export default function SiteHome({ listings }: SiteHomeProps) {
                 </li>
                 <li>
                   <a className="transition-colors hover:text-white" href="#ozellikler">
-                    QR Menü
+                    Özellikler
                   </a>
                 </li>
                 <li>
@@ -317,7 +377,7 @@ export default function SiteHome({ listings }: SiteHomeProps) {
   );
 }
 
-function ProductLine({
+function FeatureItem({
   icon,
   title,
   body,
@@ -327,8 +387,8 @@ function ProductLine({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+    <div className="group">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white">
         <span className="material-symbols-outlined text-[22px]">{icon}</span>
       </div>
       <h3 className="mt-4 font-headline text-lg font-bold text-on-background">{title}</h3>
