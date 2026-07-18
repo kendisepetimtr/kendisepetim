@@ -24,3 +24,63 @@ export async function loadTenantOrderCounts(
 
   return counts;
 }
+
+function phoneKey(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 7) return "";
+  // TR numaralarında son 10 hane ile birleştir (0535… / 90535…)
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+async function countDistinctCustomersForTenant(
+  svc: ReturnType<typeof createServiceSupabaseClient>,
+  tenantId: string,
+): Promise<number> {
+  const keys = new Set<string>();
+  const pageSize = 1000;
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await svc
+      .from("orders")
+      .select("customer_phone")
+      .eq("tenant_id", tenantId)
+      .range(from, from + pageSize - 1);
+
+    if (error || !data || data.length === 0) break;
+
+    for (const row of data) {
+      const key = phoneKey(String((row as { customer_phone?: string | null }).customer_phone ?? ""));
+      if (key) keys.add(key);
+    }
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return keys.size;
+}
+
+/**
+ * Tenant başına benzersiz müşteri (siparişlerdeki geçerli telefon).
+ * Masa/garson placeholder ("-") sayılmaz.
+ */
+export async function loadTenantCustomerCounts(
+  tenantIds: string[],
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = Object.fromEntries(tenantIds.map((id) => [id, 0]));
+  if (tenantIds.length === 0) return counts;
+
+  try {
+    const svc = createServiceSupabaseClient();
+    await Promise.all(
+      tenantIds.map(async (tenantId) => {
+        counts[tenantId] = await countDistinctCustomersForTenant(svc, tenantId);
+      }),
+    );
+  } catch {
+    /* sayılar 0 kalır */
+  }
+
+  return counts;
+}

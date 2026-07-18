@@ -16,12 +16,15 @@ type Props = {
   initialTenants: TenantRow[];
   /** tenant_id → toplam sipariş (tüm kanallar) */
   orderCounts?: Record<string, number>;
+  /** tenant_id → benzersiz müşteri (sipariş telefonları) */
+  customerCounts?: Record<string, number>;
   loadError: string | null;
 };
 
 export default function SuperadminTenantCards({
   initialTenants,
   orderCounts = {},
+  customerCounts = {},
   loadError,
 }: Props) {
   const router = useRouter();
@@ -144,16 +147,29 @@ export default function SuperadminTenantCards({
                           <Badge active={t.dashboard_enabled} label="Panel" />
                         </div>
                       </div>
-                      <div
-                        className="shrink-0 text-right"
-                        title="QR, paket, gel-al ve masa siparişleri toplamı"
-                      >
-                        <p className="font-headline text-xl font-extrabold tabular-nums leading-none text-on-background sm:text-2xl">
-                          {(orderCounts[t.id] ?? 0).toLocaleString("tr-TR")}
-                        </p>
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-secondary">
-                          Sipariş
-                        </p>
+                      <div className="flex shrink-0 items-start gap-3 sm:gap-4">
+                        <div
+                          className="text-right"
+                          title="QR, paket, gel-al ve masa siparişleri toplamı"
+                        >
+                          <p className="font-headline text-xl font-extrabold tabular-nums leading-none text-on-background sm:text-2xl">
+                            {(orderCounts[t.id] ?? 0).toLocaleString("tr-TR")}
+                          </p>
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-secondary">
+                            Sipariş
+                          </p>
+                        </div>
+                        <div
+                          className="text-right"
+                          title="Siparişlerdeki benzersiz telefon numarası"
+                        >
+                          <p className="font-headline text-xl font-extrabold tabular-nums leading-none text-on-background sm:text-2xl">
+                            {(customerCounts[t.id] ?? 0).toLocaleString("tr-TR")}
+                          </p>
+                          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-secondary">
+                            Müşteri
+                          </p>
+                        </div>
                       </div>
                     </div>
 
