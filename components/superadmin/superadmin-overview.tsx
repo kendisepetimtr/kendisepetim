@@ -16,13 +16,13 @@ export default function SuperadminOverview({ tenants, accountingSummary, account
   const recent = tenants.slice(0, 5);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <header className="mb-8">
+    <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-8">
+      <header className="mb-6 sm:mb-8">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight sm:text-3xl">Genel bakış</h1>
         <p className="mt-1 text-sm text-secondary">Platform özeti ve son işletmeler</p>
       </header>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Toplam işletme" value={String(tenants.length)} icon="storefront" />
         <StatCard label="Premium" value={String(premCount)} icon="workspace_premium" accent="amber" />
         <StatCard label="Free" value={String(freeCount)} icon="layers" />
@@ -111,14 +111,14 @@ function StatCard({
         ? "bg-emerald-500/15 text-emerald-800"
         : "bg-primary/10 text-primary";
   return (
-    <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-secondary">{label}</p>
-          <p className="mt-2 font-headline text-3xl font-extrabold">{value}</p>
+    <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm sm:p-5">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-secondary sm:text-xs">{label}</p>
+          <p className="mt-1.5 font-headline text-2xl font-extrabold sm:mt-2 sm:text-3xl">{value}</p>
         </div>
-        <span className={`inline-flex rounded-xl p-2 ${iconTone}`}>
-          <span className="material-symbols-outlined text-[22px]">{icon}</span>
+        <span className={`inline-flex shrink-0 rounded-xl p-1.5 sm:p-2 ${iconTone}`}>
+          <span className="material-symbols-outlined text-[20px] sm:text-[22px]">{icon}</span>
         </span>
       </div>
     </div>
