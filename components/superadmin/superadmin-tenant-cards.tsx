@@ -14,10 +14,16 @@ import { useEffect, useState, useTransition } from "react";
 
 type Props = {
   initialTenants: TenantRow[];
+  /** tenant_id → toplam sipariş (tüm kanallar) */
+  orderCounts?: Record<string, number>;
   loadError: string | null;
 };
 
-export default function SuperadminTenantCards({ initialTenants, loadError }: Props) {
+export default function SuperadminTenantCards({
+  initialTenants,
+  orderCounts = {},
+  loadError,
+}: Props) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -101,6 +107,17 @@ export default function SuperadminTenantCards({ initialTenants, loadError }: Pro
                     <div className="min-w-0 flex-1">
                       <h2 className="truncate font-headline text-lg font-bold">{t.business_name}</h2>
                       <p className="truncate font-mono text-xs text-primary">{t.subdomain}.kendisepetim.com</p>
+                    </div>
+                    <div
+                      className="shrink-0 text-right"
+                      title="QR, paket, gel-al ve masa siparişleri toplamı"
+                    >
+                      <p className="font-headline text-2xl font-extrabold tabular-nums leading-none text-on-background">
+                        {(orderCounts[t.id] ?? 0).toLocaleString("tr-TR")}
+                      </p>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-secondary">
+                        Sipariş
+                      </p>
                     </div>
                   </div>
 
