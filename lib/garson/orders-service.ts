@@ -12,6 +12,7 @@ import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -21,7 +22,15 @@ function orderCode(): string {
 export async function placeWaiterOrder(input: {
   tenant: Pick<
     TenantRow,
-    "id" | "subdomain" | "open_time" | "close_time" | "table_count" | "dine_in_enabled" | "public_menu_enabled"
+    | "id"
+    | "subdomain"
+    | "open_time"
+    | "close_time"
+    | "table_count"
+    | "dine_in_enabled"
+    | "public_menu_enabled"
+    | "plan"
+    | "trial_ends_at"
   >;
   tableNumber: number;
   lines: PublicOrderLineInput[];
@@ -32,6 +41,9 @@ export async function placeWaiterOrder(input: {
   const tableCount = Number(tenant.table_count ?? 0);
   const actorLabel = waiter?.displayName?.trim() || "Garson";
 
+  if (!hasFullTenantAccess(tenant)) {
+    return { ok: false, error: FREE_PLAN_UPGRADE_MESSAGE };
+  }
   if (tenant.public_menu_enabled !== true || tenant.dine_in_enabled !== true) {
     return { ok: false, error: "Masa siparişi alınamıyor." };
   }

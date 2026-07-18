@@ -51,6 +51,10 @@ export type LocalTenantProfile = {
   paymentMealCardBrands: MealCardBrandId[];
   /** Marketplace vitrininde listelenir (opt-in) */
   marketplaceEnabled: boolean;
+  /** free | premium — superadmin / ödeme */
+  plan: "free" | "premium";
+  /** Ücretsiz deneme bitiş ISO; null = yok */
+  trialEndsAt: string | null;
   city: string;
   district: string;
   neighborhood: string;
@@ -92,6 +96,11 @@ export function saveLocalTenant(
     paymentMealCard: data.paymentMealCard === true,
     paymentMealCardBrands: parseMealCardBrandIds(data.paymentMealCardBrands),
     marketplaceEnabled: data.marketplaceEnabled === true,
+    plan: data.plan === "premium" ? "premium" : "free",
+    trialEndsAt:
+      typeof data.trialEndsAt === "string" && data.trialEndsAt.trim()
+        ? data.trialEndsAt
+        : null,
     city: data.city ?? "",
     district: data.district ?? "",
     neighborhood: data.neighborhood ?? "",
@@ -156,6 +165,9 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const paymentMealCardBrands = parseMealCardBrandIds(p.paymentMealCardBrands);
 
     const marketplaceEnabled = p.marketplaceEnabled === true;
+    const plan = p.plan === "premium" ? "premium" : "free";
+    const trialEndsAt =
+      typeof p.trialEndsAt === "string" && p.trialEndsAt.trim() ? p.trialEndsAt : null;
     const city = typeof p.city === "string" ? p.city : "";
     const district = typeof p.district === "string" ? p.district : "";
     const neighborhood = typeof p.neighborhood === "string" ? p.neighborhood : "";
@@ -194,6 +206,8 @@ export function getLocalTenant(): LocalTenantProfile | null {
       paymentMealCard,
       paymentMealCardBrands,
       marketplaceEnabled,
+      plan,
+      trialEndsAt,
       city,
       district,
       neighborhood,

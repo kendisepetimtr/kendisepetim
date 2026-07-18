@@ -9,6 +9,7 @@ import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain"
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
 import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-settings-panel";
 import MenuManager from "@/components/dashboard/menu-manager";
+import TenantTrialBanner from "@/components/dashboard/tenant-trial-banner";
 import type { DashboardTenantSyncResult } from "@/lib/dashboard/tenant-sync";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
 import {
@@ -22,6 +23,7 @@ import { clearLocalOrders } from "@/lib/local-orders";
 import { clearPublicCheckoutMirror, writePublicCheckoutMirror } from "@/lib/public-checkout-mirror";
 import { clearLocalTenant, getLocalTenant, saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
+import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 import { getDashboardQuickLinks, getPublicMenuConnectionLinks } from "@/lib/public-menu-urls";
 import { useDashboardOrderNotifications } from "@/lib/hooks/use-dashboard-order-notifications";
 import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
@@ -319,6 +321,14 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
     presenceScope: tenant?.subdomain,
     onOrderCreated: handleOrderCreated,
   });
+
+  useEffect(() => {
+    if (!tenant) return;
+    if (hasFullTenantAccess(tenant)) return;
+    if (activeNav === "orders" || activeNav === "marketplace") {
+      setActiveNav("overview");
+    }
+  }, [tenant, activeNav]);
 
   useEffect(() => {
     try {
@@ -638,7 +648,10 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           aria-label="Panel menüsü"
         >
           <div className="min-h-0 flex-1 space-y-1.5 overflow-x-hidden overflow-y-auto pb-2">
-            {NAV_MAIN.map((item) => (
+            {NAV_MAIN.filter((item) => {
+              if (hasFullTenantAccess(tenant)) return true;
+              return item.id !== "orders" && item.id !== "marketplace";
+            }).map((item) => (
               <SidebarNavButton
                 key={item.id}
                 item={item}
@@ -712,6 +725,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           sidebarCollapsed ? "lg:pl-20" : "lg:pl-[280px]",
         ].join(" ")}
       >
+        <TenantTrialBanner tenant={tenant} />
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-surface-container-highest bg-surface-container-lowest/95 px-4 backdrop-blur-sm sm:px-6">
           <button
             type="button"

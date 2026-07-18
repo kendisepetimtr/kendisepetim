@@ -7,6 +7,7 @@ import { getOAuthSiteUrl, getRequestSiteUrl } from "@/lib/site-url";
 import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { normalizeTrPhone } from "@/lib/phone-tr";
+import { defaultTrialEndsAt } from "@/lib/tenant-entitlements";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -103,6 +104,8 @@ export async function registerTenantAction(
       payment_door_card: false,
       payment_meal_card: false,
       payment_meal_card_brands: [],
+      plan: "free",
+      trial_ends_at: defaultTrialEndsAt(),
     });
 
     if (insertError) {
@@ -163,6 +166,8 @@ export async function registerTenantAction(
     payment_door_card: false,
     payment_meal_card: false,
     payment_meal_card_brands: [],
+    plan: "free",
+    trial_ends_at: defaultTrialEndsAt(),
   });
 
   if (insertError) {

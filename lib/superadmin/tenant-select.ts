@@ -20,5 +20,7 @@ export const SUPERADMIN_TENANT_SELECT = `
   public_menu_enabled,
   dashboard_enabled,
   marketplace_enabled,
+  plan,
+  trial_ends_at,
   owner_admin_pin_set_at
 `;

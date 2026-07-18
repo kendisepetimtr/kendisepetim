@@ -6,9 +6,14 @@ import {
   superadminSetOwnerAdminPin,
   superadminSetPlan,
   superadminSetPublicMenu,
+  superadminSetTrialEndsAt,
   superadminUpdateSubdomain,
 } from "@/app/superadmin/actions";
 import type { TenantPlan, TenantRow } from "@/lib/supabase/tenant-types";
+import {
+  getTenantAccessTier,
+  getTrialDaysRemaining,
+} from "@/lib/tenant-entitlements";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 
@@ -36,10 +41,14 @@ export default function SuperadminTenantCards({
     Object.fromEntries(initialTenants.map((t) => [t.id, t.subdomain])),
   );
   const [pinInputs, setPinInputs] = useState<Record<string, string>>({});
+  const [trialInputs, setTrialInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initialTenants.map((t) => [t.id, toDateInputValue(t.trial_ends_at)])),
+  );
 
   useEffect(() => {
     setSubInputs(Object.fromEntries(initialTenants.map((t) => [t.id, t.subdomain])));
     setPinInputs({});
+    setTrialInputs(Object.fromEntries(initialTenants.map((t) => [t.id, toDateInputValue(t.trial_ends_at)])));
   }, [initialTenants]);
 
   const q = search.trim().toLowerCase();
@@ -142,6 +151,7 @@ export default function SuperadminTenantCards({
                             active={t.plan === "premium"}
                             label={t.plan === "premium" ? "Premium" : "Free"}
                           />
+                          <TrialBadge tenant={t} />
                           <Badge active={t.public_menu_enabled} label="QR" />
                           <Badge active={t.marketplace_enabled} label="Market" />
                           <Badge active={t.dashboard_enabled} label="Panel" />
@@ -221,8 +231,10 @@ export default function SuperadminTenantCards({
                         pending={pending}
                         subValue={subInputs[t.id] ?? t.subdomain}
                         pinValue={pinInputs[t.id] ?? ""}
+                        trialValue={trialInputs[t.id] ?? toDateInputValue(t.trial_ends_at)}
                         onSubChange={(v) => setSubInputs((s) => ({ ...s, [t.id]: v }))}
                         onPinChange={(v) => setPinInputs((s) => ({ ...s, [t.id]: v }))}
+                        onTrialChange={(v) => setTrialInputs((s) => ({ ...s, [t.id]: v }))}
                         run={run}
                       />
                     </div>
@@ -237,24 +249,49 @@ export default function SuperadminTenantCards({
   );
 }
 
+function toDateInputValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = iso.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+}
+
+function TrialBadge({ tenant }: { tenant: TenantRow }) {
+  const tier = getTenantAccessTier(tenant);
+  if (tier === "premium") {
+    return <Badge active label="Tam erişim" />;
+  }
+  if (tier === "trial") {
+    const days = getTrialDaysRemaining(tenant);
+    return <Badge active label={`Deneme ${days}g`} />;
+  }
+  return <Badge active={false} label="Deneme bitti" />;
+}
+
 function TenantAccordionBody({
   tenant: t,
   pending,
   subValue,
   pinValue,
+  trialValue,
   onSubChange,
   onPinChange,
+  onTrialChange,
   run,
 }: {
   tenant: TenantRow;
   pending: boolean;
   subValue: string;
   pinValue: string;
+  trialValue: string;
   onSubChange: (v: string) => void;
   onPinChange: (v: string) => void;
+  onTrialChange: (v: string) => void;
   run: (p: Promise<{ error?: string }>) => void;
 }) {
   const baseId = useId();
+  const tier = getTenantAccessTier(t);
+  const daysLeft = getTrialDaysRemaining(t);
+  const savedTrial = toDateInputValue(t.trial_ends_at);
 
   return (
     <div className="space-y-6">
@@ -287,7 +324,7 @@ function TenantAccordionBody({
         </div>
       </Section>
 
-      <Section title="Kimlik / plan" hint="Subdomain, paket ve patron PIN">
+      <Section title="Kimlik / plan" hint="Subdomain, paket, deneme süresi ve patron PIN">
         <div className="space-y-4 rounded-xl border border-surface-container-highest bg-surface-container-lowest p-4">
           <Field label="Subdomain">
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -318,6 +355,47 @@ function TenantAccordionBody({
               <option value="free">Free</option>
               <option value="premium">Premium</option>
             </select>
+            <p className="mt-1.5 text-xs text-secondary">
+              Premium = süresiz tam erişim. Free = deneme bitince yalnızca QR menü + menü düzenleme.
+            </p>
+          </Field>
+
+          <Field label="Ücretsiz deneme bitiş">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="date"
+                value={trialValue}
+                disabled={pending}
+                onChange={(e) => onTrialChange(e.target.value)}
+                className="rounded-lg border border-surface-container-highest bg-white px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={pending || trialValue === savedTrial}
+                onClick={() => run(superadminSetTrialEndsAt(t.id, trialValue))}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-40"
+              >
+                Kaydet
+              </button>
+              <button
+                type="button"
+                disabled={pending || !t.trial_ends_at}
+                onClick={() => {
+                  onTrialChange("");
+                  run(superadminSetTrialEndsAt(t.id, ""));
+                }}
+                className="rounded-lg border border-surface-container-highest px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface-container-low disabled:opacity-40"
+              >
+                Denemeyi kaldır
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-secondary">
+              {tier === "premium"
+                ? "Premium aktif — deneme tarihi erişimi etkilemez."
+                : tier === "trial"
+                  ? `Deneme aktif: ${daysLeft} gün kaldı.`
+                  : "Deneme yok veya bitti — Free kısıtları geçerli."}
+            </p>
           </Field>
 
           <Field label="Patron PIN (4 hane)">

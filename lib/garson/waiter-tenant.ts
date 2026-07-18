@@ -5,6 +5,7 @@ import type { WaiterRow } from "@/lib/supabase/waiter-types";
 import { waiterDisplayName } from "@/lib/supabase/waiter-types";
 import { getTenantBySubdomain } from "@/lib/staff/tenant-by-slug";
 import { verifyStaffSessionToken, WAITER_SESSION_COOKIE } from "@/lib/staff/session";
+import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
 export type AuthenticatedWaiter = {
   id: string;
@@ -130,6 +131,9 @@ export async function getAuthenticatedWaiterTenantByCookie(): Promise<
       return { ok: false, error: "İşletme bulunamadı." };
     }
     const tenant = data as TenantRow;
+    if (!hasFullTenantAccess(tenant)) {
+      return { ok: false, error: "Ücretsiz planda garson paneli kullanılamaz." };
+    }
     if (tenant.dine_in_enabled !== true || (tenant.table_count ?? 0) < 1) {
       return { ok: false, error: "Masa servisi kullanılamıyor." };
     }

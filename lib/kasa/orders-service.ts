@@ -18,6 +18,7 @@ import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
 import {
   isMealCardBrandAllowed,
   tenantPaymentFlagsFromRow,
@@ -46,6 +47,8 @@ export type PlaceCashierOrderInput = {
     | "payment_door_card"
     | "payment_meal_card"
     | "payment_meal_card_brands"
+    | "plan"
+    | "trial_ends_at"
   >;
   fulfillmentType: FulfillmentType;
   tableNumber?: number;
@@ -68,6 +71,9 @@ export async function placeCashierOrder(
 ): Promise<{ ok: true; orderId: string; orderCode: string } | { ok: false; error: string }> {
   const { tenant, fulfillmentType } = input;
 
+  if (!hasFullTenantAccess(tenant)) {
+    return { ok: false, error: FREE_PLAN_UPGRADE_MESSAGE };
+  }
   if (tenant.public_menu_enabled !== true) {
     return { ok: false, error: "Menü siparişe kapalı." };
   }

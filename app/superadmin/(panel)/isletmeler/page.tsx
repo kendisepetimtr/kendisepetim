@@ -25,6 +25,8 @@ export default async function SuperadminTenantsPage() {
         ...row,
         owner_admin_pin_hash: null,
         marketplace_enabled: row.marketplace_enabled === true,
+        plan: row.plan === "premium" ? "premium" : "free",
+        trial_ends_at: row.trial_ends_at ?? null,
       })) as TenantRow[];
       const ids = tenants.map((t) => t.id);
       const [orders, customers] = await Promise.all([

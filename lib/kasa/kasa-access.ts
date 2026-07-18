@@ -1,4 +1,5 @@
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
 export type KasaFeatures = {
   dineIn: boolean;
@@ -28,8 +29,11 @@ export function canUseKasa(
     | "table_count"
     | "fulfillment_pickup_enabled"
     | "fulfillment_delivery_enabled"
+    | "plan"
+    | "trial_ends_at"
   >,
 ): boolean {
+  if (!hasFullTenantAccess(tenant)) return false;
   if (!tenant.cashier_pin_hash || !tenant.cashier_pin_set_at) return false;
   const features = getKasaFeatures(tenant);
   return features.dineIn || features.pickup || features.delivery;
@@ -38,9 +42,17 @@ export function canUseKasa(
 export function kasaAccessError(
   tenant: Pick<
     TenantRow,
-    "dine_in_enabled" | "table_count" | "fulfillment_pickup_enabled" | "fulfillment_delivery_enabled"
+    | "dine_in_enabled"
+    | "table_count"
+    | "fulfillment_pickup_enabled"
+    | "fulfillment_delivery_enabled"
+    | "plan"
+    | "trial_ends_at"
   >,
 ): string | null {
+  if (!hasFullTenantAccess(tenant)) {
+    return "Ücretsiz planda kasa kullanılamaz. Deneme süreniz bittiyse Premium’a geçin.";
+  }
   const features = getKasaFeatures(tenant);
   if (!features.dineIn && !features.pickup && !features.delivery) {
     return "Kasa için masa servisi, gel-al veya paket siparişi aktif olmalıdır.";

@@ -37,6 +37,8 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
       row.payment_meal_card_brands,
     ),
     marketplaceEnabled: row.marketplace_enabled === true,
+    plan: row.plan === "premium" ? "premium" : "free",
+    trialEndsAt: row.trial_ends_at?.trim() ? row.trial_ends_at : null,
     city: row.city ?? "",
     district: row.district ?? "",
     neighborhood: row.neighborhood ?? "",

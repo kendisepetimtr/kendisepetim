@@ -16,6 +16,10 @@ import {
 import { ensureTableSession } from "@/lib/table-sessions";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import {
+  FREE_PLAN_UPGRADE_MESSAGE,
+  hasFullTenantAccess,
+} from "@/lib/tenant-entitlements";
+import {
   isMealCardBrandAllowed,
   isMealCardBrandId,
   tenantPaymentFlagsFromRow,
@@ -111,13 +115,17 @@ export async function POST(request: Request) {
     const { data: tenant, error: tenantError } = await svc
       .from("tenants")
       .select(
-        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands",
+        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, plan, trial_ends_at",
       )
       .eq("subdomain", subdomain)
       .maybeSingle();
 
     if (tenantError || !tenant || tenant.public_menu_enabled !== true) {
       return NextResponse.json({ error: "Sipariş alınamıyor." }, { status: 404 });
+    }
+
+    if (!hasFullTenantAccess(tenant)) {
+      return NextResponse.json({ error: FREE_PLAN_UPGRADE_MESSAGE }, { status: 403 });
     }
 
     const paymentFlags = tenantPaymentFlagsFromRow(tenant);

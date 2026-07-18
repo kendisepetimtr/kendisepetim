@@ -27,6 +27,8 @@ export default async function SuperadminOverviewPage() {
         ...row,
         owner_admin_pin_hash: null,
         marketplace_enabled: row.marketplace_enabled === true,
+        plan: row.plan === "premium" ? "premium" : "free",
+        trial_ends_at: row.trial_ends_at ?? null,
       })) as TenantRow[];
     }
   } catch (e) {

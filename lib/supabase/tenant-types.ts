@@ -30,6 +30,8 @@ export type TenantRow = {
   /** Aktif yemek kartı marka id'leri */
   payment_meal_card_brands?: string[] | null;
   plan: TenantPlan;
+  /** Ücretsiz deneme bitiş; null = deneme yok. Migration öncesi undefined olabilir. */
+  trial_ends_at?: string | null;
   public_menu_enabled: boolean;
   dashboard_enabled: boolean;
   marketplace_enabled: boolean;

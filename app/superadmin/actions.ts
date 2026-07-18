@@ -93,6 +93,30 @@ export async function superadminSetPlan(tenantId: string, plan: TenantPlan): Pro
   return {};
 }
 
+/** Deneme bitiş tarihi (YYYY-MM-DD veya ISO). Boş = denemeyi kaldır. */
+export async function superadminSetTrialEndsAt(
+  tenantId: string,
+  dateRaw: string,
+): Promise<{ error?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const trimmed = dateRaw.trim();
+  let trialEndsAt: string | null = null;
+  if (trimmed) {
+    // date input → gün sonu UTC (yerel takvim günü korunur: T23:59:59)
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : trimmed.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "Geçersiz tarih." };
+    const end = new Date(`${day}T23:59:59.999Z`);
+    if (!Number.isFinite(end.getTime())) return { error: "Geçersiz tarih." };
+    trialEndsAt = end.toISOString();
+  }
+
+  const svc = await guardAndService();
+  const { error } = await svc.from("tenants").update({ trial_ends_at: trialEndsAt }).eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidateSuperadminPaths();
+  return {};
+}
+
 export async function superadminSetPublicMenu(tenantId: string, enabled: boolean): Promise<{ error?: string }> {
   if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
   const svc = await guardAndService();

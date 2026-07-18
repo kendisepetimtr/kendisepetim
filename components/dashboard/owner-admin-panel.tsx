@@ -1,5 +1,6 @@
 "use client";
 
+import TenantTrialBanner from "@/components/dashboard/tenant-trial-banner";
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatAddressOneLine } from "@/lib/customer-address";
@@ -508,6 +509,8 @@ export default function OwnerAdminPanel({
   hoursDayMode,
   openTime,
   closeTime,
+  plan = "free",
+  trialEndsAt = null,
   initialOrders,
   initialLogs,
 }: {
@@ -519,6 +522,8 @@ export default function OwnerAdminPanel({
   hoursDayMode: BusinessHoursDayMode;
   openTime: string;
   closeTime: string;
+  plan?: "free" | "premium";
+  trialEndsAt?: string | null;
   initialOrders: AdminOrder[];
   initialLogs: ActivityLogRow[];
 }) {
@@ -728,6 +733,7 @@ export default function OwnerAdminPanel({
       </aside>
 
       <div className="lg:pl-[280px]">
+        <TenantTrialBanner tenant={{ plan, trialEndsAt }} />
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-surface-container-highest bg-surface-container-lowest/95 px-4 backdrop-blur-sm sm:px-6">
           <button
             type="button"

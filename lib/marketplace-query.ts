@@ -8,6 +8,7 @@ import {
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
 function tenantToProfileInput(
   tenant: TenantRow,
@@ -41,6 +42,7 @@ function pickSignatureDish(products: MenuProductRow[]): { name: string; price: n
 }
 
 function rowToListing(tenant: TenantRow, productCount: number, products: MenuProductRow[]): MarketplaceListing | null {
+  if (!hasFullTenantAccess(tenant)) return null;
   const profile = tenantToProfileInput(tenant, productCount);
   if (!canEnableMarketplace(profile) || tenant.marketplace_enabled !== true) return null;
 

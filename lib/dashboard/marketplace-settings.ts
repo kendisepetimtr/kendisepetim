@@ -9,6 +9,7 @@ import {
 } from "@/lib/marketplace";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
 import { tenantRowToLocalProfile } from "@/lib/tenant-map";
 import { slimTenantProfileForClient } from "@/lib/tenant-client-sync";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, isValidNeighborhood } from "@/lib/turkey-geography";
@@ -142,6 +143,13 @@ export async function updateMarketplaceSettings(
       productCount,
     };
 
+    if (patch.marketplaceEnabled && !hasFullTenantAccess(current)) {
+      return {
+        ok: false,
+        error: FREE_PLAN_UPGRADE_MESSAGE,
+      };
+    }
+
     if (patch.marketplaceEnabled && !canEnableMarketplace(profileInput)) {
       const issues = getMarketplaceQualityIssues(profileInput);
       return {
@@ -169,7 +177,7 @@ export async function updateMarketplaceSettings(
       })
       .eq("id", current.id)
       .select(
-        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount",
+        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, plan, trial_ends_at, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount",
       )
       .single();
 
