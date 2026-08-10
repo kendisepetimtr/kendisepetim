@@ -2,6 +2,7 @@ import SiteHome from "@/components/landing/site-home";
 import { fetchMarketplaceListings } from "@/lib/marketplace-query";
 import { DEFAULT_POST_LOGIN_PATH, AUTH_CALLBACK_PATH } from "@/lib/supabase/auth-urls";
 import { getCanonicalSiteUrl, isLocalHost } from "@/lib/site-url";
+import { loadCurrentPlatformVersionLabel } from "@/lib/superadmin/todos-service";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -45,5 +46,10 @@ export default async function Home({ searchParams }: Props) {
     redirect(`/giris?durum=oauth-hata&mesaj=${encodeURIComponent(mesaj)}`);
   }
 
-  return <SiteHome listings={await fetchMarketplaceListings()} />;
+  const [listings, platformVersion] = await Promise.all([
+    fetchMarketplaceListings(),
+    loadCurrentPlatformVersionLabel(),
+  ]);
+
+  return <SiteHome listings={listings} platformVersion={platformVersion} />;
 }

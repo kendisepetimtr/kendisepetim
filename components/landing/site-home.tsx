@@ -6,6 +6,7 @@ import { LAUNCH_CITY, LAUNCH_DISTRICT } from "@/lib/turkey-geography";
 
 type SiteHomeProps = {
   listings: MarketplaceListing[];
+  platformVersion?: string | null;
 };
 
 const HOME_GRID_LIMIT = 12;
@@ -58,7 +59,7 @@ const MENU_CAPABILITIES = [
   },
 ] as const;
 
-export default function SiteHome({ listings }: SiteHomeProps) {
+export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
   const visible = listings.slice(0, HOME_GRID_LIMIT);
   const hasMore = listings.length > HOME_GRID_LIMIT;
 
@@ -369,8 +370,9 @@ export default function SiteHome({ listings }: SiteHomeProps) {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-7xl pt-8 text-xs font-bold text-surface-variant/40">
-          © 2026 KendiSepetim. Tüm hakları saklıdır.
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 pt-8 text-xs font-bold text-surface-variant/40">
+          <p>© 2026 KendiSepetim. Tüm hakları saklıdır.</p>
+          {platformVersion ? <p className="tabular-nums">v{platformVersion}</p> : null}
         </div>
       </footer>
     </>

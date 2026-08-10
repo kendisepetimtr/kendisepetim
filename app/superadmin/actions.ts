@@ -19,6 +19,7 @@ import { SUPERADMIN_COOKIE } from "@/lib/superadmin/session";
 import {
   bumpMajorVersion,
   bumpMinorVersion,
+  bumpPatchVersion,
   deletePlatformTodo,
   publishTargetVersion,
   upsertPlatformTodo,
@@ -35,6 +36,10 @@ function revalidateSuperadminPaths() {
   revalidatePath("/superadmin/muhasebe");
   revalidatePath("/superadmin/yapilacaklar");
   revalidatePath("/superadmin/hesap");
+}
+
+function revalidatePublicVersionPaths() {
+  revalidatePath("/");
 }
 
 export async function superadminLoginAction(
@@ -215,11 +220,21 @@ export async function superadminDeleteTodo(todoId: string): Promise<{ error?: st
   return {};
 }
 
+export async function superadminBumpPatchVersion(): Promise<{ error?: string; label?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await bumpPatchVersion();
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  revalidatePublicVersionPaths();
+  return { label: result.version.label };
+}
+
 export async function superadminBumpMinorVersion(): Promise<{ error?: string; label?: string }> {
   await requireSuperadminOrRedirect();
   const result = await bumpMinorVersion();
   if (!result.ok) return { error: result.error };
   revalidateSuperadminPaths();
+  revalidatePublicVersionPaths();
   return { label: result.version.label };
 }
 
@@ -228,6 +243,7 @@ export async function superadminBumpMajorVersion(): Promise<{ error?: string; la
   const result = await bumpMajorVersion();
   if (!result.ok) return { error: result.error };
   revalidateSuperadminPaths();
+  revalidatePublicVersionPaths();
   return { label: result.version.label };
 }
 
@@ -236,5 +252,6 @@ export async function superadminPublishTargetVersion(): Promise<{ error?: string
   const result = await publishTargetVersion();
   if (!result.ok) return { error: result.error };
   revalidateSuperadminPaths();
+  revalidatePublicVersionPaths();
   return { label: result.version.label };
 }

@@ -3,6 +3,7 @@
 import {
   superadminBumpMajorVersion,
   superadminBumpMinorVersion,
+  superadminBumpPatchVersion,
   superadminDeleteTodo,
   superadminPublishTargetVersion,
   superadminUpsertTodo,
@@ -216,6 +217,14 @@ export default function SuperadminTodosClient({
             <button
               type="button"
               disabled={pending}
+              onClick={() => runVersionAction(superadminBumpPatchVersion)}
+              className="rounded-xl border border-surface-container-highest px-3 py-2 text-xs font-bold hover:bg-surface-container-low disabled:opacity-60"
+            >
+              Yama
+            </button>
+            <button
+              type="button"
+              disabled={pending}
               onClick={() => runVersionAction(superadminBumpMinorVersion)}
               className="rounded-xl border border-surface-container-highest px-3 py-2 text-xs font-bold hover:bg-surface-container-low disabled:opacity-60"
             >
@@ -227,7 +236,7 @@ export default function SuperadminTodosClient({
               onClick={() =>
                 runVersionAction(
                   superadminBumpMajorVersion,
-                  "Büyük güncelleme oluşturulsun mu? (ör. 2.0)",
+                  "Büyük güncelleme oluşturulsun mu? (ör. 2.0.0)",
                 )
               }
               className="rounded-xl border border-surface-container-highest px-3 py-2 text-xs font-bold hover:bg-surface-container-low disabled:opacity-60"
@@ -241,7 +250,7 @@ export default function SuperadminTodosClient({
                 runVersionAction(
                   superadminPublishTargetVersion,
                   target
-                    ? `Hedef sürüm ${target.label} yayınlansın mı? Mevcut sürüm buna geçer.`
+                    ? `Hedef sürüm ${target.label} yayınlansın mı? Landing footer buna geçer.`
                     : undefined,
                 )
               }
@@ -252,8 +261,7 @@ export default function SuperadminTodosClient({
           </div>
         </div>
         <p className="mt-3 text-xs text-secondary">
-          Küçük güncelleme minor artırır · Büyük güncelleme major artırır · Yayınla hedefi mevcut
-          yapar
+          Yama: 1.0.1 · Küçük: 1.1.0 · Büyük: 2.0.0 · Yayınlanan sürüm landing footer’da görünür
         </p>
       </section>
 

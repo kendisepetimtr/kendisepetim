@@ -9,16 +9,18 @@ import {
 function normalizeVersion(row: Record<string, unknown>): PlatformVersionRow {
   const major = Number(row.major);
   const minor = Number(row.minor);
+  const patch = Number(row.patch ?? 0);
   return {
     id: String(row.id),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     major,
     minor,
+    patch: Number.isFinite(patch) ? patch : 0,
     is_current: row.is_current === true,
     is_target: row.is_target === true,
     released_at: row.released_at != null ? String(row.released_at) : null,
-    label: formatVersionLabel(major, minor),
+    label: formatVersionLabel(major, minor, Number.isFinite(patch) ? patch : 0),
   };
 }
 
@@ -49,11 +51,28 @@ export async function loadPlatformVersions(): Promise<
       .from("platform_versions")
       .select("*")
       .order("major", { ascending: false })
-      .order("minor", { ascending: false });
+      .order("minor", { ascending: false })
+      .order("patch", { ascending: false });
     if (error) return { ok: false, error: error.message };
     return { ok: true, versions: (data ?? []).map((r) => normalizeVersion(r as Record<string, unknown>)) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Sürümler yüklenemedi." };
+  }
+}
+
+/** Landing footer — yalnızca mevcut (yayındaki) sürüm etiketi. */
+export async function loadCurrentPlatformVersionLabel(): Promise<string | null> {
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data, error } = await svc
+      .from("platform_versions")
+      .select("*")
+      .eq("is_current", true)
+      .maybeSingle();
+    if (error || !data) return null;
+    return normalizeVersion(data as Record<string, unknown>).label;
+  } catch {
+    return null;
   }
 }
 
@@ -85,6 +104,7 @@ async function ensureVersionAsTarget(
   svc: ReturnType<typeof createServiceSupabaseClient>,
   major: number,
   minor: number,
+  patch: number,
 ): Promise<{ ok: true; version: PlatformVersionRow } | { ok: false; error: string }> {
   const clearErr = await clearTargetFlag(svc);
   if (clearErr) return { ok: false, error: clearErr.message };
@@ -94,6 +114,7 @@ async function ensureVersionAsTarget(
     .select("*")
     .eq("major", major)
     .eq("minor", minor)
+    .eq("patch", patch)
     .maybeSingle();
 
   if (existing) {
@@ -112,6 +133,7 @@ async function ensureVersionAsTarget(
     .insert({
       major,
       minor,
+      patch,
       is_current: false,
       is_target: true,
       released_at: null,
@@ -120,6 +142,24 @@ async function ensureVersionAsTarget(
     .single();
   if (error || !data) return { ok: false, error: error?.message ?? "Sürüm oluşturulamadı." };
   return { ok: true, version: normalizeVersion(data as Record<string, unknown>) };
+}
+
+export async function bumpPatchVersion(): Promise<
+  { ok: true; version: PlatformVersionRow } | { ok: false; error: string }
+> {
+  try {
+    const versionsResult = await loadPlatformVersions();
+    if (!versionsResult.ok) return versionsResult;
+    const current = versionsResult.versions.find((v) => v.is_current);
+    if (!current) return { ok: false, error: "Mevcut sürüm bulunamadı." };
+
+    const target = versionsResult.versions.find((v) => v.is_target);
+    const base = target ?? current;
+    const svc = createServiceSupabaseClient();
+    return ensureVersionAsTarget(svc, base.major, base.minor, base.patch + 1);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Yama sürümü oluşturulamadı." };
+  }
 }
 
 export async function bumpMinorVersion(): Promise<
@@ -134,7 +174,7 @@ export async function bumpMinorVersion(): Promise<
     const target = versionsResult.versions.find((v) => v.is_target);
     const base = target ?? current;
     const svc = createServiceSupabaseClient();
-    return ensureVersionAsTarget(svc, base.major, base.minor + 1);
+    return ensureVersionAsTarget(svc, base.major, base.minor + 1, 0);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Küçük güncelleme oluşturulamadı." };
   }
@@ -149,9 +189,8 @@ export async function bumpMajorVersion(): Promise<
     const current = versionsResult.versions.find((v) => v.is_current);
     if (!current) return { ok: false, error: "Mevcut sürüm bulunamadı." };
 
-    const nextMajor = current.major + 1;
     const svc = createServiceSupabaseClient();
-    return ensureVersionAsTarget(svc, nextMajor, 0);
+    return ensureVersionAsTarget(svc, current.major + 1, 0, 0);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Büyük güncelleme oluşturulamadı." };
   }

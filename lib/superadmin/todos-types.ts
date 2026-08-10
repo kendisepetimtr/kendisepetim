@@ -6,6 +6,7 @@ export type PlatformVersionRow = {
   updated_at: string;
   major: number;
   minor: number;
+  patch: number;
   is_current: boolean;
   is_target: boolean;
   released_at: string | null;
@@ -32,8 +33,8 @@ export const TODO_STATUS_LABELS: Record<TodoStatus, string> = {
 
 export const TODO_STATUSES: TodoStatus[] = ["open", "in_progress", "done", "cancelled"];
 
-export function formatVersionLabel(major: number, minor: number): string {
-  return `${major}.${minor}`;
+export function formatVersionLabel(major: number, minor: number, patch: number): string {
+  return `${major}.${minor}.${patch}`;
 }
 
 export function isActiveTodoStatus(status: TodoStatus): boolean {
