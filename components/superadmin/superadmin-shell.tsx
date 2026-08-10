@@ -9,6 +9,7 @@ const NAV = [
   { href: "/superadmin", label: "Genel bakış", icon: "dashboard", short: "Özet" },
   { href: "/superadmin/isletmeler", label: "İşletmeler", icon: "storefront", short: "İşletme" },
   { href: "/superadmin/muhasebe", label: "Muhasebe", icon: "account_balance", short: "Muhasebe" },
+  { href: "/superadmin/yapilacaklar", label: "Yapılacaklar", icon: "checklist", short: "Yapılacak" },
   { href: "/superadmin/hesap", label: "Hesap", icon: "manage_accounts", short: "Hesap" },
 ] as const;
 
@@ -140,7 +141,7 @@ export default function SuperadminShell({ children }: SuperadminShellProps) {
 
       {/* Mobil alt sekme çubuğu */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-4 gap-0.5 px-1 pb-[env(safe-area-inset-bottom)] pt-1">
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pb-[env(safe-area-inset-bottom)] pt-1">
           {NAV.map((item) => (
             <Link
               key={item.href}

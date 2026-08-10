@@ -16,6 +16,14 @@ import {
   isValidSubdomainFormat,
 } from "@/lib/superadmin/reserved-subdomains";
 import { SUPERADMIN_COOKIE } from "@/lib/superadmin/session";
+import {
+  bumpMajorVersion,
+  bumpMinorVersion,
+  deletePlatformTodo,
+  publishTargetVersion,
+  upsertPlatformTodo,
+  type TodoInput,
+} from "@/lib/superadmin/todos-service";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantPlan } from "@/lib/supabase/tenant-types";
 
@@ -25,6 +33,7 @@ function revalidateSuperadminPaths() {
   revalidatePath("/superadmin");
   revalidatePath("/superadmin/isletmeler");
   revalidatePath("/superadmin/muhasebe");
+  revalidatePath("/superadmin/yapilacaklar");
   revalidatePath("/superadmin/hesap");
 }
 
@@ -188,4 +197,44 @@ export async function superadminDeleteAccountingEntry(entryId: string): Promise<
   if (!result.ok) return { error: result.error };
   revalidateSuperadminPaths();
   return {};
+}
+
+export async function superadminUpsertTodo(input: TodoInput): Promise<{ error?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await upsertPlatformTodo(input);
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminDeleteTodo(todoId: string): Promise<{ error?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await deletePlatformTodo(todoId);
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminBumpMinorVersion(): Promise<{ error?: string; label?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await bumpMinorVersion();
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return { label: result.version.label };
+}
+
+export async function superadminBumpMajorVersion(): Promise<{ error?: string; label?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await bumpMajorVersion();
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return { label: result.version.label };
+}
+
+export async function superadminPublishTargetVersion(): Promise<{ error?: string; label?: string }> {
+  await requireSuperadminOrRedirect();
+  const result = await publishTargetVersion();
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return { label: result.version.label };
 }
