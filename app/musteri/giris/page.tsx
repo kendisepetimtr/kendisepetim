@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import MusteriLoginForm from "@/components/musteri/musteri-login-form";
 import SiteLogo from "@/components/site-logo";
 import { loadMusteriSession } from "@/lib/musteri/session";
 import { getSupabaseEnv } from "@/lib/supabase/env";
-import { MUSTERI_REGISTER_PATH } from "@/lib/musteri/paths";
+import { MUSTERI_HOME_PATH, MUSTERI_REGISTER_PATH } from "@/lib/musteri/paths";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,16 @@ export default async function MusteriLoginPage({ searchParams }: Props) {
   const notice = noticeFromSearch(q as Record<string, string | undefined>);
   const oauthError = q.durum === "oauth-hata" && typeof q.mesaj === "string" ? q.mesaj : null;
   const wrongKind = q.durum === "yanlis-hesap-turu";
+  const nextPath =
+    typeof q.next === "string" && q.next.startsWith("/") && !q.next.startsWith("//")
+      ? q.next
+      : MUSTERI_HOME_PATH;
   const session = await loadMusteriSession();
+
+  // Zaten müşteri oturumu varsa login loop'a düşmesin
+  if (session.kind === "customer" && !wrongKind && q.durum !== "hesap-engelli") {
+    redirect(nextPath);
+  }
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-surface-container-low/50 via-background to-background">
@@ -70,11 +80,7 @@ export default async function MusteriLoginPage({ searchParams }: Props) {
             signedIn={session.kind !== "guest"}
             signedInEmail={session.email}
             signedInKind={session.kind === "guest" ? "guest" : session.kind}
-            nextPath={
-              typeof q.next === "string" && q.next.startsWith("/") && !q.next.startsWith("//")
-                ? q.next
-                : undefined
-            }
+            nextPath={nextPath}
           />
         </div>
       </div>

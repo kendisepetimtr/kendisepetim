@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveAccountKind } from "@/lib/account-kind";
+import { ensureCustomerAccount } from "@/lib/account-kind";
 import {
   deleteCustomerFavorite,
   loadCustomerFavorites,
@@ -18,7 +18,7 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ ok: true, kind: "guest", items: [] });
-    const accountKind = await resolveAccountKind(user);
+    const accountKind = await ensureCustomerAccount(user);
     if (accountKind !== "customer") return NextResponse.json({ ok: true, kind: "guest", items: [] });
     const items = await loadCustomerFavorites(user.id);
     return NextResponse.json({ ok: true, kind: "customer", items });
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ ok: false, error: "Oturum gerekli." }, { status: 401 });
-    const accountKind = await resolveAccountKind(user);
+    const accountKind = await ensureCustomerAccount(user);
     if (accountKind !== "customer") {
       return NextResponse.json({ ok: false, error: "Müşteri hesabı gerekli." }, { status: 403 });
     }

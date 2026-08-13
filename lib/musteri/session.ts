@@ -1,4 +1,4 @@
-import { resolveAccountKind, type AccountKind } from "@/lib/account-kind";
+import { ensureCustomerAccount, type AccountKind } from "@/lib/account-kind";
 import { getCustomerProfileByUserId } from "@/lib/musteri/customer-profile";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -20,7 +20,7 @@ export async function loadMusteriSession(): Promise<MusteriSession> {
     } = await supabase.auth.getUser();
     if (!user) return empty;
 
-    const kind = await resolveAccountKind(user);
+    const kind = await ensureCustomerAccount(user);
     if (kind === "customer") {
       const profile = await getCustomerProfileByUserId(user.id);
       const metaName =
@@ -31,7 +31,7 @@ export async function loadMusteriSession(): Promise<MusteriSession> {
         kind: "customer",
         userId: user.id,
         email: user.email ?? null,
-        firstName: profile?.firstName || metaName.split(" ")[0] || "",
+        firstName: profile?.firstName || metaName.split(" ")[0] || "Müşteri",
         blocked: Boolean(profile?.blockedAt),
       };
     }

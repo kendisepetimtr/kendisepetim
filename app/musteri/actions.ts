@@ -6,6 +6,7 @@ import { persistAuthIntent } from "@/lib/auth-intent-persist";
 import {
   RESTAURANT_ACCOUNT_ON_CUSTOMER_LOGIN,
   RESTAURANT_SESSION_BLOCKS_CUSTOMER_REGISTER,
+  ensureCustomerAccount,
   resolveAccountKind,
 } from "@/lib/account-kind";
 import { humanizeLoginError } from "@/lib/auth-errors";
@@ -62,7 +63,7 @@ export async function musteriLoginAction(
   const user = data.user;
   if (!user) return { error: "E-posta veya şifre hatalı." };
 
-  const kind = await resolveAccountKind(user);
+  const kind = await ensureCustomerAccount(user);
   if (kind === "restaurant") {
     try {
       await supabase.auth.signOut({ scope: "local" });
@@ -72,24 +73,8 @@ export async function musteriLoginAction(
     return { error: RESTAURANT_ACCOUNT_ON_CUSTOMER_LOGIN };
   }
 
-  if (kind === "unknown") {
-    const meta = user.user_metadata ?? {};
-    const firstName =
-      (typeof meta.first_name === "string" && meta.first_name) ||
-      (typeof meta.full_name === "string" && String(meta.full_name).split(" ")[0]) ||
-      "Müşteri";
-    const lastName =
-      (typeof meta.last_name === "string" && meta.last_name) ||
-      (typeof meta.full_name === "string" && String(meta.full_name).split(" ").slice(1).join(" ")) ||
-      "";
-    await upsertCustomerProfile({
-      userId: user.id,
-      firstName,
-      lastName,
-      phone: "",
-      email: user.email ?? "",
-    });
-    await supabase.auth.updateUser({ data: { account_kind: "customer" } });
+  if (kind !== "customer") {
+    return { error: "Müşteri hesabı oluşturulamadı. Lütfen tekrar deneyin." };
   }
 
   const block = await getCustomerBlockState(user.id);

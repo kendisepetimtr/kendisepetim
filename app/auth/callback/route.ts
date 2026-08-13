@@ -3,8 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { withSharedAuthCookieOptions } from "@/lib/supabase/cookie-options";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
-import { resolveAccountKind } from "@/lib/account-kind";
-import { upsertCustomerProfile } from "@/lib/musteri/customer-profile";
+import { ensureCustomerAccount, resolveAccountKind } from "@/lib/account-kind";
 import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH, isMusteriNextPath } from "@/lib/musteri/paths";
 import { getCustomerBlockState } from "@/lib/superadmin/customers-service";
 import { AUTH_INTENT_COOKIE, parseAuthIntent } from "@/lib/auth-intent";
@@ -17,9 +16,10 @@ function loginRedirect(request: NextRequest, params: Record<string, string>, cus
   return NextResponse.redirect(loginUrl);
 }
 
-function copyResponseCookies(from: NextResponse, to: NextResponse) {
+function copyResponseCookies(from: NextResponse, to: NextResponse, hostname: string) {
   from.cookies.getAll().forEach(({ name, value }) => {
-    to.cookies.set(name, value);
+    // Domain kaybolursa oturum yalnızca apex'te kalır; menü subdomain misafir görünür.
+    to.cookies.set(name, value, withSharedAuthCookieOptions(undefined, hostname));
   });
 }
 
@@ -98,14 +98,14 @@ export async function GET(request: NextRequest) {
     const sendTo = (path: string) => {
       if (path === fallbackDest) return response;
       const to = NextResponse.redirect(new URL(path, request.nextUrl.origin));
-      copyResponseCookies(response, to);
+      copyResponseCookies(response, to, hostname);
       return to;
     };
 
     if (kind === "customer" && intent === "restaurant") {
       await supabase.auth.signOut({ scope: "local" });
       const deny = loginRedirect(request, { durum: "yanlis-hesap-turu" }, false);
-      copyResponseCookies(response, deny);
+      copyResponseCookies(response, deny, hostname);
       return deny;
     }
 
@@ -113,34 +113,17 @@ export async function GET(request: NextRequest) {
       if (kind === "restaurant") {
         await supabase.auth.signOut({ scope: "local" });
         const deny = loginRedirect(request, { durum: "yanlis-hesap-turu" }, true);
-        copyResponseCookies(response, deny);
+        copyResponseCookies(response, deny, hostname);
         return deny;
       }
       if (kind !== "customer") {
-        const meta = user.user_metadata ?? {};
-        const fullName =
-          typeof meta.full_name === "string" ? meta.full_name : typeof meta.name === "string" ? meta.name : "";
-        const parts = fullName.trim().split(/\s+/);
-        const firstName =
-          (typeof meta.first_name === "string" && meta.first_name) || parts[0] || "Müşteri";
-        const lastName =
-          (typeof meta.last_name === "string" && meta.last_name) || parts.slice(1).join(" ");
-        await upsertCustomerProfile({
-          userId: user.id,
-          firstName,
-          lastName,
-          phone: "",
-          email: user.email ?? "",
-        });
-        await supabase.auth.updateUser({
-          data: { account_kind: "customer", first_name: firstName, last_name: lastName },
-        });
+        await ensureCustomerAccount(user);
       }
       const block = await getCustomerBlockState(user.id);
       if (block.blocked) {
         await supabase.auth.signOut({ scope: "local" });
         const deny = loginRedirect(request, { durum: "hesap-engelli" }, true);
-        copyResponseCookies(response, deny);
+        copyResponseCookies(response, deny, hostname);
         return deny;
       }
       const dest = isMusteriNextPath(nextPath) ? nextPath : MUSTERI_HOME_PATH;
@@ -149,7 +132,7 @@ export async function GET(request: NextRequest) {
 
     if (kind === "unknown") {
       const kayit = NextResponse.redirect(new URL("/kayit?reason=tenant-missing", request.nextUrl.origin));
-      copyResponseCookies(response, kayit);
+      copyResponseCookies(response, kayit, hostname);
       return kayit;
     }
   }

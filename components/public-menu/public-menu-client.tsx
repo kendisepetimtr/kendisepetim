@@ -44,7 +44,6 @@ import {
   isRestaurantFavorited,
 } from "@/lib/guest-favorites";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
-import { getOAuthSiteBase } from "@/lib/site-url";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -117,6 +116,12 @@ type PublicMenuClientProps = {
   /** Staff: daha sade menü kabuğu */
   compactChrome?: boolean;
   initialMenu: LocalMenuState;
+  /** Sunucu oturumu — API gecikmeden / cookie domain hatasında bile doğru kimlik */
+  initialCustomerSession?: {
+    kind: "guest" | "customer" | "restaurant" | "unknown";
+    firstName: string;
+    email: string | null;
+  };
 };
 
 function subscribeOnlineStatus(onStoreChange: () => void): () => void {
@@ -152,6 +157,7 @@ export default function PublicMenuClient({
   onCashierOrderPlaced,
   compactChrome = false,
   initialMenu,
+  initialCustomerSession,
 }: PublicMenuClientProps) {
   const slug = rawSlug.toLowerCase();
   const isTableMenu = tableNumber != null && tableNumber > 0;
@@ -162,9 +168,15 @@ export default function PublicMenuClient({
   const [tab, setTab] = useState<string>("all");
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
   const [restaurantFav, setRestaurantFav] = useState(false);
-  const [customerKind, setCustomerKind] = useState<"guest" | "customer" | "restaurant" | "unknown">("guest");
-  const [customerFirstName, setCustomerFirstName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
+  const [customerKind, setCustomerKind] = useState<"guest" | "customer" | "restaurant" | "unknown">(
+    () => initialCustomerSession?.kind ?? "guest",
+  );
+  const [customerFirstName, setCustomerFirstName] = useState(
+    () => initialCustomerSession?.firstName ?? "",
+  );
+  const [customerEmail, setCustomerEmail] = useState<string | null>(
+    () => initialCustomerSession?.email ?? null,
+  );
   const [cart, setCart] = useState<CartState>({});
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [clockTick, setClockTick] = useState(0);
@@ -200,7 +212,7 @@ export default function PublicMenuClient({
 
     void (async () => {
       try {
-        const res = await fetch(`${getOAuthSiteBase()}/api/musteri/checkout-context`, {
+        const res = await fetch("/api/musteri/checkout-context", {
           credentials: "include",
           cache: "no-store",
         });
@@ -214,7 +226,7 @@ export default function PublicMenuClient({
           setCustomerKind("customer");
           setCustomerFirstName(data.firstName ?? "");
           setCustomerEmail(data.email ?? null);
-          const favRes = await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+          const favRes = await fetch("/api/musteri/favorites", {
             credentials: "include",
             cache: "no-store",
           });
@@ -233,6 +245,8 @@ export default function PublicMenuClient({
             setRestaurantFav(rest);
             setFavorites(productSet);
           }
+        } else if (res.ok && data.ok && (data.kind === "restaurant" || data.kind === "unknown")) {
+          setCustomerKind(data.kind);
         }
       } catch {
         /* misafir */
@@ -369,7 +383,7 @@ export default function PublicMenuClient({
 
     if (customerKind === "customer") {
       try {
-        await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+        await fetch("/api/musteri/favorites", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -401,7 +415,7 @@ export default function PublicMenuClient({
     setRestaurantFav(!was);
     if (customerKind === "customer") {
       try {
-        await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+        await fetch("/api/musteri/favorites", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -563,7 +577,7 @@ export default function PublicMenuClient({
                 favorite
               </span>
             </button>
-            <CustomerNotificationsPanel enabled={customerKind === "customer"} absoluteApi />
+            <CustomerNotificationsPanel enabled={customerKind === "customer"} />
           </div>
         </div>
       ) : null}

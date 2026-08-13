@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import PublicMenuClient from "@/components/public-menu/public-menu-client";
 import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
 import { isValidMenuSlug } from "@/lib/menu-subdomain";
+import { loadMusteriSession } from "@/lib/musteri/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { buildLocalMenuState } from "@/lib/menu-map";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
@@ -123,6 +124,7 @@ export default async function PublicMenuPage({ params }: Props) {
   };
   const initialOpenStatus = isBusinessOpenNow(row.open_time, row.close_time);
   const initialClosedMessage = getBusinessClosedMessage(row.open_time, row.close_time);
+  const musteriSession = await loadMusteriSession();
 
   return (
     <PublicMenuClient
@@ -141,6 +143,11 @@ export default async function PublicMenuPage({ params }: Props) {
         categories,
         products: (productRows ?? []) as MenuProductRow[],
       })}
+      initialCustomerSession={{
+        kind: musteriSession.kind,
+        firstName: musteriSession.firstName,
+        email: musteriSession.email,
+      }}
     />
   );
 }

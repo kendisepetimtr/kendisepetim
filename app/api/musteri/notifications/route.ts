@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveAccountKind } from "@/lib/account-kind";
+import { ensureCustomerAccount } from "@/lib/account-kind";
 import {
   deliverDueCustomerNotifications,
   loadCustomerNotifications,
@@ -17,10 +17,9 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ ok: true, items: [], unread: 0 });
-    const kind = await resolveAccountKind(user);
+    const kind = await ensureCustomerAccount(user);
     if (kind !== "customer") return NextResponse.json({ ok: true, items: [], unread: 0 });
 
-    // Hobby: Vercel cron yok — poll sırasında zamanı gelen bildirimleri teslim et
     await deliverDueCustomerNotifications(user.id);
 
     const items = await loadCustomerNotifications(user.id);
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-    const kind = await resolveAccountKind(user);
+    const kind = await ensureCustomerAccount(user);
     if (kind !== "customer") return NextResponse.json({ ok: false }, { status: 403 });
 
     const body = (await request.json().catch(() => ({}))) as { action?: string; ids?: string[] };
