@@ -3,13 +3,20 @@
 import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
 import CustomerIdentityAddressForm from "@/components/customer/customer-identity-address-form";
 import {
+  addressHasCoordinates,
+  applyAddressToFormValues,
   emptyCustomerFormValues,
+  formatAddressOneLine,
   type CustomerFormValues,
   validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
 import { formatCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
+import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
+import type { MusteriCheckoutContextResponse } from "@/app/api/musteri/checkout-context/route";
+import { MUSTERI_ADDRESSES_PATH } from "@/lib/musteri/paths";
+import { getOAuthSiteBase } from "@/lib/site-url";
 import type { LocalMenuProduct } from "@/lib/local-menu";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import {
@@ -112,13 +119,41 @@ export default function CartCheckoutModal({
   const [locLoading, setLocLoading] = useState(false);
   const [locMsg, setLocMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loggedInCustomer, setLoggedInCustomer] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<CustomerSavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
 
-  const hydrateCheckout = useCallback(() => {
+  const applySavedAddress = useCallback((addr: CustomerSavedAddress) => {
+    setSelectedAddressId(addr.id);
+    if (addressHasCoordinates(addr.address)) {
+      const lat = addr.address.latitude as number;
+      const lng = addr.address.longitude as number;
+      setCustomerLatitude(lat);
+      setCustomerLongitude(lng);
+      const line = formatCourierLocationNoteLine(lat, lng);
+      setFormValues((prev) => {
+        const withAddr = applyAddressToFormValues(prev, addr.address);
+        const note = withAddr.courierNote.trim();
+        return {
+          ...withAddr,
+          courierNote: note.includes(line) ? note : note ? `${note}\n\n${line}` : line,
+        };
+      });
+      setLocMsg("Kayıtlı adresteki konum kullanılacak.");
+    } else {
+      setCustomerLatitude(null);
+      setCustomerLongitude(null);
+      setFormValues((prev) => applyAddressToFormValues(prev, addr.address));
+      setLocMsg(null);
+    }
+  }, []);
+
+  const hydrateCheckout = useCallback(async () => {
     const session = loadQrCheckoutSession(subdomain);
     const guest = getGuestCustomer();
     const guestAddr = guestDefaultAddress(guest);
     const base = emptyCustomerFormValues();
-    setFormValues({
+    const guestPrefill: CustomerFormValues = {
       ...base,
       firstName: session.firstName || guest.firstName || "",
       lastName: session.lastName || guest.lastName || "",
@@ -135,14 +170,48 @@ export default function CartCheckoutModal({
       block: session.block || guestAddr?.address.block || "",
       orderNote: "",
       courierNote: "",
-    });
+    };
+
+    setLoggedInCustomer(false);
+    setSavedAddresses([]);
+    setSelectedAddressId("");
+    setCustomerLatitude(null);
+    setCustomerLongitude(null);
+    setFormValues(guestPrefill);
+
     const picked = pickDefaultPaymentMethod(paymentFlags, session.lastPaymentMethod ?? "");
     setPayMethod(picked);
     setMealBrand(
       picked === "meal_card" && session.lastMealCardBrandId ? session.lastMealCardBrandId : "",
     );
     setLocMsg(null);
-  }, [paymentFlags, subdomain]);
+
+    if (waiterMode || cashierMode) return;
+
+    try {
+      const res = await fetch("/api/musteri/checkout-context", { credentials: "include", cache: "no-store" });
+      const data = (await res.json()) as MusteriCheckoutContextResponse;
+      if (!res.ok || !data.ok || data.kind !== "customer") return;
+
+      setLoggedInCustomer(true);
+      setSavedAddresses(data.addresses);
+      setFormValues((prev) => ({
+        ...prev,
+        firstName: data.firstName || prev.firstName,
+        lastName: data.lastName || prev.lastName,
+        phone: data.phone || prev.phone,
+        email: data.email || prev.email,
+      }));
+
+      const preferred =
+        data.addresses.find((a) => a.isDefault) ?? data.addresses[0] ?? null;
+      if (preferred) {
+        applySavedAddress(preferred);
+      }
+    } catch {
+      /* misafir gibi devam */
+    }
+  }, [paymentFlags, subdomain, waiterMode, cashierMode, applySavedAddress]);
 
   useEffect(() => {
     if (!open) return;
@@ -183,7 +252,7 @@ export default function CartCheckoutModal({
   useEffect(() => {
     if (!open || step !== "checkout") return;
     if (isCashierOrder && fulfillmentType === "dine_in") return;
-    hydrateCheckout();
+    void hydrateCheckout();
   }, [open, step, hydrateCheckout, isCashierOrder, fulfillmentType]);
 
   useEffect(() => {
@@ -403,6 +472,15 @@ export default function CartCheckoutModal({
       window.alert(err);
       return;
     }
+    if (
+      loggedInCustomer &&
+      fulfillmentType === "delivery" &&
+      savedAddresses.length > 0 &&
+      !selectedAddressId
+    ) {
+      window.alert("Teslimat için kayıtlı bir adres seçin.");
+      return;
+    }
     if (fulfillmentType === "delivery" && (customerLatitude == null || customerLongitude == null)) {
       window.alert("Teslimat için «Konum al» ile adresinizi paylaşın.");
       return;
@@ -511,7 +589,13 @@ export default function CartCheckoutModal({
           ? { method: resolvedPayMethod, mealCardBrandId: mealBrand as MealCardBrandId }
           : { method: resolvedPayMethod },
       );
-      saveGuestFromCheckout(formValues, fulfillmentType);
+      saveGuestFromCheckout(
+        formValues,
+        fulfillmentType,
+        fulfillmentType === "delivery" && customerLatitude != null && customerLongitude != null
+          ? { latitude: customerLatitude, longitude: customerLongitude }
+          : null,
+      );
 
       setCart({});
       onClose();
@@ -748,7 +832,9 @@ export default function CartCheckoutModal({
                   ? "Müşteri bilgilerini girin. Ödeme sipariş kapanışında alınır."
                   : isTableOrder
                     ? "Adınızı girin; sipariş masanıza iletilecek. Ödeme kasada alınır."
-                    : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
+                    : loggedInCustomer
+                      ? "Kayıtlı hesabınızla devam ediyorsunuz. Teslimat için adresinizi seçin, ödeme yöntemini onaylayın."
+                      : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
               </p>
               <div className="mt-4 rounded-xl border border-surface-container-high bg-surface-container-low/50 px-3 py-2 text-xs">
                 <span className="font-semibold text-on-background">Ara toplam:</span>{" "}
@@ -786,7 +872,10 @@ export default function CartCheckoutModal({
                     )}
                     {fulfillmentType === "delivery" && fulfillmentFlags.fulfillmentDeliveryEnabled ? (
                       <p className="mt-2 text-[11px] text-secondary">
-                        Teslimat yarıçapı: {fulfillmentFlags.deliveryRadiusKm} km — «Konum al» zorunludur.
+                        Teslimat yarıçapı: {fulfillmentFlags.deliveryRadiusKm} km
+                        {customerLatitude != null && customerLongitude != null
+                          ? " — konum hazır."
+                          : " — «Konum al» zorunludur."}
                       </p>
                     ) : null}
                   </div>
@@ -801,6 +890,98 @@ export default function CartCheckoutModal({
                   </p>
                 ) : null}
 
+                {loggedInCustomer &&
+                !isCashierOrder &&
+                !isTableOrder &&
+                fulfillmentType === "delivery" ? (
+                  <div className="mb-5 rounded-2xl border border-surface-container-high bg-surface-container-low/40 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-secondary">Teslimat adresi</p>
+                      <a
+                        href={`${getOAuthSiteBase()}${MUSTERI_ADDRESSES_PATH}`}
+                        className="text-[11px] font-bold text-primary underline-offset-2 hover:underline"
+                      >
+                        Adreslerim
+                      </a>
+                    </div>
+                    {savedAddresses.length === 0 ? (
+                      <p className="mt-3 text-sm text-secondary">
+                        Kayıtlı adres yok. Aşağıdan bir kez girin veya{" "}
+                        <a
+                          href={`${getOAuthSiteBase()}${MUSTERI_ADDRESSES_PATH}`}
+                          className="font-bold text-primary underline-offset-2 hover:underline"
+                        >
+                          Adreslerim
+                        </a>
+                        ’den ekleyin.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {savedAddresses.map((addr) => {
+                          const active = selectedAddressId === addr.id;
+                          return (
+                            <li key={addr.id}>
+                              <button
+                                type="button"
+                                onClick={() => applySavedAddress(addr)}
+                                className={[
+                                  "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
+                                  active
+                                    ? "border-primary bg-primary/10"
+                                    : "border-surface-container-highest bg-white hover:border-primary/35",
+                                ].join(" ")}
+                              >
+                                <span
+                                  className={[
+                                    "mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
+                                    active ? "border-primary bg-primary text-white" : "border-surface-container-highest",
+                                  ].join(" ")}
+                                >
+                                  {active ? (
+                                    <span className="material-symbols-outlined text-[14px]">check</span>
+                                  ) : null}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-sm font-bold text-on-background">
+                                    {addr.label}
+                                    {addr.isDefault ? (
+                                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">
+                                        Varsayılan
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-secondary">
+                                    {formatAddressOneLine(addr.address)}
+                                  </span>
+                                  {addressHasCoordinates(addr.address) ? (
+                                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
+                                      <span className="material-symbols-outlined text-[12px]">my_location</span>
+                                      Konum hazır
+                                    </span>
+                                  ) : (
+                                    <span className="mt-1 block text-[10px] text-secondary">
+                                      Konum yok — aşağıdan alın
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {loggedInCustomer && formValues.firstName ? (
+                      <p className="mt-3 text-[11px] text-secondary">
+                        Sipariş:{" "}
+                        <span className="font-semibold text-on-background">
+                          {formValues.firstName} {formValues.lastName}
+                        </span>
+                        {formValues.phone ? ` · ${formValues.phone}` : ""}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <CustomerIdentityAddressForm
                   idPrefix={`${baseId}-co`}
                   values={formValues}
@@ -811,18 +992,22 @@ export default function CartCheckoutModal({
                     }
                   }}
                   phoneFirst={isCashierOrder && fulfillmentType === "delivery"}
-                  showPrefillNotice={!isCashierOrder}
+                  showPrefillNotice={!isCashierOrder && !loggedInCustomer}
+                  hideIdentity={loggedInCustomer && !isCashierOrder && !isTableOrder}
                   showOrderNote
                   showCourierNote={
                     (!isTableOrder || isCashierOrder) && fulfillmentType === "delivery"
                   }
                   hideAddress={
-                    (!isCashierOrder && isTableOrder) || fulfillmentType === "pickup"
+                    (!isCashierOrder && isTableOrder) ||
+                    fulfillmentType === "pickup" ||
+                    (loggedInCustomer && !isCashierOrder && savedAddresses.length > 0 && fulfillmentType === "delivery")
                   }
                   showLocationButton={
-                    isCashierOrder
+                    (isCashierOrder
                       ? fulfillmentType === "delivery"
-                      : !isTableOrder && fulfillmentType === "delivery"
+                      : !isTableOrder && fulfillmentType === "delivery") &&
+                    (customerLatitude == null || customerLongitude == null)
                   }
                   locationLoading={locLoading}
                   locationMessage={locMsg}

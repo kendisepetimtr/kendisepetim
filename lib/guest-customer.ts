@@ -36,6 +36,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function parseAddress(raw: unknown): CustomerAddress {
   if (!isRecord(raw)) return emptyCustomerAddress();
+  const lat = raw.latitude;
+  const lng = raw.longitude;
   return {
     neighborhood: typeof raw.neighborhood === "string" ? raw.neighborhood : "",
     street: typeof raw.street === "string" ? raw.street : "",
@@ -46,6 +48,8 @@ function parseAddress(raw: unknown): CustomerAddress {
     livesInSite: raw.livesInSite === true,
     siteName: typeof raw.siteName === "string" ? raw.siteName : "",
     block: typeof raw.block === "string" ? raw.block : "",
+    latitude: typeof lat === "number" && Number.isFinite(lat) ? lat : null,
+    longitude: typeof lng === "number" && Number.isFinite(lng) ? lng : null,
   };
 }
 
@@ -146,6 +150,7 @@ export function deleteGuestAddress(id: string): GuestCustomerState {
 export function saveGuestFromCheckout(
   values: CustomerFormValues,
   fulfillmentType: string,
+  coords?: { latitude: number; longitude: number } | null,
 ): void {
   const cur = getGuestCustomer();
   const next: GuestCustomerState = {
@@ -158,7 +163,11 @@ export function saveGuestFromCheckout(
   };
 
   if (fulfillmentType === "delivery") {
-    const address = formValuesToAddress(values);
+    const address: CustomerAddress = {
+      ...formValuesToAddress(values),
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+    };
     const same = next.addresses.find(
       (a) =>
         a.address.neighborhood === address.neighborhood &&
@@ -166,7 +175,21 @@ export function saveGuestFromCheckout(
         a.address.buildingNo === address.buildingNo &&
         a.address.apartmentNo === address.apartmentNo,
     );
-    if (!same) {
+    if (same) {
+      next.addresses = next.addresses.map((a) =>
+        a.id === same.id
+          ? {
+              ...a,
+              address: {
+                ...a.address,
+                ...address,
+                latitude: address.latitude ?? a.address.latitude ?? null,
+                longitude: address.longitude ?? a.address.longitude ?? null,
+              },
+            }
+          : a,
+      );
+    } else {
       const makeDefault = next.addresses.length === 0;
       next.addresses = [
         {

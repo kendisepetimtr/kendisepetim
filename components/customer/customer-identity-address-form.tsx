@@ -13,6 +13,8 @@ type CustomerIdentityAddressFormProps = {
   showCourierNote?: boolean;
   showLocationButton?: boolean;
   hideAddress?: boolean;
+  /** Kayıtlı müşteri: ad / soyad / telefon / e-posta alanlarını gizle */
+  hideIdentity?: boolean;
   /** Kasa: telefonu en üste al (canlı arama için) */
   phoneFirst?: boolean;
   /** Telefon alanının hemen altına ek içerik (öneri listesi vb.) */
@@ -35,6 +37,7 @@ export default function CustomerIdentityAddressForm({
   showCourierNote = false,
   showLocationButton = false,
   hideAddress = false,
+  hideIdentity = false,
   phoneFirst = false,
   phoneFieldSlot = null,
   locationLoading = false,
@@ -126,7 +129,7 @@ export default function CustomerIdentityAddressForm({
         </p>
       ) : null}
 
-      {phoneFirst ? (
+      {hideIdentity ? null : phoneFirst ? (
         <>
           {phoneField}
           {nameFields}
@@ -171,7 +174,7 @@ export default function CustomerIdentityAddressForm({
                 className={inputCls}
               />
             </div>
-            {showLocationButton ? (
+            {showLocationButton && !hideAddress ? (
               <div className="shrink-0 sm:pt-5">
                 <button
                   type="button"
@@ -185,7 +188,7 @@ export default function CustomerIdentityAddressForm({
               </div>
             ) : null}
           </div>
-          {showLocationButton && locationMessage ? (
+          {showLocationButton && !hideAddress && locationMessage ? (
             <p className="text-[11px] leading-relaxed text-secondary">{locationMessage}</p>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -285,6 +288,27 @@ export default function CustomerIdentityAddressForm({
         </div>
       </div>
       )}
+
+      {showLocationButton && hideAddress ? (
+        <div className="rounded-2xl border border-primary/25 bg-primary/[0.05] p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-secondary">Teslimat konumu</p>
+          <p className="mt-1 text-xs text-secondary">
+            Seçili adreste konum yok. Kurye için tam noktanızı paylaşın.
+          </p>
+          <button
+            type="button"
+            onClick={onRequestLocation}
+            disabled={locationLoading}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-white px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/[0.08] disabled:opacity-60 sm:w-auto"
+          >
+            <span className="material-symbols-outlined text-[18px]">my_location</span>
+            {locationLoading ? "Konum alınıyor…" : "Konum al"}
+          </button>
+          {locationMessage ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-secondary">{locationMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {showOrderNote ? (
         <div>

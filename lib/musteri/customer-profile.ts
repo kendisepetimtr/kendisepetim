@@ -23,6 +23,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function parseAddress(raw: unknown): CustomerAddress {
   if (!isRecord(raw)) return emptyCustomerAddress();
+  const lat = raw.latitude;
+  const lng = raw.longitude;
   return {
     neighborhood: typeof raw.neighborhood === "string" ? raw.neighborhood : "",
     street: typeof raw.street === "string" ? raw.street : "",
@@ -33,6 +35,8 @@ function parseAddress(raw: unknown): CustomerAddress {
     livesInSite: raw.livesInSite === true,
     siteName: typeof raw.siteName === "string" ? raw.siteName : "",
     block: typeof raw.block === "string" ? raw.block : "",
+    latitude: typeof lat === "number" && Number.isFinite(lat) ? lat : null,
+    longitude: typeof lng === "number" && Number.isFinite(lng) ? lng : null,
   };
 }
 

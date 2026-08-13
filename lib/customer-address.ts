@@ -10,6 +10,9 @@ export type CustomerAddress = {
   livesInSite: boolean;
   siteName: string;
   block: string;
+  /** Teslimat noktası — adres kaydında opsiyonel; yoksa checkout’ta istenir */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export function emptyCustomerAddress(): CustomerAddress {
@@ -23,6 +26,8 @@ export function emptyCustomerAddress(): CustomerAddress {
     livesInSite: false,
     siteName: "",
     block: "",
+    latitude: null,
+    longitude: null,
   };
 }
 
@@ -75,6 +80,35 @@ export function formValuesToAddress(v: CustomerFormValues): CustomerAddress {
     livesInSite: v.livesInSite,
     siteName: v.siteName.trim(),
     block: v.block.trim(),
+    latitude: null,
+    longitude: null,
+  };
+}
+
+export function addressHasCoordinates(a: CustomerAddress): boolean {
+  return (
+    typeof a.latitude === "number" &&
+    Number.isFinite(a.latitude) &&
+    typeof a.longitude === "number" &&
+    Number.isFinite(a.longitude)
+  );
+}
+
+export function applyAddressToFormValues(
+  v: CustomerFormValues,
+  address: CustomerAddress,
+): CustomerFormValues {
+  return {
+    ...v,
+    neighborhood: address.neighborhood,
+    street: address.street,
+    buildingNo: address.buildingNo,
+    buildingName: address.buildingName,
+    floor: address.floor,
+    apartmentNo: address.apartmentNo,
+    livesInSite: address.livesInSite,
+    siteName: address.siteName,
+    block: address.block,
   };
 }
 
