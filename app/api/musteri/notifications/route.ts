@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveAccountKind } from "@/lib/account-kind";
 import {
+  deliverDueCustomerNotifications,
   loadCustomerNotifications,
   markCustomerNotificationsRead,
 } from "@/lib/musteri/notifications-service";
@@ -18,6 +19,9 @@ export async function GET() {
     if (!user) return NextResponse.json({ ok: true, items: [], unread: 0 });
     const kind = await resolveAccountKind(user);
     if (kind !== "customer") return NextResponse.json({ ok: true, items: [], unread: 0 });
+
+    // Hobby: Vercel cron yok — poll sırasında zamanı gelen bildirimleri teslim et
+    await deliverDueCustomerNotifications(user.id);
 
     const items = await loadCustomerNotifications(user.id);
     const unread = items.filter((i) => !i.readAt).length;

@@ -171,17 +171,18 @@ export async function markCustomerNotificationsRead(userId: string, ids?: string
   }
 }
 
-/** Zamanı gelen otomatik bildirimleri teslim et (cron). */
-export async function deliverDueCustomerNotifications(): Promise<number> {
+/** Zamanı gelen otomatik bildirimleri teslim et (müşteri paneli poll / açılış). */
+export async function deliverDueCustomerNotifications(userId?: string): Promise<number> {
   try {
     const svc = createServiceSupabaseClient();
     const now = new Date().toISOString();
-    const { data, error } = await svc
+    let q = svc
       .from("customer_order_notifications")
       .update({ delivered_at: now })
       .is("delivered_at", null)
-      .lte("scheduled_at", now)
-      .select("id");
+      .lte("scheduled_at", now);
+    if (userId) q = q.eq("user_id", userId);
+    const { data, error } = await q.select("id");
     if (error || !data) return 0;
     return data.length;
   } catch {
