@@ -4,6 +4,7 @@
 
 import type { FulfillmentType } from "@/lib/fulfillment";
 import { googleMapsPlaceUrl } from "@/lib/maps-links";
+import { formatTrPhoneReceipt } from "@/lib/phone-tr";
 import type { TenantReceiptSettings } from "@/lib/receipt-settings";
 import { DEFAULT_RECEIPT_SETTINGS } from "@/lib/receipt-settings";
 
@@ -255,7 +256,7 @@ export function renderCourierReceiptText(
   if (settings.courierShowCustomer) {
     lines.push(repeatChar("-", w));
     if (order.customerName) lines.push(`Müşteri: ${order.customerName}`.slice(0, w));
-    if (order.customerPhone) lines.push(`Tel: ${order.customerPhone}`.slice(0, w));
+    if (order.customerPhone) lines.push(`Tel: ${formatTrPhoneReceipt(order.customerPhone)}`.slice(0, w));
   }
 
   if (settings.courierShowAddress && order.customerAddress?.trim()) {
