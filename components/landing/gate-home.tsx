@@ -1,6 +1,7 @@
 import Link from "next/link";
+import GateAuthEntry from "@/components/landing/gate-auth-entry";
 import SiteLogo from "@/components/site-logo";
-import { ISLETME_HOME_PATH, MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
+import { ISLETME_HOME_PATH, MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 
 export default function GateHome() {
   return (
@@ -8,14 +9,7 @@ export default function GateHome() {
       <header className="glass-nav sticky top-0 z-40">
         <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-8 sm:py-3">
           <SiteLogo variant="landing" iconOnly />
-          <div className="flex shrink-0 items-center gap-3 text-xs font-semibold sm:gap-5 sm:text-sm">
-            <Link href={MUSTERI_LOGIN_PATH} className="whitespace-nowrap text-secondary hover:text-on-background">
-              Müşteri girişi
-            </Link>
-            <Link href="/giris" className="whitespace-nowrap text-secondary hover:text-on-background">
-              Restoran girişi
-            </Link>
-          </div>
+          <GateAuthEntry />
         </nav>
         <div className="border-t border-[#e8e8ea]/50">
           <Link

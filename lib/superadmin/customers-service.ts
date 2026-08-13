@@ -64,9 +64,10 @@ async function countByUserId(
     const svc = createServiceSupabaseClient();
     const { data, error } = await svc.from(table).select(column).in(column, userIds);
     if (error || !data) return counts;
-    for (const row of data) {
-      if (!isRecord(row)) continue;
-      const id = typeof row[column] === "string" ? row[column] : "";
+    for (const item of data as unknown[]) {
+      if (!isRecord(item)) continue;
+      const raw = item[column];
+      const id = typeof raw === "string" ? raw : "";
       if (id && id in counts) counts[id] += 1;
     }
   } catch {
