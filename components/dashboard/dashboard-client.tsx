@@ -11,6 +11,8 @@ import MarketplaceSettingsPanel from "@/components/dashboard/marketplace-setting
 import MenuManager from "@/components/dashboard/menu-manager";
 import TenantTrialBanner from "@/components/dashboard/tenant-trial-banner";
 import type { DashboardTenantSyncResult } from "@/lib/dashboard/tenant-sync";
+import { readAuthIntentFromDocumentCookie } from "@/lib/auth-intent";
+import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 import SidebarBrandRotator from "@/components/dashboard/sidebar-brand-rotator";
 import {
   ACTIVITY_ACTION_LABELS,
@@ -361,6 +363,14 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           if (cancelled) return;
 
           if (!result.ok) {
+            const isCustomerAccount =
+              result.accountKind === "customer" ||
+              (result.accountKind === "unknown" && readAuthIntentFromDocumentCookie() === "customer");
+            if (isCustomerAccount) {
+              router.replace(MUSTERI_HOME_PATH);
+              setTenant(null);
+              return;
+            }
             if (!local) {
               router.replace("/kayit?reason=tenant-missing");
               setTenant(null);

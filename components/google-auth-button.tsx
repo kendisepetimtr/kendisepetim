@@ -4,13 +4,15 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { buildAuthCallbackUrl, DEFAULT_POST_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { getOAuthSiteBase } from "@/lib/site-url";
+import { inferAuthIntentFromNext, writeAuthIntentBrowser, type AuthIntent } from "@/lib/auth-intent";
 
 type Props = {
   nextPath: string;
   label?: string;
+  intent?: AuthIntent;
 };
 
-export default function GoogleAuthButton({ nextPath, label = "Google ile devam et" }: Props) {
+export default function GoogleAuthButton({ nextPath, label = "Google ile devam et", intent }: Props) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +29,7 @@ export default function GoogleAuthButton({ nextPath, label = "Google ile devam e
       }
 
       const next = nextPath.startsWith("/") ? nextPath : DEFAULT_POST_LOGIN_PATH;
+      writeAuthIntentBrowser(intent ?? inferAuthIntentFromNext(next));
       const redirectTo = buildAuthCallbackUrl(siteBase, next);
 
       const supabase = createBrowserSupabaseClient();

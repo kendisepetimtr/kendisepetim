@@ -2,9 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { updateSession } from "@/lib/supabase/middleware";
 import { buildAuthCallbackRedirectUrl } from "@/lib/oauth-redirect";
-import { AUTH_CALLBACK_PATH, isCentralAuthPath } from "@/lib/supabase/auth-urls";
+import { AUTH_CALLBACK_PATH, DEFAULT_POST_LOGIN_PATH, isCentralAuthPath } from "@/lib/supabase/auth-urls";
 import { getCanonicalSiteUrl, isLocalHost } from "@/lib/site-url";
 import { applyTenantSubdomainRewrite } from "@/lib/tenant-routing";
+import {
+  AUTH_INTENT_COOKIE,
+  authIntentCookieSetOptions,
+  authIntentForPathname,
+  parseAuthIntent,
+} from "@/lib/auth-intent";
+import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
 
 function getCanonicalSiteUrlFromEnv(): string {
   return getCanonicalSiteUrl();
@@ -75,9 +82,12 @@ function redirectAuthCodeToCallback(request: NextRequest): NextResponse | null {
     return null;
   }
 
+  const intent = parseAuthIntent(request.cookies.get(AUTH_INTENT_COOKIE)?.value);
+  const defaultNext = intent === "customer" ? MUSTERI_HOME_PATH : DEFAULT_POST_LOGIN_PATH;
   const target = buildAuthCallbackRedirectUrl(
     getOAuthOrigin(request),
     request.nextUrl.search,
+    defaultNext,
   );
   return NextResponse.redirect(new URL(target, request.url));
 }
@@ -86,7 +96,8 @@ function redirectOAuthQueryErrorToLogin(request: NextRequest): NextResponse | nu
   const error = request.nextUrl.searchParams.get("error");
   if (!error) return null;
 
-  const url = new URL("/giris", getOAuthOrigin(request));
+  const intent = parseAuthIntent(request.cookies.get(AUTH_INTENT_COOKIE)?.value);
+  const url = new URL(intent === "customer" ? MUSTERI_LOGIN_PATH : "/giris", getOAuthOrigin(request));
   url.search = "";
   url.searchParams.set("durum", "oauth-hata");
   const desc =
@@ -119,7 +130,16 @@ export async function middleware(request: NextRequest) {
       rewrite = u;
     }
   }
-  return updateSession(request, { rewrite, tenantSlug: slug ?? undefined });
+  const response = await updateSession(request, { rewrite, tenantSlug: slug ?? undefined });
+  const intent = authIntentForPathname(request.nextUrl.pathname);
+  if (intent) {
+    response.cookies.set(
+      AUTH_INTENT_COOKIE,
+      intent,
+      authIntentCookieSetOptions(request.nextUrl.hostname),
+    );
+  }
+  return response;
 }
 
 export const config = {

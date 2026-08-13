@@ -3,10 +3,11 @@ import { slimTenantProfileForClient } from "@/lib/tenant-client-sync";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { tenantRowToLocalProfile } from "@/lib/tenant-map";
+import { resolveAccountKind } from "@/lib/account-kind";
 
 export type DashboardTenantSyncResult =
   | { ok: true; profile: LocalTenantProfile }
-  | { ok: false; error: string };
+  | { ok: false; error: string; accountKind?: "restaurant" | "customer" | "unknown" };
 
 const TENANT_SYNC_COLUMNS = [
   "business_name",
@@ -62,7 +63,10 @@ export async function loadDashboardTenantProfile(): Promise<DashboardTenantSyncR
       .eq("owner_user_id", user.id)
       .maybeSingle();
 
-    if (error || !row) return { ok: false, error: "İşletme kaydı bulunamadı." };
+    if (error || !row) {
+      const accountKind = await resolveAccountKind(user);
+      return { ok: false, error: "İşletme kaydı bulunamadı.", accountKind };
+    }
 
     const profile = slimTenantProfileForClient(tenantRowToLocalProfile(row as unknown as TenantRow));
     return { ok: true, profile };

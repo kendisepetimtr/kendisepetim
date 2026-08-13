@@ -129,7 +129,7 @@ export default function LoginForm({
       ) : null}
 
       <div className="mb-6">
-        <GoogleAuthButton nextPath={nextPath} label="Google ile giriş yap" />
+        <GoogleAuthButton nextPath={nextPath} intent="restaurant" label="Google ile giriş yap" />
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center" aria-hidden>
             <div className="w-full border-t border-surface-container-highest" />

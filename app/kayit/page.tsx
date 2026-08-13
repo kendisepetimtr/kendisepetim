@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import RegisterForm from "@/components/register-form";
 import SiteLogo from "@/components/site-logo";
+import { resolveAccountKind } from "@/lib/account-kind";
+import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,7 @@ export default async function RegisterPage({ searchParams }: Props) {
   const tenantMissing = q.reason === "tenant-missing";
 
   let oauthUser: { email: string; ownerName: string } | null = null;
+  let bounceCustomer = false;
   if (supabaseConfigured) {
     try {
       const supabase = await createServerSupabaseClient();
@@ -30,20 +34,26 @@ export default async function RegisterPage({ searchParams }: Props) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const meta = user.user_metadata ?? {};
-        const ownerName =
-          (typeof meta.full_name === "string" && meta.full_name) ||
-          (typeof meta.name === "string" && meta.name) ||
-          "";
-        oauthUser = {
-          email: user.email ?? "",
-          ownerName,
-        };
+        const kind = await resolveAccountKind(user);
+        if (kind === "customer") {
+          bounceCustomer = true;
+        } else {
+          const meta = user.user_metadata ?? {};
+          const ownerName =
+            (typeof meta.full_name === "string" && meta.full_name) ||
+            (typeof meta.name === "string" && meta.name) ||
+            "";
+          oauthUser = {
+            email: user.email ?? "",
+            ownerName,
+          };
+        }
       }
     } catch {
       oauthUser = null;
     }
   }
+  if (bounceCustomer) redirect(MUSTERI_HOME_PATH);
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-surface-container-low/50 via-background to-background">

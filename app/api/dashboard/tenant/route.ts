@@ -11,7 +11,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const result = await loadDashboardTenantProfile();
   if (!result.ok) {
-    const status = result.error === "Oturum bulunamadı." ? 401 : 503;
+    const status =
+      result.error === "Oturum bulunamadı."
+        ? 401
+        : result.error === "İşletme kaydı bulunamadı."
+          ? 404
+          : 503;
     return NextResponse.json(result, { status });
   }
   return NextResponse.json(result);

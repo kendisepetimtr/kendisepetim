@@ -6,6 +6,7 @@ import { humanizeLoginError } from "@/lib/auth-errors";
 import { getOwnerTenantByUserId, resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { getRequestSiteUrl } from "@/lib/site-url";
 import { CUSTOMER_ACCOUNT_ON_RESTAURANT_LOGIN, resolveAccountKind } from "@/lib/account-kind";
+import { persistAuthIntent } from "@/lib/auth-intent-persist";
 import { redirect } from "next/navigation";
 
 export type LoginActionState = { error: string } | null;
@@ -29,6 +30,8 @@ export async function loginAction(
   if (!email || !password) {
     return { error: "E-posta ve şifre gerekli." };
   }
+
+  await persistAuthIntent("restaurant");
 
   const supabase = await createServerSupabaseClient();
 

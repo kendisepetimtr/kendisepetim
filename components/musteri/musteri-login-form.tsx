@@ -116,7 +116,7 @@ export default function MusteriLoginForm({
       ) : null}
 
       <div className="mb-6">
-        <GoogleAuthButton nextPath={MUSTERI_HOME_PATH} label="Google ile müşteri girişi" />
+        <GoogleAuthButton nextPath={MUSTERI_HOME_PATH} intent="customer" label="Google ile müşteri girişi" />
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center" aria-hidden>
             <div className="w-full border-t border-surface-container-highest" />

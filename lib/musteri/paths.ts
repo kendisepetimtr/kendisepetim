@@ -25,5 +25,6 @@ export function isMusteriAuthPath(pathname: string): boolean {
 }
 
 export function isMusteriNextPath(nextPath: string): boolean {
-  return isMusteriAppPath(nextPath) || isMusteriAuthPath(nextPath);
+  const pathname = nextPath.split("?")[0] || "";
+  return isMusteriAppPath(pathname) || isMusteriAuthPath(pathname);
 }

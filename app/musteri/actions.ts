@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { persistAuthIntent } from "@/lib/auth-intent-persist";
 import {
   RESTAURANT_ACCOUNT_ON_CUSTOMER_LOGIN,
   RESTAURANT_SESSION_BLOCKS_CUSTOMER_REGISTER,
@@ -42,6 +43,8 @@ export async function musteriLoginAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { error: "E-posta ve şifre gerekli." };
+
+  await persistAuthIntent("customer");
 
   const supabase = await createServerSupabaseClient();
   try {
@@ -121,6 +124,8 @@ export async function musteriRegisterAction(
   if (password.length < 8) return { error: "Şifre en az 8 karakter olmalıdır." };
   if (password !== passwordAgain) return { error: "Şifreler eşleşmiyor." };
   if (!acceptedTerms) return { error: "Devam etmek için kullanım şartlarını onaylayın." };
+
+  await persistAuthIntent("customer");
 
   const supabase = await createServerSupabaseClient();
   const {

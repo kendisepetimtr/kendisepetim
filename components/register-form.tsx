@@ -184,7 +184,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
 
       {supabaseConfigured && !oauthMode ? (
         <div className="mb-6">
-          <GoogleAuthButton nextPath="/dashboard" label="Google ile kayıt ol" />
+          <GoogleAuthButton nextPath="/dashboard" intent="restaurant" label="Google ile kayıt ol" />
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center" aria-hidden>
               <div className="w-full border-t border-surface-container-highest" />

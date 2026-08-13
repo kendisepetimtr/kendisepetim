@@ -9,6 +9,7 @@ import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { normalizeTrPhone } from "@/lib/phone-tr";
 import { defaultTrialEndsAt } from "@/lib/tenant-entitlements";
 import { CUSTOMER_SESSION_BLOCKS_RESTAURANT_REGISTER, resolveAccountKind } from "@/lib/account-kind";
+import { persistAuthIntent } from "@/lib/auth-intent-persist";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -53,6 +54,8 @@ export async function registerTenantAction(
   const subErr = validateSubdomain(subdomain);
   if (subErr) return { error: subErr };
   if (!acceptedTerms) return { error: "Devam etmek için kullanım şartlarını onaylayın." };
+
+  await persistAuthIntent("restaurant");
 
   let service;
   try {

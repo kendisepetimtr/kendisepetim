@@ -13,6 +13,7 @@ import {
   pathRequiresOwnerAuth,
 } from "@/lib/tenant-routing";
 import { resolveAccountKind } from "@/lib/account-kind";
+import { AUTH_INTENT_COOKIE, parseAuthIntent } from "@/lib/auth-intent";
 import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 
 export type UpdateSessionOptions = {
@@ -116,7 +117,8 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
 
   if (needsAuth && user) {
     const kind = await resolveAccountKind(user);
-    if (kind === "customer") {
+    const intent = parseAuthIntent(request.cookies.get(AUTH_INTENT_COOKIE)?.value);
+    if (kind === "customer" || (kind === "unknown" && intent === "customer")) {
       const url = request.nextUrl.clone();
       url.pathname = MUSTERI_HOME_PATH;
       url.search = "";
@@ -137,7 +139,17 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
   // /giris: oturum açık olsa bile formu göster — son kullanıcıyı otomatik açma
 
   if ((pathname === "/kayit" || pathname.startsWith("/kayit/")) && user) {
-    // İşletmesi olmayan kullanıcı kayıtta kalsın (dashboard ↔ kayit loop olmasın)
+    const kind = await resolveAccountKind(user);
+    const intent = parseAuthIntent(request.cookies.get(AUTH_INTENT_COOKIE)?.value);
+    if (kind === "customer" || intent === "customer") {
+      const url = request.nextUrl.clone();
+      url.pathname = MUSTERI_HOME_PATH;
+      url.search = "";
+      const redirectRes = NextResponse.redirect(url);
+      copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
+      return redirectRes;
+    }
+    // İşletmesi olmayan restoran kullanıcısı kayıtta kalsın (dashboard ↔ kayit loop olmasın)
     if (request.nextUrl.searchParams.get("reason") === "tenant-missing") {
       return supabaseResponse;
     }
