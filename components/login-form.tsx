@@ -69,10 +69,10 @@ export default function LoginForm({
     <>
       <div className="mb-8 text-center">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">
-          Giriş yap
+          Restoran girişi
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-secondary">
-          Google ile veya e-posta ve şifrenizle yönetim panelinize erişin.
+          İşletme paneline Google veya e-posta ile girin. Yemek siparişi için müşteri girişi ayrıdır.
         </p>
       </div>
 
@@ -201,9 +201,15 @@ export default function LoginForm({
       </form>
 
       <p className="mt-8 text-center text-sm text-secondary">
-        Hesabınız yok mu?{" "}
+        Restoran hesabınız yok mu?{" "}
         <Link href="/kayit" className="font-semibold text-primary underline-offset-2 hover:underline">
-          Ücretsiz kayıt olun
+          Restoran kaydı
+        </Link>
+      </p>
+      <p className="mt-3 text-center text-sm text-secondary">
+        Yemek mi sipariş vereceksiniz?{" "}
+        <Link href="/musteri/giris" className="font-semibold text-primary underline-offset-2 hover:underline">
+          Müşteri girişi
         </Link>
       </p>
     </>

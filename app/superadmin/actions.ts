@@ -148,6 +148,8 @@ export async function superadminSetMarketplace(tenantId: string, enabled: boolea
   revalidateSuperadminPaths();
   revalidatePath("/restoranlar");
   revalidatePath("/kesfet");
+  revalidatePath("/musteri");
+  revalidatePath("/isletme");
   revalidatePath("/");
   return {};
 }

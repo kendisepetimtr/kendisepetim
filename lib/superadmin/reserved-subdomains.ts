@@ -24,6 +24,8 @@ export const RESERVED_SUBDOMAINS = new Set([
   "localhost",
   "kesfet",
   "restoranlar",
+  "musteri",
+  "isletme",
 ]);
 
 export function isReservedSubdomain(sub: string): boolean {

@@ -131,3 +131,19 @@ export function clearLocalOrders(subdomain: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(localOrdersStorageKey(subdomain));
 }
+
+const LOCAL_ORDERS_KEY_PREFIX = "kendisepetim_orders_v1_";
+
+/** Bu cihazdaki tüm restoranlara ait misafir siparişleri. */
+export function listAllLocalOrders(): LocalOrder[] {
+  if (typeof window === "undefined") return [];
+  const all: LocalOrder[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (!key || !key.startsWith(LOCAL_ORDERS_KEY_PREFIX)) continue;
+    const subdomain = key.slice(LOCAL_ORDERS_KEY_PREFIX.length);
+    all.push(...getLocalOrders(subdomain).orders);
+  }
+  all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return all;
+}

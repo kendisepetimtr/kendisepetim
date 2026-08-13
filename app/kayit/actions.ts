@@ -8,6 +8,7 @@ import { buildAuthCallbackUrl, EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/
 import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { normalizeTrPhone } from "@/lib/phone-tr";
 import { defaultTrialEndsAt } from "@/lib/tenant-entitlements";
+import { CUSTOMER_SESSION_BLOCKS_RESTAURANT_REGISTER, resolveAccountKind } from "@/lib/account-kind";
 import { redirect } from "next/navigation";
 
 export type RegisterActionState =
@@ -79,6 +80,11 @@ export async function registerTenantAction(
       return { error: "E-posta adresi bulunamadı. Google hesabınızda e-posta paylaşımına izin verin." };
     }
 
+    const kind = await resolveAccountKind(existingUser);
+    if (kind === "customer") {
+      return { error: CUSTOMER_SESSION_BLOCKS_RESTAURANT_REGISTER };
+    }
+
     const { data: existingTenant } = await service
       .from("tenants")
       .select("id")
@@ -112,6 +118,8 @@ export async function registerTenantAction(
       return { error: insertError.message || "İşletme kaydı oluşturulamadı." };
     }
 
+    await supabase.auth.updateUser({ data: { account_kind: "restaurant" } });
+
     const siteOrigin = await getRequestSiteUrl();
     redirect(await resolveOwnerDashboardUrl(existingUser.id, siteOrigin));
   }
@@ -132,6 +140,7 @@ export async function registerTenantAction(
         business_name: businessName,
         subdomain,
         owner_name: ownerName,
+        account_kind: "restaurant",
       },
       ...(siteBase
         ? { emailRedirectTo: buildAuthCallbackUrl(siteBase, EMAIL_VERIFIED_LOGIN_PATH) }

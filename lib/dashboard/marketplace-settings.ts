@@ -187,6 +187,8 @@ export async function updateMarketplaceSettings(
 
     revalidatePath("/restoranlar");
     revalidatePath("/kesfet");
+    revalidatePath("/musteri");
+    revalidatePath("/isletme");
     revalidatePath("/");
     revalidatePath(`/m/${updated.subdomain}`);
 

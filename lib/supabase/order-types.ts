@@ -31,6 +31,7 @@ export type OrderRow = {
   table_session_id: string | null;
   courier_id: string | null;
   delivery_status: DeliveryStatus | null;
+  customer_user_id?: string | null;
 };
 
 export type OrderLineRow = {

@@ -8,9 +8,9 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Ucretsiz Dene",
+  title: "Restoran kaydı",
   description:
-    "Restoraninizi KendiSepetim'e kaydedin; restoranadiniz.kendisepetim.com adresinde QR menu ve yonetim paneli.",
+    "Restoraninizi KendiSepetim'e kaydedin; restoranadiniz.kendisepetim.com adresinde QR menu ve yonetim paneli. Musteri siparisi icin ayri kayit kullanin.",
 };
 
 type Props = {
@@ -48,9 +48,9 @@ export default async function RegisterPage({ searchParams }: Props) {
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-surface-container-low/50 via-background to-background">
       <p className="absolute right-6 top-5 text-right text-sm text-secondary sm:right-10 sm:top-8">
-        Zaten hesabınız var mı?{" "}
+        Zaten restoran hesabınız var mı?{" "}
         <Link href="/giris" className="font-medium text-primary underline-offset-2 hover:underline">
-          Giriş yap
+          Restoran girişi
         </Link>
       </p>
 

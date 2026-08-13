@@ -5,6 +5,7 @@ import { describeSupabaseEnvGap } from "@/lib/supabase/env";
 import { humanizeLoginError } from "@/lib/auth-errors";
 import { getOwnerTenantByUserId, resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import { getRequestSiteUrl } from "@/lib/site-url";
+import { CUSTOMER_ACCOUNT_ON_RESTAURANT_LOGIN, resolveAccountKind } from "@/lib/account-kind";
 import { redirect } from "next/navigation";
 
 export type LoginActionState = { error: string } | null;
@@ -47,6 +48,16 @@ export async function loginAction(
   const userId = signInData.user?.id;
   if (!userId) {
     return { error: "E-posta veya şifre hatalı. Bu bilgilerle kayıtlı hesap bulunamadı." };
+  }
+
+  const kind = await resolveAccountKind(signInData.user);
+  if (kind === "customer") {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* devam */
+    }
+    return { error: CUSTOMER_ACCOUNT_ON_RESTAURANT_LOGIN };
   }
 
   if (next === "/dashboard" || next.startsWith("/dashboard/")) {

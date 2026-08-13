@@ -158,12 +158,12 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
     <>
       <div className="mb-8 text-center">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">
-          Hesabınızı oluşturun
+          Restoran hesabı oluşturun
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-secondary">
           Menünüz{" "}
           <span className="font-medium text-on-background">restoranadiniz.kendisepetim.com</span> adresinde yayınlanır;
-          yönetim paneli ve QR menü tek hesaptan yönetilir.
+          yönetim paneli ve QR menü tek hesaptan yönetilir. Yemek siparişi için müşteri kaydı ayrıdır.
         </p>
         {supabaseConfigured ? (
           <p className="mt-2 text-xs text-secondary">
@@ -415,6 +415,12 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       </form>
 
       <LegalSummaryModal kind={legalModal} onClose={() => setLegalModal(null)} />
+      <p className="mt-8 text-center text-sm text-secondary">
+        Yemek mi sipariş vereceksiniz?{" "}
+        <Link href="/musteri/kayit" className="font-semibold text-primary underline-offset-2 hover:underline">
+          Müşteri kaydı
+        </Link>
+      </p>
     </>
   );
 }

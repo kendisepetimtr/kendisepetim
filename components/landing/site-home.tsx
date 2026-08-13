@@ -70,10 +70,10 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
           <SiteLogo variant="landing" />
           <div className="hidden items-center gap-8 md:flex">
             <Link
-              href="/restoranlar"
+              href="/musteri"
               className="font-headline text-base font-medium tracking-tight text-slate-600 transition-colors hover:text-primary-container"
             >
-              Restoranlar
+              Sipariş ver
             </Link>
             <a
               href="#ozellikler"
@@ -93,7 +93,7 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
               href="/giris"
               className="font-headline text-sm font-medium tracking-tight text-slate-600 transition-colors hover:text-primary-container sm:text-base"
             >
-              Giriş
+              Restoran girişi
             </Link>
             <Link
               href="/kayit"
@@ -175,7 +175,7 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
                   {LAUNCH_CITY} {LAUNCH_DISTRICT} — menüye gidip sipariş verin
                 </p>
               </div>
-              <Link href="/restoranlar" className="text-sm font-bold text-primary hover:underline">
+              <Link href="/musteri" className="text-sm font-bold text-primary hover:underline">
                 Tüm restoranlar
               </Link>
             </div>
@@ -190,7 +190,7 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
                 {hasMore ? (
                   <div className="mt-10 text-center">
                     <Link
-                      href="/restoranlar"
+                      href="/musteri"
                       className="inline-flex items-center gap-2 rounded-2xl border border-surface-container-highest bg-white px-6 py-3 text-sm font-bold text-on-background hover:bg-surface-container-low"
                     >
                       Tüm restoranları gör
@@ -322,8 +322,8 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
               <h4 className="text-xs font-bold uppercase tracking-widest text-white">Platform</h4>
               <ul className="space-y-3 text-sm font-medium">
                 <li>
-                  <Link className="transition-colors hover:text-white" href="/restoranlar">
-                    Restoranlar
+                  <Link className="transition-colors hover:text-white" href="/musteri">
+                    Sipariş ver
                   </Link>
                 </li>
                 <li>
@@ -358,12 +358,12 @@ export default function SiteHome({ listings, platformVersion }: SiteHomeProps) {
               <ul className="space-y-3 text-sm font-medium">
                 <li>
                   <Link className="transition-colors hover:text-white" href="/giris">
-                    Giriş
+                    Restoran girişi
                   </Link>
                 </li>
                 <li>
                   <Link className="transition-colors hover:text-white" href="/kayit">
-                    Kayıt
+                    Restoran kaydı
                   </Link>
                 </li>
               </ul>

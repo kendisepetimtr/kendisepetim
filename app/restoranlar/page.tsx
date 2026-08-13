@@ -1,15 +1,7 @@
-import RestoranlarClient from "@/components/marketplace/restoranlar-client";
-import { fetchMarketplaceListings } from "@/lib/marketplace-query";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 
-export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "Restoranlar",
-  description: "Antalya Muratpaşa bölgesindeki restoranların menüsüne göz atın ve sipariş verin.",
-};
-
-export default async function RestoranlarPage() {
-  const listings = await fetchMarketplaceListings();
-  return <RestoranlarClient initialListings={listings} />;
+/** Eski /restoranlar yolu — müşteri keşfet sayfasına yönlendirir. */
+export default function RestoranlarRedirectPage() {
+  redirect(MUSTERI_HOME_PATH);
 }

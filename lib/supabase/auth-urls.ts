@@ -14,6 +14,8 @@ export const RESET_PASSWORD_PATH = "/sifre-yenile";
 export const CENTRAL_AUTH_PATHS = [
   "/giris",
   "/kayit",
+  "/musteri/giris",
+  "/musteri/kayit",
   AUTH_CALLBACK_PATH,
   "/sifremi-unuttum",
   RESET_PASSWORD_PATH,

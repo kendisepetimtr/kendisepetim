@@ -24,6 +24,8 @@ import {
   isMealCardBrandId,
   tenantPaymentFlagsFromRow,
 } from "@/lib/tenant-payment";
+import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveAccountKind } from "@/lib/account-kind";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -235,31 +237,63 @@ export async function POST(request: Request) {
       tableSessionId = await ensureTableSession(svc, tenant.id, tableNumberRaw, "table_qr");
     }
 
-    const { data: insertedOrder, error: orderError } = await svc
+    let customerUserId: string | null = null;
+    try {
+      const authClient = await tryCreateServerSupabaseClient();
+      if (authClient) {
+        const {
+          data: { user },
+        } = await authClient.auth.getUser();
+        if (user && (await resolveAccountKind(user)) === "customer") {
+          customerUserId = user.id;
+        }
+      }
+    } catch {
+      customerUserId = null;
+    }
+
+    const orderPayload = {
+      tenant_id: tenant.id,
+      order_code: code,
+      order_source: orderSource,
+      fulfillment_type: fulfillmentType,
+      table_number: fulfillmentType === "dine_in" ? tableNumberRaw : null,
+      table_session_id: tableSessionId,
+      total,
+      customer_first_name: firstName,
+      customer_last_name: lastName,
+      customer_phone: phone,
+      customer_email: email,
+      address_json: fulfillmentType === "delivery" ? address : emptyCustomerAddress(),
+      customer_latitude: fulfillmentType === "delivery" ? savedCustomerLat : null,
+      customer_longitude: fulfillmentType === "delivery" ? savedCustomerLng : null,
+      payment_method: paymentMethod ?? "cash",
+      meal_card_brand_id: paymentMethod === "meal_card" ? mealCardBrandId ?? null : null,
+      order_note: orderNote,
+      courier_note: fulfillmentType === "delivery" ? courierNote : "",
+      delivery_status: fulfillmentType === "delivery" ? "pending" : null,
+    };
+
+    let insertedOrder: { id: string; order_code: string } | null = null;
+    let orderError: { message: string } | null = null;
+
+    const firstInsert = await svc
       .from("orders")
-      .insert({
-        tenant_id: tenant.id,
-        order_code: code,
-        order_source: orderSource,
-        fulfillment_type: fulfillmentType,
-        table_number: fulfillmentType === "dine_in" ? tableNumberRaw : null,
-        table_session_id: tableSessionId,
-        total,
-        customer_first_name: firstName,
-        customer_last_name: lastName,
-        customer_phone: phone,
-        customer_email: email,
-        address_json: fulfillmentType === "delivery" ? address : emptyCustomerAddress(),
-        customer_latitude: fulfillmentType === "delivery" ? savedCustomerLat : null,
-        customer_longitude: fulfillmentType === "delivery" ? savedCustomerLng : null,
-        payment_method: paymentMethod ?? "cash",
-        meal_card_brand_id: paymentMethod === "meal_card" ? mealCardBrandId ?? null : null,
-        order_note: orderNote,
-        courier_note: fulfillmentType === "delivery" ? courierNote : "",
-        delivery_status: fulfillmentType === "delivery" ? "pending" : null,
-      })
+      .insert({ ...orderPayload, customer_user_id: customerUserId })
       .select("id, order_code")
       .single();
+    insertedOrder = firstInsert.data as { id: string; order_code: string } | null;
+    orderError = firstInsert.error;
+
+    if (
+      (orderError || !insertedOrder) &&
+      customerUserId &&
+      /customer_user_id/i.test(orderError?.message ?? "")
+    ) {
+      const retry = await svc.from("orders").insert(orderPayload).select("id, order_code").single();
+      insertedOrder = retry.data as { id: string; order_code: string } | null;
+      orderError = retry.error;
+    }
 
     if (orderError || !insertedOrder) {
       return NextResponse.json({ error: orderError?.message ?? "Sipariş kaydedilemedi." }, { status: 500 });

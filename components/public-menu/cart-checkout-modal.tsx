@@ -9,6 +9,7 @@ import {
 } from "@/lib/customer-address";
 import { formatCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
+import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
 import type { LocalMenuProduct } from "@/lib/local-menu";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import {
@@ -114,22 +115,24 @@ export default function CartCheckoutModal({
 
   const hydrateCheckout = useCallback(() => {
     const session = loadQrCheckoutSession(subdomain);
+    const guest = getGuestCustomer();
+    const guestAddr = guestDefaultAddress(guest);
     const base = emptyCustomerFormValues();
     setFormValues({
       ...base,
-      firstName: session.firstName ?? "",
-      lastName: session.lastName ?? "",
-      phone: session.phone ?? "",
-      email: session.email ?? "",
-      neighborhood: session.neighborhood ?? "",
-      street: session.street ?? "",
-      buildingNo: session.buildingNo ?? "",
-      buildingName: session.buildingName ?? "",
-      floor: session.floor ?? "",
-      apartmentNo: session.apartmentNo ?? "",
-      livesInSite: session.livesInSite === true,
-      siteName: session.siteName ?? "",
-      block: session.block ?? "",
+      firstName: session.firstName || guest.firstName || "",
+      lastName: session.lastName || guest.lastName || "",
+      phone: session.phone || guest.phone || "",
+      email: session.email || guest.email || "",
+      neighborhood: session.neighborhood || guestAddr?.address.neighborhood || "",
+      street: session.street || guestAddr?.address.street || "",
+      buildingNo: session.buildingNo || guestAddr?.address.buildingNo || "",
+      buildingName: session.buildingName || guestAddr?.address.buildingName || "",
+      floor: session.floor || guestAddr?.address.floor || "",
+      apartmentNo: session.apartmentNo || guestAddr?.address.apartmentNo || "",
+      livesInSite: session.livesInSite === true || guestAddr?.address.livesInSite === true,
+      siteName: session.siteName || guestAddr?.address.siteName || "",
+      block: session.block || guestAddr?.address.block || "",
       orderNote: "",
       courierNote: "",
     });
@@ -508,6 +511,7 @@ export default function CartCheckoutModal({
           ? { method: resolvedPayMethod, mealCardBrandId: mealBrand as MealCardBrandId }
           : { method: resolvedPayMethod },
       );
+      saveGuestFromCheckout(formValues, fulfillmentType);
 
       setCart({});
       onClose();

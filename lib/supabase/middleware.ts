@@ -12,6 +12,8 @@ import {
   isCentralDashboardPath,
   pathRequiresOwnerAuth,
 } from "@/lib/tenant-routing";
+import { resolveAccountKind } from "@/lib/account-kind";
+import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 
 export type UpdateSessionOptions = {
   /** Verildiğinde yanıt `rewrite` olur; çerez yenilemede de aynı hedef korunur. */
@@ -110,6 +112,18 @@ export async function updateSession(request: NextRequest, options?: UpdateSessio
     const redirectRes = NextResponse.redirect(url);
     copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
     return redirectRes;
+  }
+
+  if (needsAuth && user) {
+    const kind = await resolveAccountKind(user);
+    if (kind === "customer") {
+      const url = request.nextUrl.clone();
+      url.pathname = MUSTERI_HOME_PATH;
+      url.search = "";
+      const redirectRes = NextResponse.redirect(url);
+      copyCookies(supabaseResponse, redirectRes, hostname, refreshedCookies);
+      return redirectRes;
+    }
   }
 
   if (user && !hostSlug && isCentralDashboardPath(pathname)) {

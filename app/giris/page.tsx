@@ -7,8 +7,8 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Giriş",
-  description: "KendiSepetim işletme paneli girişi.",
+  title: "Restoran girişi",
+  description: "KendiSepetim işletme paneli girişi. Müşteri siparişi için ayrı giriş kullanın.",
 };
 
 type Props = {
@@ -69,9 +69,9 @@ export default async function LoginPage({ searchParams }: Props) {
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-surface-container-low/50 via-background to-background">
       <p className="absolute right-6 top-5 text-right text-sm text-secondary sm:right-10 sm:top-8">
-        Henüz hesabınız yok mu?{" "}
+        Henüz restoran hesabınız yok mu?{" "}
         <a href="/kayit" className="font-medium text-primary underline-offset-2 hover:underline">
-          Kayıt olun
+          Restoran kaydı
         </a>
       </p>
 
@@ -81,6 +81,11 @@ export default async function LoginPage({ searchParams }: Props) {
             <SiteLogo variant="auth" />
           </div>
 
+          {q.durum === "yanlis-hesap-turu" ? (
+            <p className="mb-6 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">
+              Bu hesap müşteri kaydına bağlı. Restoran paneli için ayrı bir e-posta ile giriş yapın.
+            </p>
+          ) : null}
           <LoginForm
             nextPath={nextPath}
             notice={notice}
