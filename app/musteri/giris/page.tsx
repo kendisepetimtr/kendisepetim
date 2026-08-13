@@ -19,6 +19,7 @@ type Props = {
     kayit?: string;
     durum?: string;
     mesaj?: string;
+    next?: string;
   }>;
 };
 
@@ -69,6 +70,11 @@ export default async function MusteriLoginPage({ searchParams }: Props) {
             signedIn={session.kind !== "guest"}
             signedInEmail={session.email}
             signedInKind={session.kind === "guest" ? "guest" : session.kind}
+            nextPath={
+              typeof q.next === "string" && q.next.startsWith("/") && !q.next.startsWith("//")
+                ? q.next
+                : undefined
+            }
           />
         </div>
       </div>

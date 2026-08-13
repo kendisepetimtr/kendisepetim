@@ -1,6 +1,7 @@
 import MusteriAddresses from "@/components/musteri/musteri-addresses";
 import { loadCustomerAddresses } from "@/lib/musteri/customer-profile";
-import { loadMusteriSession } from "@/lib/musteri/session";
+import { requireMusteriCustomer } from "@/lib/musteri/require-customer";
+import { MUSTERI_ADDRESSES_PATH } from "@/lib/musteri/paths";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function MusteriAddressesPage() {
-  const session = await loadMusteriSession();
-  const isCustomer = session.kind === "customer";
-  const initialAddresses =
-    isCustomer && session.userId ? await loadCustomerAddresses(session.userId) : [];
-
-  return <MusteriAddresses isCustomer={isCustomer} initialAddresses={initialAddresses} />;
+  const userId = await requireMusteriCustomer(MUSTERI_ADDRESSES_PATH);
+  const initialAddresses = await loadCustomerAddresses(userId);
+  return <MusteriAddresses isCustomer initialAddresses={initialAddresses} />;
 }

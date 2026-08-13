@@ -1,5 +1,7 @@
 import MusteriAccount from "@/components/musteri/musteri-account";
 import { getCustomerProfileByUserId } from "@/lib/musteri/customer-profile";
+import { requireMusteriCustomer } from "@/lib/musteri/require-customer";
+import { MUSTERI_ACCOUNT_PATH } from "@/lib/musteri/paths";
 import { loadMusteriSession } from "@/lib/musteri/session";
 import type { Metadata } from "next";
 
@@ -10,14 +12,13 @@ export const metadata: Metadata = {
 };
 
 export default async function MusteriAccountPage() {
+  const userId = await requireMusteriCustomer(MUSTERI_ACCOUNT_PATH);
   const session = await loadMusteriSession();
-  const isCustomer = session.kind === "customer";
-  const profile =
-    isCustomer && session.userId ? await getCustomerProfileByUserId(session.userId) : null;
+  const profile = await getCustomerProfileByUserId(userId);
 
   return (
     <MusteriAccount
-      isCustomer={isCustomer}
+      isCustomer
       email={session.email}
       firstName={profile?.firstName ?? session.firstName}
       lastName={profile?.lastName ?? ""}

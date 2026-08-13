@@ -70,6 +70,19 @@ export default function MarketplaceSettingsPanel({
   const [minOrderAmount, setMinOrderAmount] = useState(
     tenant.minOrderAmount != null ? String(tenant.minOrderAmount).replace(".", ",") : "",
   );
+  const [orderEtaAutoEnabled, setOrderEtaAutoEnabled] = useState(tenant.orderEtaAutoEnabled === true);
+  const [orderEtaMode, setOrderEtaMode] = useState<"total" | "stages">(
+    tenant.orderEtaMode === "stages" ? "stages" : "total",
+  );
+  const [orderEtaTotalMinutes, setOrderEtaTotalMinutes] = useState(String(tenant.orderEtaTotalMinutes ?? 15));
+  const [orderEtaPrepMinutes, setOrderEtaPrepMinutes] = useState(String(tenant.orderEtaPrepMinutes ?? 10));
+  const [orderEtaReadyMinutes, setOrderEtaReadyMinutes] = useState(String(tenant.orderEtaReadyMinutes ?? 12));
+  const [orderEtaDispatchMinutes, setOrderEtaDispatchMinutes] = useState(
+    String(tenant.orderEtaDispatchMinutes ?? 15),
+  );
+  const [orderEtaDeliverMinutes, setOrderEtaDeliverMinutes] = useState(
+    String(tenant.orderEtaDeliverMinutes ?? 30),
+  );
   const [savedFlash, setSavedFlash] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -139,6 +152,13 @@ export default function MarketplaceSettingsPanel({
     setMinOrderAmount(
       tenant.minOrderAmount != null ? String(tenant.minOrderAmount).replace(".", ",") : "",
     );
+    setOrderEtaAutoEnabled(tenant.orderEtaAutoEnabled === true);
+    setOrderEtaMode(tenant.orderEtaMode === "stages" ? "stages" : "total");
+    setOrderEtaTotalMinutes(String(tenant.orderEtaTotalMinutes ?? 15));
+    setOrderEtaPrepMinutes(String(tenant.orderEtaPrepMinutes ?? 10));
+    setOrderEtaReadyMinutes(String(tenant.orderEtaReadyMinutes ?? 12));
+    setOrderEtaDispatchMinutes(String(tenant.orderEtaDispatchMinutes ?? 15));
+    setOrderEtaDeliverMinutes(String(tenant.orderEtaDeliverMinutes ?? 30));
   }, [tenant]);
 
   function toggleCuisineTag(tag: string) {
@@ -193,6 +213,13 @@ export default function MarketplaceSettingsPanel({
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
+      orderEtaAutoEnabled,
+      orderEtaMode,
+      orderEtaTotalMinutes: Number(orderEtaTotalMinutes) || 15,
+      orderEtaPrepMinutes: Number(orderEtaPrepMinutes) || 10,
+      orderEtaReadyMinutes: Number(orderEtaReadyMinutes) || 12,
+      orderEtaDispatchMinutes: Number(orderEtaDispatchMinutes) || 15,
+      orderEtaDeliverMinutes: Number(orderEtaDeliverMinutes) || 30,
     };
 
     if (!persistSettingsToSupabase) {
@@ -217,6 +244,13 @@ export default function MarketplaceSettingsPanel({
       minOrderAmount: parsedMin != null && Number.isFinite(parsedMin) ? parsedMin : null,
       coverImageUrl,
       publicDescription: publicDescription.trim(),
+      orderEtaAutoEnabled,
+      orderEtaMode,
+      orderEtaTotalMinutes: Number(orderEtaTotalMinutes) || 15,
+      orderEtaPrepMinutes: Number(orderEtaPrepMinutes) || 10,
+      orderEtaReadyMinutes: Number(orderEtaReadyMinutes) || 12,
+      orderEtaDispatchMinutes: Number(orderEtaDispatchMinutes) || 15,
+      orderEtaDeliverMinutes: Number(orderEtaDeliverMinutes) || 30,
     };
 
     startSaveTransition(async () => {
@@ -507,6 +541,95 @@ export default function MarketplaceSettingsPanel({
             </div>
           </div>
         ) : null}
+
+        <div className="mt-8 rounded-2xl border border-surface-container-highest bg-surface-container-low/40 p-4">
+          <p className="text-sm font-bold text-on-background">Sipariş süreleri ve otomatik bildirim</p>
+          <p className="mt-1 text-xs text-secondary">
+            Dakika cinsinden. Otomatik açıksa müşteriye planlı bildirim gider (Alındı → Hazırlanıyor / Yolda…).
+          </p>
+          <label className="mt-4 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={orderEtaAutoEnabled}
+              onChange={(e) => setOrderEtaAutoEnabled(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
+            />
+            <span className="text-sm font-medium text-on-background">Otomatik müşteri bildirimi</span>
+          </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-medium text-secondary">
+              Mod
+              <select
+                value={orderEtaMode}
+                onChange={(e) => setOrderEtaMode(e.target.value === "stages" ? "stages" : "total")}
+                className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="total">Toplam süre (ör. 15 dk sonra yolda)</option>
+                <option value="stages">Aşamalı süreler</option>
+              </select>
+            </label>
+            {orderEtaMode === "total" ? (
+              <label className="text-xs font-medium text-secondary">
+                Toplam (dk)
+                <input
+                  type="number"
+                  min={1}
+                  max={180}
+                  value={orderEtaTotalMinutes}
+                  onChange={(e) => setOrderEtaTotalMinutes(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+                />
+              </label>
+            ) : (
+              <>
+                <label className="text-xs font-medium text-secondary">
+                  Hazırlanıyor (dk)
+                  <input
+                    type="number"
+                    min={1}
+                    max={180}
+                    value={orderEtaPrepMinutes}
+                    onChange={(e) => setOrderEtaPrepMinutes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-medium text-secondary">
+                  Hazır (dk)
+                  <input
+                    type="number"
+                    min={1}
+                    max={180}
+                    value={orderEtaReadyMinutes}
+                    onChange={(e) => setOrderEtaReadyMinutes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-medium text-secondary">
+                  Yola çıktı (dk)
+                  <input
+                    type="number"
+                    min={1}
+                    max={180}
+                    value={orderEtaDispatchMinutes}
+                    onChange={(e) => setOrderEtaDispatchMinutes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="text-xs font-medium text-secondary">
+                  Teslim (dk)
+                  <input
+                    type="number"
+                    min={1}
+                    max={180}
+                    value={orderEtaDeliverMinutes}
+                    onChange={(e) => setOrderEtaDeliverMinutes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+                  />
+                </label>
+              </>
+            )}
+          </div>
+        </div>
 
         <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-surface-container-high bg-surface-container-low/40 p-4">
           <input

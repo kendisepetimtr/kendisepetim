@@ -3,6 +3,13 @@ import { formatAddressOneLine, type CustomerAddress } from "@/lib/customer-addre
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import type { DeliveryStatus, FulfillmentType } from "@/lib/fulfillment";
 
+export type MusteriOrderLineView = {
+  productId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+};
+
 export type MusteriOrderView = {
   id: string;
   orderCode: string;
@@ -14,6 +21,7 @@ export type MusteriOrderView = {
   restaurantName: string;
   subdomain: string;
   addressLine: string;
+  lines: MusteriOrderLineView[];
 };
 
 function parseAddress(raw: unknown): CustomerAddress {
@@ -50,7 +58,7 @@ export async function loadCustomerOrders(userId: string): Promise<MusteriOrderVi
     const { data, error } = await svc
       .from("orders")
       .select(
-        "id, created_at, order_code, status, total, delivery_status, fulfillment_type, address_json, tenant_id, tenants ( business_name, subdomain )",
+        "id, created_at, order_code, status, total, delivery_status, fulfillment_type, address_json, tenant_id, tenants ( business_name, subdomain ), order_lines ( product_id, name, qty, unit_price )",
       )
       .eq("customer_user_id", userId)
       .order("created_at", { ascending: false })
@@ -61,6 +69,16 @@ export async function loadCustomerOrders(userId: string): Promise<MusteriOrderVi
     return data.map((row) => {
       const tenant = Array.isArray(row.tenants) ? row.tenants[0] : row.tenants;
       const t = tenant as { business_name?: string; subdomain?: string } | null;
+      const rawLines = Array.isArray(row.order_lines) ? row.order_lines : [];
+      const lines: MusteriOrderLineView[] = rawLines.map((line) => {
+        const l = line as Record<string, unknown>;
+        return {
+          productId: typeof l.product_id === "string" ? l.product_id : "",
+          name: typeof l.name === "string" ? l.name : "Ürün",
+          qty: Number(l.qty) || 1,
+          unitPrice: Number(l.unit_price) || 0,
+        };
+      });
       return {
         id: row.id as string,
         orderCode: (row.order_code as string) ?? "",
@@ -72,6 +90,7 @@ export async function loadCustomerOrders(userId: string): Promise<MusteriOrderVi
         restaurantName: t?.business_name ?? "Restoran",
         subdomain: t?.subdomain ?? "",
         addressLine: formatAddressOneLine(parseAddress(row.address_json)),
+        lines,
       };
     });
   } catch {

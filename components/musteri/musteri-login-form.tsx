@@ -18,6 +18,7 @@ type Props = {
   signedIn?: boolean;
   signedInEmail?: string | null;
   signedInKind?: "customer" | "restaurant" | "unknown" | "guest";
+  nextPath?: string;
 };
 
 const NOTICE_COPY: Record<NonNullable<Props["notice"]>, { title: string; body: string }> = {
@@ -42,6 +43,7 @@ export default function MusteriLoginForm({
   signedIn = false,
   signedInEmail = null,
   signedInKind = "guest",
+  nextPath = MUSTERI_HOME_PATH,
 }: Props) {
   const formId = useId();
   const [state, formAction, pending] = useActionState(musteriLoginAction, null as MusteriAuthState);
@@ -116,7 +118,7 @@ export default function MusteriLoginForm({
       ) : null}
 
       <div className="mb-6">
-        <GoogleAuthButton nextPath={MUSTERI_HOME_PATH} intent="customer" label="Google ile müşteri girişi" />
+        <GoogleAuthButton nextPath={nextPath} intent="customer" label="Google ile müşteri girişi" />
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center" aria-hidden>
             <div className="w-full border-t border-surface-container-highest" />
@@ -132,6 +134,7 @@ export default function MusteriLoginForm({
         className="space-y-6 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-8 shadow-sm"
         noValidate
       >
+        <input type="hidden" name="next" value={nextPath} />
         <div className="space-y-2">
           <label htmlFor={`${formId}-email`} className="block text-sm font-semibold">
             E-posta

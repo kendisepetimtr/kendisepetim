@@ -68,6 +68,13 @@ export type LocalTenantProfile = {
   minOrderAmount: number | null;
   tableCount: number;
   dineInEnabled: boolean;
+  orderEtaAutoEnabled: boolean;
+  orderEtaMode: "total" | "stages";
+  orderEtaTotalMinutes: number;
+  orderEtaPrepMinutes: number;
+  orderEtaReadyMinutes: number;
+  orderEtaDispatchMinutes: number;
+  orderEtaDeliverMinutes: number;
 };
 
 export function saveLocalTenant(
@@ -121,6 +128,16 @@ export function saveLocalTenant(
     tableCount:
       typeof data.tableCount === "number" && Number.isFinite(data.tableCount) ? Math.max(0, data.tableCount) : 0,
     dineInEnabled: data.dineInEnabled === true,
+    orderEtaAutoEnabled: data.orderEtaAutoEnabled === true,
+    orderEtaMode: data.orderEtaMode === "stages" ? "stages" : "total",
+    orderEtaTotalMinutes:
+      typeof data.orderEtaTotalMinutes === "number" ? data.orderEtaTotalMinutes : 15,
+    orderEtaPrepMinutes: typeof data.orderEtaPrepMinutes === "number" ? data.orderEtaPrepMinutes : 10,
+    orderEtaReadyMinutes: typeof data.orderEtaReadyMinutes === "number" ? data.orderEtaReadyMinutes : 12,
+    orderEtaDispatchMinutes:
+      typeof data.orderEtaDispatchMinutes === "number" ? data.orderEtaDispatchMinutes : 15,
+    orderEtaDeliverMinutes:
+      typeof data.orderEtaDeliverMinutes === "number" ? data.orderEtaDeliverMinutes : 30,
     registeredAt: data.registeredAt ?? new Date().toISOString(),
   };
   window.localStorage.setItem(LOCAL_TENANT_STORAGE_KEY, JSON.stringify(profile));
@@ -221,6 +238,28 @@ export function getLocalTenant(): LocalTenantProfile | null {
       minOrderAmount,
       tableCount,
       dineInEnabled,
+      orderEtaAutoEnabled: p.orderEtaAutoEnabled === true,
+      orderEtaMode: p.orderEtaMode === "stages" ? "stages" : "total",
+      orderEtaTotalMinutes:
+        typeof p.orderEtaTotalMinutes === "number" && Number.isFinite(p.orderEtaTotalMinutes)
+          ? p.orderEtaTotalMinutes
+          : 15,
+      orderEtaPrepMinutes:
+        typeof p.orderEtaPrepMinutes === "number" && Number.isFinite(p.orderEtaPrepMinutes)
+          ? p.orderEtaPrepMinutes
+          : 10,
+      orderEtaReadyMinutes:
+        typeof p.orderEtaReadyMinutes === "number" && Number.isFinite(p.orderEtaReadyMinutes)
+          ? p.orderEtaReadyMinutes
+          : 12,
+      orderEtaDispatchMinutes:
+        typeof p.orderEtaDispatchMinutes === "number" && Number.isFinite(p.orderEtaDispatchMinutes)
+          ? p.orderEtaDispatchMinutes
+          : 15,
+      orderEtaDeliverMinutes:
+        typeof p.orderEtaDeliverMinutes === "number" && Number.isFinite(p.orderEtaDeliverMinutes)
+          ? p.orderEtaDeliverMinutes
+          : 30,
     };
   } catch {
     return null;

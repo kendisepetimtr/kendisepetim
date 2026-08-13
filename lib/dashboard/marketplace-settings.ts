@@ -7,6 +7,7 @@ import {
   getMarketplaceQualityIssues,
   type MarketplaceProfileInput,
 } from "@/lib/marketplace";
+import { clampEtaMinutes } from "@/lib/musteri/order-tracking";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
@@ -30,6 +31,13 @@ export type MarketplaceSettingsPatch = {
   minOrderAmount: number | null;
   coverImageUrl: string;
   publicDescription: string;
+  orderEtaAutoEnabled: boolean;
+  orderEtaMode: "total" | "stages";
+  orderEtaTotalMinutes: number;
+  orderEtaPrepMinutes: number;
+  orderEtaReadyMinutes: number;
+  orderEtaDispatchMinutes: number;
+  orderEtaDeliverMinutes: number;
 };
 
 export type UpdateMarketplaceSettingsResult =
@@ -174,10 +182,17 @@ export async function updateMarketplaceSettings(
         min_order_amount: minOrderAmount,
         cover_image_url: coverImageUrl || null,
         public_description: publicDescription,
+        order_eta_auto_enabled: patch.orderEtaAutoEnabled === true,
+        order_eta_mode: patch.orderEtaMode === "stages" ? "stages" : "total",
+        order_eta_total_minutes: clampEtaMinutes(patch.orderEtaTotalMinutes, 15),
+        order_eta_prep_minutes: clampEtaMinutes(patch.orderEtaPrepMinutes, 10),
+        order_eta_ready_minutes: clampEtaMinutes(patch.orderEtaReadyMinutes, 12),
+        order_eta_dispatch_minutes: clampEtaMinutes(patch.orderEtaDispatchMinutes, 15),
+        order_eta_deliver_minutes: clampEtaMinutes(patch.orderEtaDeliverMinutes, 30),
       })
       .eq("id", current.id)
       .select(
-        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, plan, trial_ends_at, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount",
+        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, plan, trial_ends_at, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount, order_eta_auto_enabled, order_eta_mode, order_eta_total_minutes, order_eta_prep_minutes, order_eta_ready_minutes, order_eta_dispatch_minutes, order_eta_deliver_minutes",
       )
       .single();
 

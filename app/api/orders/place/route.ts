@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     const { data: tenant, error: tenantError } = await svc
       .from("tenants")
       .select(
-        "id, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, plan, trial_ends_at",
+        "id, subdomain, business_name, public_menu_enabled, open_time, close_time, fulfillment_pickup_enabled, fulfillment_delivery_enabled, latitude, longitude, delivery_radius_km, min_order_amount, dine_in_enabled, table_count, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, plan, trial_ends_at, order_eta_auto_enabled, order_eta_mode, order_eta_total_minutes, order_eta_prep_minutes, order_eta_ready_minutes, order_eta_dispatch_minutes, order_eta_deliver_minutes",
       )
       .eq("subdomain", subdomain)
       .maybeSingle();
@@ -332,6 +332,38 @@ export async function POST(request: Request) {
         item_count: lines.length,
       },
     });
+
+    if (customerUserId) {
+      try {
+        const { scheduleAutoNotificationsForOrder } = await import("@/lib/musteri/notifications-service");
+        await scheduleAutoNotificationsForOrder({
+          userId: customerUserId,
+          orderId: insertedOrder.id,
+          orderCode: insertedOrder.order_code as string,
+          subdomain: String((tenant as { subdomain?: string }).subdomain ?? subdomain),
+          restaurantName: String((tenant as { business_name?: string }).business_name ?? "Restoran"),
+          fulfillmentIsDelivery: fulfillmentType === "delivery",
+          tenantRow: tenant as unknown as Record<string, unknown>,
+        });
+      } catch {
+        /* bildirim opsiyonel — ETA kolonları yoksa yine de received dene */
+        try {
+          const { insertCustomerNotification } = await import("@/lib/musteri/notifications-service");
+          await insertCustomerNotification({
+            userId: customerUserId,
+            orderId: insertedOrder.id,
+            orderCode: insertedOrder.order_code as string,
+            subdomain,
+            restaurantName: String((tenant as { business_name?: string }).business_name ?? "Restoran"),
+            stage: "received",
+            source: "system",
+            deliverNow: true,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
 
     return NextResponse.json({
       ok: true,

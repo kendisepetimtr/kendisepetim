@@ -55,5 +55,12 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
         : null,
     tableCount: Number.isFinite(Number(row.table_count)) ? Math.max(0, Number(row.table_count)) : 0,
     dineInEnabled: row.dine_in_enabled === true,
+    orderEtaAutoEnabled: row.order_eta_auto_enabled === true,
+    orderEtaMode: row.order_eta_mode === "stages" ? "stages" : "total",
+    orderEtaTotalMinutes: Number(row.order_eta_total_minutes ?? 15) || 15,
+    orderEtaPrepMinutes: Number(row.order_eta_prep_minutes ?? 10) || 10,
+    orderEtaReadyMinutes: Number(row.order_eta_ready_minutes ?? 12) || 12,
+    orderEtaDispatchMinutes: Number(row.order_eta_dispatch_minutes ?? 15) || 15,
+    orderEtaDeliverMinutes: Number(row.order_eta_deliver_minutes ?? 30) || 30,
   };
 }

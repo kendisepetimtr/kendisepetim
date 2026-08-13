@@ -35,7 +35,16 @@ import CartCheckoutModal from "@/components/public-menu/cart-checkout-modal";
 import PublicMenuPwaCard, { usePublicMenuPwaInstall } from "@/components/public-menu/public-menu-pwa-card";
 import PwaIosInstallHelp from "@/components/public-menu/pwa-ios-install-help";
 import SiteLogo from "@/components/site-logo";
+import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
+import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
+import {
+  isProductFavorited,
+  toggleGuestProductFavorite,
+  toggleGuestRestaurantFavorite,
+  isRestaurantFavorited,
+} from "@/lib/guest-favorites";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { getOAuthSiteBase } from "@/lib/site-url";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -152,6 +161,10 @@ export default function PublicMenuClient({
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<string>("all");
   const [favorites, setFavorites] = useState<Set<string>>(() => new Set());
+  const [restaurantFav, setRestaurantFav] = useState(false);
+  const [customerKind, setCustomerKind] = useState<"guest" | "customer" | "restaurant" | "unknown">("guest");
+  const [customerFirstName, setCustomerFirstName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const [cart, setCart] = useState<CartState>({});
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [clockTick, setClockTick] = useState(0);
@@ -175,6 +188,82 @@ export default function PublicMenuClient({
     const id = window.setInterval(() => setClockTick((n) => n + 1), 60_000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (staffChrome) return;
+    setRestaurantFav(isRestaurantFavorited(slug));
+    const next = new Set<string>();
+    for (const p of menu.products) {
+      if (isProductFavorited(slug, p.id)) next.add(p.id);
+    }
+    setFavorites(next);
+
+    void (async () => {
+      try {
+        const res = await fetch(`${getOAuthSiteBase()}/api/musteri/checkout-context`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          kind?: string;
+          firstName?: string;
+          email?: string;
+        };
+        if (res.ok && data.ok && data.kind === "customer") {
+          setCustomerKind("customer");
+          setCustomerFirstName(data.firstName ?? "");
+          setCustomerEmail(data.email ?? null);
+          const favRes = await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          const favData = (await favRes.json()) as {
+            ok?: boolean;
+            items?: { kind: string; subdomain: string; productId: string | null }[];
+          };
+          if (favRes.ok && favData.ok && favData.items) {
+            const productSet = new Set<string>();
+            let rest = false;
+            for (const item of favData.items) {
+              if (item.subdomain !== slug) continue;
+              if (item.kind === "restaurant") rest = true;
+              if (item.kind === "product" && item.productId) productSet.add(item.productId);
+            }
+            setRestaurantFav(rest);
+            setFavorites(productSet);
+          }
+        }
+      } catch {
+        /* misafir */
+      }
+    })();
+  }, [slug, menu.products, staffChrome]);
+
+  useEffect(() => {
+    if (staffChrome || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tekrar = params.get("tekrar");
+    if (!tekrar) return;
+    const ids = tekrar.split(",").map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return;
+    setCart((prev) => {
+      const next = { ...prev };
+      for (const productId of ids) {
+        const product = menu.products.find((p) => p.id === productId && !p.hidden);
+        if (!product) continue;
+        const key = buildCartKey(productId, [], []);
+        next[key] = {
+          productId,
+          qty: (next[key]?.qty ?? 0) + 1,
+          removedIngredients: [],
+          selectedOptions: [],
+        };
+      }
+      return next;
+    });
+    setCheckoutOpen(true);
+  }, [staffChrome, menu.products]);
 
   const openStatus = useMemo(() => {
     if (clockTick === 0) return initialOpenStatus;
@@ -268,13 +357,67 @@ export default function PublicMenuClient({
     setSelectedOptionsDraft(seedDefaultSelections(product));
   }
 
-  function toggleFavorite(id: string) {
+  async function toggleFavorite(id: string) {
+    const product = menu.products.find((p) => p.id === id);
+    const was = favorites.has(id);
     setFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+
+    if (customerKind === "customer") {
+      try {
+        await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: was ? "remove" : "add",
+            kind: "product",
+            subdomain: slug,
+            productId: id,
+            productName: product?.name ?? "",
+            restaurantName: title,
+          }),
+        });
+      } catch {
+        /* local state already updated */
+      }
+      return;
+    }
+
+    toggleGuestProductFavorite({
+      subdomain: slug,
+      productId: id,
+      productName: product?.name ?? "",
+      restaurantName: title,
+    });
+  }
+
+  async function toggleRestaurantFavorite() {
+    const was = restaurantFav;
+    setRestaurantFav(!was);
+    if (customerKind === "customer") {
+      try {
+        await fetch(`${getOAuthSiteBase()}/api/musteri/favorites`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: was ? "remove" : "add",
+            kind: "restaurant",
+            subdomain: slug,
+            restaurantName: title,
+          }),
+        });
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    toggleGuestRestaurantFavorite({ subdomain: slug, restaurantName: title });
   }
 
   function categoryLabel(c: LocalMenuCategory): string {
@@ -394,10 +537,45 @@ export default function PublicMenuClient({
       className={[
         "relative min-h-screen bg-background font-body text-on-background",
         desktopSplit
-          ? "mx-auto max-w-md pb-28 lg:max-w-7xl lg:px-6 lg:pb-12 lg:pt-8"
-          : "mx-auto max-w-md pb-28",
+          ? "mx-auto max-w-md pb-28 lg:max-w-7xl lg:px-6 lg:pb-12 lg:pt-8 lg:pl-60"
+          : staffChrome
+            ? "mx-auto max-w-md pb-28"
+            : "mx-auto max-w-md pb-32",
       ].join(" ")}
     >
+      {!staffChrome ? (
+        <div className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-surface-container-highest/80 bg-background/90 px-4 py-2 backdrop-blur">
+          <CustomerIdentityChip
+            session={{ kind: customerKind, firstName: customerFirstName, email: customerEmail }}
+            absolute
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void toggleRestaurantFavorite()}
+              className="inline-flex size-9 items-center justify-center rounded-full border border-surface-container-highest bg-white"
+              aria-label={restaurantFav ? "Restoranı favoriden çıkar" : "Restoranı favorile"}
+            >
+              <span
+                className={["material-symbols-outlined text-[20px]", restaurantFav ? "text-primary" : "text-secondary"].join(" ")}
+                style={restaurantFav ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              >
+                favorite
+              </span>
+            </button>
+            <CustomerNotificationsPanel enabled={customerKind === "customer"} absoluteApi />
+          </div>
+        </div>
+      ) : null}
+
+      {!staffChrome ? (
+        <CustomerChrome
+          session={{ kind: customerKind, firstName: customerFirstName, email: customerEmail }}
+          variant="overlay"
+          absoluteLinks
+        />
+      ) : null}
+
       <div
         className={
           desktopSplit
@@ -652,7 +830,8 @@ export default function PublicMenuClient({
                   {gridProducts.map((p) => (
                     <div
                       key={p.id}
-                      className="group rounded-3xl bg-surface-container-lowest p-3 transition-transform duration-200 active:scale-95"
+                      id={`urun-${p.id}`}
+                      className="group scroll-mt-28 rounded-3xl bg-surface-container-lowest p-3 transition-transform duration-200 active:scale-95"
                     >
                       <div
                         className={[

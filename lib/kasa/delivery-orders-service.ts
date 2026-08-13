@@ -385,6 +385,38 @@ export async function updateDeliveryOrderStatus(input: {
       },
     });
 
+    try {
+      const { data: orderRow } = await svc
+        .from("orders")
+        .select("customer_user_id, order_code, tenants ( business_name, subdomain )")
+        .eq("id", input.orderId)
+        .maybeSingle();
+      const customerUserId =
+        orderRow && typeof (orderRow as { customer_user_id?: unknown }).customer_user_id === "string"
+          ? ((orderRow as { customer_user_id: string }).customer_user_id)
+          : null;
+      if (customerUserId) {
+        const { stageFromDeliveryStatus } = await import("@/lib/musteri/order-tracking");
+        const stage = stageFromDeliveryStatus(input.deliveryStatus);
+        if (stage) {
+          const tenantsRaw = (orderRow as { tenants?: unknown }).tenants;
+          const tenant = Array.isArray(tenantsRaw) ? tenantsRaw[0] : tenantsRaw;
+          const t = tenant as { business_name?: string; subdomain?: string } | null;
+          const { notifyCustomerOrderStage } = await import("@/lib/musteri/notifications-service");
+          await notifyCustomerOrderStage({
+            userId: customerUserId,
+            orderId: input.orderId,
+            orderCode: detail.order.orderCode,
+            subdomain: t?.subdomain ?? "",
+            restaurantName: t?.business_name ?? "Restoran",
+            stage,
+          });
+        }
+      }
+    } catch {
+      /* müşteri bildirimi opsiyonel */
+    }
+
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Durum güncellenemedi." };

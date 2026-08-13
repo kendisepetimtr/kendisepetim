@@ -49,6 +49,13 @@ export type TenantRow = {
   owner_admin_pin_set_at: string | null;
   table_count: number;
   dine_in_enabled: boolean;
+  order_eta_auto_enabled?: boolean;
+  order_eta_mode?: "total" | "stages" | string;
+  order_eta_total_minutes?: number;
+  order_eta_prep_minutes?: number;
+  order_eta_ready_minutes?: number;
+  order_eta_dispatch_minutes?: number;
+  order_eta_deliver_minutes?: number;
   waiter_pin_hash: string | null;
   waiter_pin_set_at: string | null;
   cashier_pin_hash: string | null;

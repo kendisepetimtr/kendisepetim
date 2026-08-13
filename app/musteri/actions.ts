@@ -42,6 +42,9 @@ export async function musteriLoginAction(
 
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const nextRaw = String(formData.get("next") ?? MUSTERI_HOME_PATH);
+  const next =
+    nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : MUSTERI_HOME_PATH;
   if (!email || !password) return { error: "E-posta ve şifre gerekli." };
 
   await persistAuthIntent("customer");
@@ -99,7 +102,7 @@ export async function musteriLoginAction(
     return { error: CUSTOMER_BLOCKED_LOGIN_MESSAGE };
   }
 
-  redirect(MUSTERI_HOME_PATH);
+  redirect(next);
 }
 
 export async function musteriRegisterAction(
