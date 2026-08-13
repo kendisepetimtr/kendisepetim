@@ -21,6 +21,7 @@ import {
   MUSTERI_HOME_PATH,
   MUSTERI_LOGIN_PATH,
 } from "@/lib/musteri/paths";
+import { CUSTOMER_BLOCKED_LOGIN_MESSAGE, getCustomerBlockState } from "@/lib/superadmin/customers-service";
 import { normalizeTrPhone } from "@/lib/phone-tr";
 import { describeSupabaseEnvGap } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -80,8 +81,19 @@ export async function musteriLoginAction(
       firstName,
       lastName,
       phone: "",
+      email: user.email ?? "",
     });
     await supabase.auth.updateUser({ data: { account_kind: "customer" } });
+  }
+
+  const block = await getCustomerBlockState(user.id);
+  if (block.blocked) {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* devam */
+    }
+    return { error: CUSTOMER_BLOCKED_LOGIN_MESSAGE };
   }
 
   redirect(MUSTERI_HOME_PATH);
@@ -128,6 +140,7 @@ export async function musteriRegisterAction(
       firstName,
       lastName,
       phone: normalizedPhone,
+      email: existingUser.email ?? email,
     });
     if (!profile.ok) return { error: profile.error };
     await supabase.auth.updateUser({ data: { account_kind: "customer", first_name: firstName, last_name: lastName } });
@@ -165,6 +178,7 @@ export async function musteriRegisterAction(
     firstName,
     lastName,
     phone: normalizedPhone,
+    email,
   });
   if (!profile.ok) return { error: profile.error };
 
@@ -194,6 +208,8 @@ async function requireCustomerUserId(): Promise<string | { error: string }> {
   const kind = await resolveAccountKind(user);
   if (kind === "restaurant") return { error: RESTAURANT_ACCOUNT_ON_CUSTOMER_LOGIN };
   if (kind !== "customer") return { error: "Müşteri hesabı bulunamadı." };
+  const block = await getCustomerBlockState(user.id);
+  if (block.blocked) return { error: CUSTOMER_BLOCKED_LOGIN_MESSAGE };
   return user.id;
 }
 

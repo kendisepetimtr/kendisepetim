@@ -7,9 +7,15 @@ type Props = {
   tenants: TenantRow[];
   accountingSummary: AccountingMonthSummary | null;
   accountingError: string | null;
+  customerCount: number;
 };
 
-export default function SuperadminOverview({ tenants, accountingSummary, accountingError }: Props) {
+export default function SuperadminOverview({
+  tenants,
+  accountingSummary,
+  accountingError,
+  customerCount,
+}: Props) {
   const freeCount = tenants.filter((t) => t.plan === "free").length;
   const premCount = tenants.filter((t) => t.plan === "premium").length;
   const lifetimeCount = tenants.filter((t) => t.plan === "lifetime").length;
@@ -23,8 +29,9 @@ export default function SuperadminOverview({ tenants, accountingSummary, account
         <p className="mt-1 text-sm text-secondary">Platform özeti ve son işletmeler</p>
       </header>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 xl:grid-cols-5">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 xl:grid-cols-6">
         <StatCard label="Toplam işletme" value={String(tenants.length)} icon="storefront" />
+        <StatCard label="Müşteri" value={String(customerCount)} icon="group" />
         <StatCard label="Premium" value={String(premCount)} icon="workspace_premium" accent="amber" />
         <StatCard label="Ömür boyu" value={String(lifetimeCount)} icon="all_inclusive" accent="emerald" />
         <StatCard label="Free" value={String(freeCount)} icon="layers" />
@@ -62,9 +69,14 @@ export default function SuperadminOverview({ tenants, accountingSummary, account
       <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm">
         <div className="flex items-center justify-between border-b border-surface-container-highest px-5 py-4">
           <h2 className="font-headline text-base font-bold">Son kayıtlar</h2>
-          <Link href="/superadmin/isletmeler" className="text-xs font-bold text-primary hover:underline">
-            Tümünü gör
-          </Link>
+          <div className="flex gap-3">
+            <Link href="/superadmin/musteriler" className="text-xs font-bold text-primary hover:underline">
+              Müşteriler
+            </Link>
+            <Link href="/superadmin/isletmeler" className="text-xs font-bold text-primary hover:underline">
+              Tümünü gör
+            </Link>
+          </div>
         </div>
         {recent.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-secondary">Henüz işletme yok.</p>

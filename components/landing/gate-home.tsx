@@ -6,26 +6,30 @@ export default function GateHome() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="glass-nav sticky top-0 z-40">
-        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-8">
-          <SiteLogo variant="landing" />
-          <div className="flex items-center gap-3 text-sm font-semibold sm:gap-4">
-            <Link href={MUSTERI_LOGIN_PATH} className="text-secondary hover:text-on-background">
+        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-8 sm:py-3">
+          <SiteLogo variant="landing" iconOnly />
+          <div className="flex shrink-0 items-center gap-3 text-xs font-semibold sm:gap-5 sm:text-sm">
+            <Link href={MUSTERI_LOGIN_PATH} className="whitespace-nowrap text-secondary hover:text-on-background">
               Müşteri girişi
             </Link>
-            <Link href="/giris" className="text-secondary hover:text-on-background">
+            <Link href="/giris" className="whitespace-nowrap text-secondary hover:text-on-background">
               Restoran girişi
             </Link>
           </div>
         </nav>
-        <div className="h-px w-full bg-[#e8e8ea] opacity-50" />
+        <div className="border-t border-[#e8e8ea]/50">
+          <Link
+            href="/"
+            className="mx-auto block max-w-6xl px-4 py-2 text-center font-headline text-lg font-extrabold tracking-tighter text-[#bc000c] sm:px-8 sm:text-2xl"
+          >
+            KendiSepetim
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-8 sm:py-12">
         <div className="mb-8 text-center sm:mb-10">
-          <p className="land-fade-up font-headline text-xs font-bold uppercase tracking-[0.28em] text-primary">
-            KendiSepetim
-          </p>
-          <h1 className="land-fade-up-delay-1 mt-3 font-headline text-3xl font-extrabold tracking-tight text-on-background sm:text-4xl lg:text-5xl">
+          <h1 className="land-fade-up font-headline text-3xl font-extrabold tracking-tight text-on-background sm:text-4xl lg:text-5xl">
             Ne yapmak istiyorsunuz?
           </h1>
           <p className="land-fade-up-delay-2 mx-auto mt-3 max-w-xl text-sm text-secondary sm:text-base">

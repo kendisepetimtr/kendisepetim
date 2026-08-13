@@ -6,6 +6,8 @@ export type CustomerProfile = {
   firstName: string;
   lastName: string;
   phone: string;
+  email?: string;
+  blockedAt?: string | null;
 };
 
 export type CustomerSavedAddress = {
@@ -39,15 +41,32 @@ export async function getCustomerProfileByUserId(userId: string): Promise<Custom
     const svc = createServiceSupabaseClient();
     const { data, error } = await svc
       .from("customer_profiles")
-      .select("user_id, first_name, last_name, phone")
+      .select("user_id, first_name, last_name, phone, email, blocked_at")
       .eq("user_id", userId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) {
+      const fallback = await svc
+        .from("customer_profiles")
+        .select("user_id, first_name, last_name, phone")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (fallback.error || !fallback.data) return null;
+      return {
+        userId: fallback.data.user_id as string,
+        firstName: (fallback.data.first_name as string) ?? "",
+        lastName: (fallback.data.last_name as string) ?? "",
+        phone: (fallback.data.phone as string) ?? "",
+        blockedAt: null,
+      };
+    }
+    if (!data) return null;
     return {
       userId: data.user_id as string,
       firstName: (data.first_name as string) ?? "",
       lastName: (data.last_name as string) ?? "",
       phone: (data.phone as string) ?? "",
+      email: (data.email as string) ?? "",
+      blockedAt: (data.blocked_at as string | null) ?? null,
     };
   } catch {
     return null;
@@ -59,18 +78,20 @@ export async function upsertCustomerProfile(input: {
   firstName: string;
   lastName: string;
   phone: string;
+  email?: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const svc = createServiceSupabaseClient();
-    const { error } = await svc.from("customer_profiles").upsert(
-      {
-        user_id: input.userId,
-        first_name: input.firstName.trim(),
-        last_name: input.lastName.trim(),
-        phone: input.phone.trim(),
-      },
-      { onConflict: "user_id" },
-    );
+    const payload: Record<string, string> = {
+      user_id: input.userId,
+      first_name: input.firstName.trim(),
+      last_name: input.lastName.trim(),
+      phone: input.phone.trim(),
+    };
+    if (typeof input.email === "string") {
+      payload.email = input.email.trim().toLowerCase();
+    }
+    const { error } = await svc.from("customer_profiles").upsert(payload, { onConflict: "user_id" });
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   } catch (e) {

@@ -26,6 +26,7 @@ import {
 } from "@/lib/tenant-payment";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
 import { resolveAccountKind } from "@/lib/account-kind";
+import { CUSTOMER_BLOCKED_LOGIN_MESSAGE, getCustomerBlockState } from "@/lib/superadmin/customers-service";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -245,6 +246,10 @@ export async function POST(request: Request) {
           data: { user },
         } = await authClient.auth.getUser();
         if (user && (await resolveAccountKind(user)) === "customer") {
+          const block = await getCustomerBlockState(user.id);
+          if (block.blocked) {
+            return NextResponse.json({ error: CUSTOMER_BLOCKED_LOGIN_MESSAGE }, { status: 403 });
+          }
           customerUserId = user.id;
         }
       }

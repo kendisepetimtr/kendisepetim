@@ -6,6 +6,7 @@ import { EMAIL_VERIFIED_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { resolveAccountKind } from "@/lib/account-kind";
 import { upsertCustomerProfile } from "@/lib/musteri/customer-profile";
 import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH, isMusteriNextPath } from "@/lib/musteri/paths";
+import { getCustomerBlockState } from "@/lib/superadmin/customers-service";
 
 function loginRedirect(request: NextRequest, params: Record<string, string>, customer: boolean) {
   const loginUrl = new URL(customer ? MUSTERI_LOGIN_PATH : "/giris", request.nextUrl.origin);
@@ -113,8 +114,16 @@ export async function GET(request: NextRequest) {
           firstName,
           lastName,
           phone: "",
+          email: user.email ?? "",
         });
         await supabase.auth.updateUser({ data: { account_kind: "customer", first_name: firstName, last_name: lastName } });
+      }
+      const block = await getCustomerBlockState(user.id);
+      if (block.blocked) {
+        await supabase.auth.signOut({ scope: "local" });
+        const deny = loginRedirect(request, { durum: "hesap-engelli" }, true);
+        copyResponseCookies(response, deny);
+        return deny;
       }
       if (nextPath === "/giris" || nextPath.startsWith("/giris?")) {
         return NextResponse.redirect(new URL(MUSTERI_HOME_PATH, request.nextUrl.origin));

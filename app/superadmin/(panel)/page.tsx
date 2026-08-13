@@ -8,6 +8,7 @@ import { currentYearMonth } from "@/lib/superadmin/accounting-types";
 import { SUPERADMIN_TENANT_SELECT } from "@/lib/superadmin/tenant-select";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { normalizeTenantPlan } from "@/lib/tenant-entitlements";
+import { countCustomerProfiles } from "@/lib/superadmin/customers-service";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 
 export default async function SuperadminOverviewPage() {
@@ -37,7 +38,10 @@ export default async function SuperadminOverviewPage() {
   }
 
   const { year, month } = currentYearMonth();
-  const accounting = await loadAllAccountingEntries();
+  const [accounting, customerCount] = await Promise.all([
+    loadAllAccountingEntries(),
+    countCustomerProfiles(),
+  ]);
   const accountingSummary = accounting.ok
     ? buildAccountingMonthSummary(accounting.entries, year, month)
     : null;
@@ -47,6 +51,7 @@ export default async function SuperadminOverviewPage() {
       tenants={tenants}
       accountingSummary={accountingSummary}
       accountingError={accounting.ok ? null : accounting.error}
+      customerCount={customerCount}
     />
   );
 }

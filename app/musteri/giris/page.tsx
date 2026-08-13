@@ -57,6 +57,11 @@ export default async function MusteriLoginPage({ searchParams }: Props) {
               Bu hesap restoran kaydına bağlı. Yemek siparişi için ayrı bir müşteri hesabı kullanın.
             </p>
           ) : null}
+          {q.durum === "hesap-engelli" ? (
+            <p className="mb-6 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">
+              Bu müşteri hesabı kapatıldı. Sipariş ve giriş şu an kullanılamaz.
+            </p>
+          ) : null}
           <MusteriLoginForm
             supabaseConfigured={!!getSupabaseEnv()}
             notice={notice}

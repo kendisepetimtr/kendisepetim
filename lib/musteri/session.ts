@@ -7,10 +7,11 @@ export type MusteriSession = {
   userId: string | null;
   email: string | null;
   firstName: string;
+  blocked: boolean;
 };
 
 export async function loadMusteriSession(): Promise<MusteriSession> {
-  const empty: MusteriSession = { kind: "guest", userId: null, email: null, firstName: "" };
+  const empty: MusteriSession = { kind: "guest", userId: null, email: null, firstName: "", blocked: false };
   try {
     const supabase = await tryCreateServerSupabaseClient();
     if (!supabase) return empty;
@@ -31,6 +32,7 @@ export async function loadMusteriSession(): Promise<MusteriSession> {
         userId: user.id,
         email: user.email ?? null,
         firstName: profile?.firstName || metaName.split(" ")[0] || "",
+        blocked: Boolean(profile?.blockedAt),
       };
     }
 
@@ -40,6 +42,7 @@ export async function loadMusteriSession(): Promise<MusteriSession> {
         userId: user.id,
         email: user.email ?? null,
         firstName: "",
+        blocked: false,
       };
     }
 
@@ -48,6 +51,7 @@ export async function loadMusteriSession(): Promise<MusteriSession> {
       userId: user.id,
       email: user.email ?? null,
       firstName: "",
+      blocked: false,
     };
   } catch {
     return empty;

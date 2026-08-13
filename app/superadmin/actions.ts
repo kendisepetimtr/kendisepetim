@@ -25,6 +25,11 @@ import {
   upsertPlatformTodo,
   type TodoInput,
 } from "@/lib/superadmin/todos-service";
+import {
+  deleteSuperadminCustomer,
+  setCustomerAdminNote,
+  setCustomerBlocked,
+} from "@/lib/superadmin/customers-service";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { TenantPlan } from "@/lib/supabase/tenant-types";
 
@@ -35,6 +40,7 @@ function revalidateSuperadminPaths() {
   revalidatePath("/superadmin/isletmeler");
   revalidatePath("/superadmin/muhasebe");
   revalidatePath("/superadmin/yapilacaklar");
+  revalidatePath("/superadmin/musteriler");
   revalidatePath("/superadmin/hesap");
 }
 
@@ -256,4 +262,46 @@ export async function superadminPublishTargetVersion(): Promise<{ error?: string
   revalidateSuperadminPaths();
   revalidatePublicVersionPaths();
   return { label: result.version.label };
+}
+
+export async function superadminBlockCustomer(
+  userId: string,
+  reason: string,
+): Promise<{ error?: string }> {
+  if (!isUuid(userId)) return { error: "Geçersiz müşteri." };
+  await requireSuperadminOrRedirect();
+  const result = await setCustomerBlocked({ userId, blocked: true, reason });
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminUnblockCustomer(userId: string): Promise<{ error?: string }> {
+  if (!isUuid(userId)) return { error: "Geçersiz müşteri." };
+  await requireSuperadminOrRedirect();
+  const result = await setCustomerBlocked({ userId, blocked: false });
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminSaveCustomerNote(
+  userId: string,
+  note: string,
+): Promise<{ error?: string }> {
+  if (!isUuid(userId)) return { error: "Geçersiz müşteri." };
+  await requireSuperadminOrRedirect();
+  const result = await setCustomerAdminNote({ userId, note });
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminDeleteCustomer(userId: string): Promise<{ error?: string }> {
+  if (!isUuid(userId)) return { error: "Geçersiz müşteri." };
+  await requireSuperadminOrRedirect();
+  const result = await deleteSuperadminCustomer(userId);
+  if (!result.ok) return { error: result.error };
+  revalidateSuperadminPaths();
+  return {};
 }
