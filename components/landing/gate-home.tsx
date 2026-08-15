@@ -14,7 +14,7 @@ export default function GateHome() {
         <div className="border-t border-[#e8e8ea]/50">
           <Link
             href="/"
-            className="mx-auto block max-w-6xl px-4 py-2 text-center font-headline text-lg font-extrabold tracking-tighter text-[#bc000c] sm:px-8 sm:text-2xl"
+            className="mx-auto block max-w-6xl px-4 py-3 text-center font-headline text-4xl font-extrabold tracking-tighter text-[#bc000c] sm:px-8 sm:py-4 sm:text-6xl"
           >
             KendiSepetim
           </Link>
@@ -24,7 +24,7 @@ export default function GateHome() {
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-8 sm:py-12">
         <div className="mb-8 text-center sm:mb-10">
           <h1 className="land-fade-up font-headline text-3xl font-extrabold tracking-tight text-on-background sm:text-4xl lg:text-5xl">
-            Ne yapmak istiyorsunuz?
+            kendisepetim
           </h1>
           <p className="land-fade-up-delay-2 mx-auto mt-3 max-w-xl text-sm text-secondary sm:text-base">
             Yemek sipariş etmek ayrı, restoranını yönetmek ayrı. İki kapı, iki hesap.
