@@ -31,6 +31,7 @@ export type TenantRow = {
   cover_image_url: string | null;
   public_description: string;
   google_maps_url: string | null;
+  google_reviews_url?: string | null;
   seo_index_enabled: boolean;
   hours_day_mode: TenantHoursDayMode;
   open_time: string;

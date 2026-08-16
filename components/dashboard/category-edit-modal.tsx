@@ -1,6 +1,7 @@
 "use client";
 
 import type { LocalMenuCategory } from "@/lib/local-menu";
+import LanguageAddStub from "@/components/dashboard/language-add-stub";
 import { type FormEvent, useEffect, useId, useState } from "react";
 
 export type CategoryEditFields = {
@@ -102,6 +103,7 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
                   required
                   className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+                <LanguageAddStub />
               </div>
 
               <div>
@@ -133,6 +135,7 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
                   placeholder="QR menüde bu kategori seçildiğinde ürün listesinin üstünde gösterilir."
                   className="mt-1 w-full resize-y rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background placeholder:text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+                <LanguageAddStub />
               </div>
             </div>
           </div>

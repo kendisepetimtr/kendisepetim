@@ -34,6 +34,7 @@ import {
 import CartCheckoutModal from "@/components/public-menu/cart-checkout-modal";
 import PublicMenuPwaCard, { usePublicMenuPwaInstall } from "@/components/public-menu/public-menu-pwa-card";
 import PwaIosInstallHelp from "@/components/public-menu/pwa-ios-install-help";
+import QrMenuHeaderActions from "@/components/public-menu/qr-menu-header-actions";
 import SiteLogo from "@/components/site-logo";
 import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
 import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
@@ -43,6 +44,8 @@ import {
   toggleGuestRestaurantFavorite,
   isRestaurantFavorited,
 } from "@/lib/guest-favorites";
+import { closedMessageForLocale } from "@/lib/menu-i18n";
+import { useMenuT } from "@/lib/use-menu-locale";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 import {
   clearMarketplaceCart,
@@ -106,6 +109,7 @@ type PublicMenuClientProps = {
   businessCoverImageUrl: string;
   publicDescription: string;
   googleMapsUrl: string;
+  googleReviewsUrl?: string;
   hoursPair: { open: string; close: string } | null;
   initialOpenStatus: boolean | null;
   initialClosedMessage: string;
@@ -152,6 +156,7 @@ export default function PublicMenuClient({
   businessCoverImageUrl,
   publicDescription,
   googleMapsUrl,
+  googleReviewsUrl = "",
   hoursPair,
   initialOpenStatus,
   initialClosedMessage,
@@ -167,6 +172,7 @@ export default function PublicMenuClient({
   initialMenu,
   initialCustomerSession,
 }: PublicMenuClientProps) {
+  const { locale, t } = useMenuT();
   const slug = rawSlug.toLowerCase();
   const isTableMenu = tableNumber != null && tableNumber > 0;
   const staffChrome = waiterMode || cashierMode || compactChrome;
@@ -346,11 +352,13 @@ export default function PublicMenuClient({
     return hoursPair ? getBusinessHoursRangeLabel(hoursPair.open, hoursPair.close) : null;
   }, [hoursPair]);
   const orderingEnabled = openStatus !== false && isOnline;
-  const closedMessage = !isOnline
-    ? "Cevrimdisisiniz. Menuyu inceleyebilirsiniz ancak siparis gondermek icin internet baglantisi gerekir."
-    : clockTick > 0 && hoursPair
+  const closedMessageTr =
+    clockTick > 0 && hoursPair
       ? getBusinessClosedMessage(hoursPair.open, hoursPair.close)
       : initialClosedMessage;
+  const closedMessage = !isOnline
+    ? t("offline")
+    : closedMessageForLocale(locale, hoursPair?.open ?? "", hoursPair?.close ?? "", closedMessageTr);
 
   const visibleCategories = useMemo(
     () => sortCategoriesForMenu(menu.categories.filter((c) => !c.hidden)),
@@ -579,7 +587,7 @@ export default function PublicMenuClient({
   }
 
   const activeCategory = effectiveTab !== "all" ? visibleCategories.find((c) => c.id === effectiveTab) : null;
-  const sectionHeading = activeCategory?.name ?? "Sizin İçin Seçtiklerimiz";
+  const sectionHeading = activeCategory?.name ?? t("picksForYou");
   /** Public / masa QR: web'de sol marka + sağ ızgara. Kasa/garson dar mobil kabukta kalır. */
   const desktopSplit = !staffChrome;
 
@@ -590,7 +598,7 @@ export default function PublicMenuClient({
       </span>
       <input
         className="w-full rounded-2xl border-none bg-surface-container-low py-4 pl-12 pr-4 font-medium text-on-surface placeholder:text-secondary focus:ring-2 focus:ring-primary/20"
-        placeholder="Lezzet keşfine çık..."
+        placeholder={t("searchPlaceholder")}
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -622,7 +630,7 @@ export default function PublicMenuClient({
               : "font-medium text-secondary transition-colors hover:text-primary",
           ].join(" ")}
         >
-          Popüler
+          {t("popular")}
         </button>
         {visibleCategories.map((c) => (
           <button
@@ -670,7 +678,7 @@ export default function PublicMenuClient({
               type="button"
               onClick={() => void toggleRestaurantFavorite()}
               className="inline-flex size-9 items-center justify-center rounded-full border border-surface-container-highest bg-white"
-              aria-label={restaurantFav ? "Restoranı favoriden çıkar" : "Restoranı favorile"}
+              aria-label={restaurantFav ? t("unfavRestaurant") : t("favRestaurant")}
             >
               <span
                 className={["material-symbols-outlined text-[20px]", restaurantFav ? "text-[#bc000c]" : "text-secondary"].join(" ")}
@@ -748,7 +756,7 @@ export default function PublicMenuClient({
                 {isTableMenu && !waiterMode && !cashierMode ? (
                   <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                     <span className="material-symbols-outlined text-[16px]">table_restaurant</span>
-                    Masa {tableNumber}
+                    {t("table")} {tableNumber}
                   </p>
                 ) : null}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -756,21 +764,21 @@ export default function PublicMenuClient({
                     <>
                       <span className="h-2 w-2 shrink-0 rounded-full bg-secondary/40" aria-hidden />
                       <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
-                        Çalışma saati bilgisi yok
+                        {t("noHours")}
                       </span>
                     </>
                   ) : openStatus ? (
                     <>
                       <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
                       <span className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
-                        Şu an açık
+                        {t("openNow")}
                       </span>
                     </>
                   ) : (
                     <>
                       <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden />
                       <span className="text-xs font-semibold uppercase tracking-widest text-amber-800">
-                        Şu an kapalı
+                        {t("closedNow")}
                       </span>
                     </>
                   )}
@@ -802,54 +810,17 @@ export default function PublicMenuClient({
                 ) : null}
               </div>
             </div>
-            <div
-              className={[
-                "flex shrink-0 flex-col items-end gap-2",
-                desktopSplit ? "lg:mt-5 lg:w-full lg:flex-row lg:items-stretch lg:justify-start" : "",
-              ].join(" ")}
-            >
-              {googleMapsUrl ? (
-                <a
-                  href={googleMapsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={[
-                    "inline-flex rounded-2xl bg-surface-container-high p-3 text-on-surface transition-transform active:scale-95",
-                    desktopSplit ? "lg:flex-1 lg:items-center lg:justify-center lg:gap-2 lg:px-4" : "",
-                  ].join(" ")}
-                  aria-label="Konumu Google Maps'te ac"
-                  title="Konum"
-                >
-                  <span className="material-symbols-outlined">location_on</span>
-                  {desktopSplit ? (
-                    <span className="hidden text-xs font-bold lg:inline">Harita</span>
-                  ) : null}
-                </a>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => void pwaInstall.handleInstallClick()}
-                disabled={pwaInstall.isInstalled}
-                className={[
-                  "inline-flex min-h-11 items-center justify-center rounded-2xl border px-3 py-2 text-xs font-bold transition",
-                  pwaInstall.isInstalled
-                    ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-primary/15 bg-primary/8 text-primary hover:bg-primary/12",
-                  desktopSplit ? "lg:flex-1 lg:gap-2" : "",
-                ].join(" ")}
-                aria-label={pwaInstall.buttonLabel}
-                title={pwaInstall.buttonLabel}
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  {pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
-                </span>
-                {desktopSplit ? (
-                  <span className="hidden lg:inline">
-                    {pwaInstall.isInstalled ? "Yüklü" : "Uygulama"}
-                  </span>
-                ) : null}
-              </button>
-            </div>
+            <QrMenuHeaderActions
+              googleMapsUrl={googleMapsUrl}
+              googleReviewsUrl={googleReviewsUrl}
+              desktopSplit={desktopSplit}
+              locale={locale}
+              t={t}
+              appInstalled={pwaInstall.isInstalled}
+              appLabel={pwaInstall.buttonLabel}
+              appIcon={pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
+              onInstall={() => void pwaInstall.handleInstallClick()}
+            />
           </div>
           <div className={desktopSplit ? "mt-4 lg:hidden" : "relative mt-4"}>{searchField}</div>
         </header>
@@ -885,7 +856,7 @@ export default function PublicMenuClient({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   <div className="absolute bottom-6 left-6 right-6">
                     <span className="mb-2 inline-block rounded-md bg-primary px-2 py-1 text-[10px] font-black uppercase text-white">
-                      İmza lezzet
+                      {t("signature")}
                     </span>
                     <h2
                       className={[
@@ -925,8 +896,8 @@ export default function PublicMenuClient({
               {gridProducts.length === 0 ? (
                 <p className="rounded-2xl bg-surface-container-low px-4 py-6 text-center text-sm text-secondary">
                   {visibleProducts.length === 0
-                    ? "Bu işletme için henüz görünür ürün yok. Panelden menü ekleyebilirsiniz."
-                    : "Aramanızla eşleşen ürün yok."}
+                    ? t("noProducts")
+                    : t("noSearch")}
                 </p>
               ) : (
                 <div
@@ -965,7 +936,7 @@ export default function PublicMenuClient({
                         <button
                           type="button"
                           className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow-sm backdrop-blur"
-                          aria-label={favorites.has(p.id) ? "Favoriden çıkar" : "Favorilere ekle"}
+                          aria-label={favorites.has(p.id) ? t("removeFavorite") : t("addFavorite")}
                           onClick={(e) => {
                             e.stopPropagation();
                             setPreviewProduct(null);
@@ -1011,7 +982,7 @@ export default function PublicMenuClient({
                           ].join(" ")}
                           aria-label={`Sepete ekle: ${p.name}`}
                           aria-disabled={!orderingEnabled}
-                          title={orderingEnabled ? undefined : "Restoran kapalı"}
+                          title={orderingEnabled ? undefined : t("restaurantClosed")}
                           disabled={!orderingEnabled}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1035,9 +1006,9 @@ export default function PublicMenuClient({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-on-background">Konum</p>
+                    <p className="text-sm font-semibold text-on-background">{t("location")}</p>
                     <p className="mt-1 text-xs leading-relaxed text-secondary">
-                      Restoran konumunu Google Maps uzerinde acabilir ve yol tarifi alabilirsiniz.
+                      {t("locationHint")}
                     </p>
                   </div>
                   <a
@@ -1046,7 +1017,7 @@ export default function PublicMenuClient({
                     rel="noreferrer"
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary/12"
                   >
-                    Haritada ac
+                    {t("openInMaps")}
                     <span className="material-symbols-outlined text-[16px]">north_east</span>
                   </a>
                 </div>
@@ -1113,13 +1084,13 @@ export default function PublicMenuClient({
                 ? "bg-gradient-to-b from-[#bc000c] to-[#e71418] active:scale-95"
                 : "cursor-not-allowed bg-surface-container-high text-secondary shadow-none",
             ].join(" ")}
-            aria-label={`Sepet: ${cartCount} ürün, ${formatTry(cartTotal)}`}
+            aria-label={`${t("cart")}: ${cartCount} ${t("items")}, ${formatTry(cartTotal)}`}
             aria-disabled={!orderingEnabled}
-            title={orderingEnabled ? undefined : "Restoran kapalı"}
+            title={orderingEnabled ? undefined : t("restaurantClosed")}
           >
             <span className="material-symbols-outlined">shopping_bag</span>
             <span className="text-sm font-bold">
-              {cartCount} Ürün — {formatTry(cartTotal)}
+              {cartCount} {t("items")} — {formatTry(cartTotal)}
             </span>
           </button>
         </div>
@@ -1215,6 +1186,7 @@ function ProductPreviewModal({
   onAddToCart: () => void;
   orderingEnabled: boolean;
 }) {
+  const { t } = useMenuT();
   const ingredientLines = parseIngredientLines(product.ingredients);
 
   return (
@@ -1277,7 +1249,7 @@ function ProductPreviewModal({
           ) : null}
           {ingredientLines.length > 0 ? (
             <div className="mt-5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-secondary">İçindekiler</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-secondary">{t("ingredients")}</h3>
               <ul className="mt-2 space-y-2 text-sm leading-relaxed text-secondary">
                 {ingredientLines.map((line) => (
                   <li key={line} className="rounded-xl bg-surface-container-low px-3 py-2">
@@ -1300,7 +1272,7 @@ function ProductPreviewModal({
                 : "cursor-not-allowed bg-surface-container-high text-secondary shadow-none",
             ].join(" ")}
           >
-            {orderingEnabled ? "Sepete ekle" : "Restoran kapalı"}
+            {orderingEnabled ? t("addToCart") : t("restaurantClosed")}
           </button>
         </div>
       </div>
@@ -1339,6 +1311,7 @@ function ProductCustomizeModal({
   onConfirm: () => void;
   orderingEnabled: boolean;
 }) {
+  const { t } = useMenuT();
   const groups = product.variationGroups;
   const livePrice = basePrice + sumVariationDeltas(selectedOptions);
   const isOptionSelected = (groupId: string, optionId: string) =>
@@ -1356,9 +1329,7 @@ function ProductCustomizeModal({
         <div className="border-b border-surface-container-high px-5 py-4">
           <h2 className="font-headline text-lg font-bold text-on-background">{product.name}</h2>
           <p className="mt-1 text-sm text-secondary">
-            {groups.length > 0
-              ? "Seçeneklerinizi belirleyin ve istemediğiniz malzemeleri çıkarın."
-              : "İstemediğiniz malzemeleri çıkarabilirsiniz. Hiçbir şey seçmezseniz ürün standart gelir."}
+            {groups.length > 0 ? t("customizeHint") : t("removeHint")}
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -1369,9 +1340,9 @@ function ProductCustomizeModal({
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
                   {group.type === "single"
                     ? group.required
-                      ? "Zorunlu · tek seçim"
-                      : "Tek seçim"
-                    : "Çoklu seçim"}
+                      ? t("requiredSingle")
+                      : t("single")
+                    : t("multi")}
                 </span>
               </div>
               <div className="space-y-2">
@@ -1465,7 +1436,7 @@ function ProductCustomizeModal({
                 : "cursor-not-allowed bg-surface-container-high text-secondary shadow-none",
             ].join(" ")}
           >
-            {orderingEnabled ? `Sepete ekle · ${formatTry(livePrice)}` : "Restoran kapalı"}
+            {orderingEnabled ? `${t("addToCart")} · ${formatTry(livePrice)}` : t("restaurantClosed")}
           </button>
           <button
             type="button"

@@ -29,6 +29,8 @@ export type LocalTenantProfile = {
   publicDescription: string;
   /** Haritada aç bağlantısı */
   googleMapsUrl: string;
+  /** Google yorum / işletme sayfası */
+  googleReviewsUrl: string;
   /** Arama motorlarında görünürlük */
   seoIndexEnabled: boolean;
   /** QR / herkese açık menü */
@@ -94,6 +96,7 @@ export function saveLocalTenant(
     coverImageUrl: data.coverImageUrl ?? "",
     publicDescription: data.publicDescription ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
+    googleReviewsUrl: data.googleReviewsUrl ?? "",
     seoIndexEnabled: data.seoIndexEnabled === true,
     publicMenuEnabled: data.publicMenuEnabled !== false,
     hoursDayMode: data.hoursDayMode === "shift" ? "shift" : "calendar",
@@ -164,6 +167,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const coverImageUrl = typeof p.coverImageUrl === "string" ? p.coverImageUrl : "";
     const publicDescription = typeof p.publicDescription === "string" ? p.publicDescription : "";
     const googleMapsUrl = typeof p.googleMapsUrl === "string" ? p.googleMapsUrl : "";
+    const googleReviewsUrl = typeof p.googleReviewsUrl === "string" ? p.googleReviewsUrl : "";
     const seoIndexEnabled = p.seoIndexEnabled === true;
     const publicMenuEnabled = p.publicMenuEnabled !== false;
 
@@ -214,6 +218,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
       coverImageUrl,
       publicDescription,
       googleMapsUrl,
+      googleReviewsUrl,
       seoIndexEnabled,
       publicMenuEnabled,
       hoursDayMode,

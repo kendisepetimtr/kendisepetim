@@ -257,6 +257,7 @@ export default function KasaPosClient({
           businessCoverImageUrl={businessCoverImageUrl}
           publicDescription=""
           googleMapsUrl=""
+          googleReviewsUrl=""
           hoursPair={hoursPair}
           initialOpenStatus={initialOpenStatus}
           initialClosedMessage={initialClosedMessage}

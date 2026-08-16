@@ -142,6 +142,7 @@ export default function RegisterForm({ supabaseConfigured, oauthUser = null }: R
       coverImageUrl: "",
       publicDescription: "",
       googleMapsUrl: "",
+      googleReviewsUrl: "",
       seoIndexEnabled: false,
       hoursDayMode: "calendar",
       openTime: "09:00",

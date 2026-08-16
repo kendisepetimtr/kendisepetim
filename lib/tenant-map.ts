@@ -25,6 +25,7 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
     coverImageUrl: row.cover_image_url?.trim() ?? "",
     publicDescription: row.public_description ?? "",
     googleMapsUrl: row.google_maps_url?.trim() ?? "",
+    googleReviewsUrl: row.google_reviews_url?.trim() ?? "",
     seoIndexEnabled: row.seo_index_enabled === true,
     publicMenuEnabled: row.public_menu_enabled !== false,
     hoursDayMode,

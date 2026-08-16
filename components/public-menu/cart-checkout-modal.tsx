@@ -38,6 +38,7 @@ import {
 import { upsertLocalCustomerByPhone } from "@/lib/local-customers";
 import { formatCashierPhonePreview, type CashierCustomerMatch } from "@/lib/kasa/customer-search";
 import { loadQrCheckoutSession, saveQrCheckoutSession } from "@/lib/qr-checkout-session";
+import { useMenuT } from "@/lib/use-menu-locale";
 import {
   pickDefaultPaymentMethod,
   type CheckoutPaymentMethod,
@@ -94,6 +95,7 @@ export default function CartCheckoutModal({
   orderingEnabled,
   closedMessage,
 }: CartCheckoutModalProps) {
+  const { t } = useMenuT();
   const baseId = useId();
   const isTableOrder = tableNumber != null && tableNumber > 0;
   const isWaiterOrder = waiterMode && isTableOrder && !cashierMode;
@@ -613,7 +615,7 @@ export default function CartCheckoutModal({
 
   if (!open) return null;
 
-  const title = step === "cart" ? "Sepetiniz" : "Siparişi tamamla";
+  const title = step === "cart" ? t("cartTitle") : t("checkoutTitle");
 
   return (
     <div
@@ -639,7 +641,7 @@ export default function CartCheckoutModal({
                 type="button"
                 onClick={() => setStep("cart")}
                 className="rounded-xl p-2 text-secondary hover:bg-surface-container-low hover:text-on-background"
-                aria-label="Sepete dön"
+                aria-label={t("backToCart")}
               >
                 <span className="material-symbols-outlined text-[22px]">arrow_back</span>
               </button>
@@ -668,7 +670,7 @@ export default function CartCheckoutModal({
               ) : null}
               {cartLines.length === 0 ? (
                 <p className="rounded-2xl bg-surface-container-low px-4 py-8 text-center text-sm text-secondary">
-                  Sepetiniz boş. Menüden ürün ekleyin.
+                  {t("cartEmpty")}
                 </p>
               ) : (
                 <ul className="space-y-3">
@@ -783,7 +785,7 @@ export default function CartCheckoutModal({
               {cartLines.length > 0 ? (
                 <>
                   <div className="mb-3 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-secondary">Ara toplam</span>
+                    <span className="font-semibold text-secondary">{t("subtotal")}</span>
                     <span className="font-headline text-lg font-black text-on-background">{formatTry(cartTotal)}</span>
                   </div>
                   <button
@@ -793,19 +795,19 @@ export default function CartCheckoutModal({
                     className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
                   >
                     {submitting
-                      ? "Gönderiliyor…"
+                      ? t("savingOrder")
                       : orderingEnabled
                         ? isWaiterOrder || (isCashierOrder && !cashierNeedsCustomer)
-                          ? "Siparişi kaydet"
-                          : "Devam et"
-                        : "Restoran kapalı"}
+                          ? t("saveOrder")
+                          : t("continue")
+                        : t("restaurantClosed")}
                   </button>
                   <button
                     type="button"
                     onClick={clearCart}
                     className="mt-2 w-full rounded-xl border border-surface-container-highest py-2.5 text-xs font-semibold text-secondary hover:bg-surface-container-low hover:text-on-background"
                   >
-                    Sepeti boşalt
+                    {t("clearCart")}
                   </button>
                 </>
               ) : (
@@ -837,7 +839,7 @@ export default function CartCheckoutModal({
                       : "Bilgilerinizi girin, ödeme yöntemini seçin ve siparişi onaylayın. Veriler bu cihazda saklanır; bir sonraki siparişinizde hızlanır."}
               </p>
               <div className="mt-4 rounded-xl border border-surface-container-high bg-surface-container-low/50 px-3 py-2 text-xs">
-                <span className="font-semibold text-on-background">Ara toplam:</span>{" "}
+                <span className="font-semibold text-on-background">{t("subtotal")}:</span>{" "}
                 <span className="font-headline font-black text-primary">{formatTry(cartTotal)}</span>
               </div>
 
@@ -846,7 +848,7 @@ export default function CartCheckoutModal({
                 !isTableOrder &&
                 (showFulfillmentChoice || fulfillmentFlags.fulfillmentPickupEnabled || fulfillmentFlags.fulfillmentDeliveryEnabled) ? (
                   <div className="mb-6">
-                    <p className="text-xs font-bold uppercase tracking-wider text-secondary">Sipariş tipi</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-secondary">{t("orderType")}</p>
                     {showFulfillmentChoice ? (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         {(["pickup", "delivery"] as FulfillmentType[]).map((type) => (
@@ -896,7 +898,7 @@ export default function CartCheckoutModal({
                 fulfillmentType === "delivery" ? (
                   <div className="mb-5 rounded-2xl border border-surface-container-high bg-surface-container-low/40 p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold uppercase tracking-wider text-secondary">Teslimat adresi</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-secondary">{t("deliveryAddress")}</p>
                       <a
                         href={`${getOAuthSiteBase()}${MUSTERI_ADDRESSES_PATH}`}
                         className="text-[11px] font-bold text-primary underline-offset-2 hover:underline"
@@ -1086,7 +1088,7 @@ export default function CartCheckoutModal({
                 disabled={submitting || !orderingEnabled}
                 className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
               >
-                {submitting ? "Sipariş kaydediliyor…" : orderingEnabled ? "Siparişi onayla" : "Restoran kapalı"}
+                {submitting ? t("savingOrder") : orderingEnabled ? t("confirmOrder") : t("restaurantClosed")}
               </button>
               <button
                 type="button"
@@ -1094,7 +1096,7 @@ export default function CartCheckoutModal({
                 disabled={submitting}
                 className="mt-2 w-full rounded-xl border border-surface-container-highest py-2.5 text-xs font-semibold text-secondary hover:bg-surface-container-low hover:text-on-background"
               >
-                Sepete dön
+                {t("backToCart")}
               </button>
             </div>
           </>

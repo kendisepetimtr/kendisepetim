@@ -20,6 +20,7 @@ const TENANT_SYNC_COLUMNS = [
   "cover_image_url",
   "public_description",
   "google_maps_url",
+  "google_reviews_url",
   "seo_index_enabled",
   "public_menu_enabled",
   "hours_day_mode",

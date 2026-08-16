@@ -134,6 +134,7 @@ export default async function PublicMenuPage({ params }: Props) {
       businessCoverImageUrl={row.cover_image_url ?? ""}
       publicDescription={row.public_description ?? ""}
       googleMapsUrl={row.google_maps_url ?? ""}
+      googleReviewsUrl={row.google_reviews_url ?? ""}
       hoursPair={{ open: row.open_time, close: row.close_time }}
       initialOpenStatus={initialOpenStatus}
       initialClosedMessage={initialClosedMessage}

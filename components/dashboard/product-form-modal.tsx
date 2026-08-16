@@ -26,6 +26,7 @@ import {
   type VariationSelectionType,
 } from "@/lib/menu-variations";
 import { MAX_MENU_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
+import LanguageAddStub from "@/components/dashboard/language-add-stub";
 import { type FormEvent, useEffect, useId, useState } from "react";
 
 type OptionDraft = { id: string; label: string; priceDelta: string };
@@ -460,6 +461,7 @@ export default function ProductFormModal({
                   required
                   className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+                <LanguageAddStub />
               </div>
 
               <div>
@@ -477,6 +479,7 @@ export default function ProductFormModal({
                 <p className="mt-1 text-[11px] text-secondary">
                   {description.length}/{MAX_PRODUCT_DESCRIPTION_LENGTH} karakter
                 </p>
+                <LanguageAddStub />
               </div>
 
               <div>
@@ -491,6 +494,7 @@ export default function ProductFormModal({
                   placeholder="Örn. 100gr Tavuk, Soğan, Patates"
                   className="mt-1 w-full resize-y rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background placeholder:text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
+                <LanguageAddStub />
               </div>
 
               <div className="rounded-xl border border-surface-container-high bg-surface-container-low/50">
@@ -684,6 +688,7 @@ export default function ProductFormModal({
                                   onChange={(e) => updateVariationGroup(groupIndex, { name: e.target.value })}
                                   className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                                 />
+                                <LanguageAddStub />
                               </div>
                               <div className="flex items-end">
                                 <button
@@ -742,6 +747,7 @@ export default function ProductFormModal({
                                     }
                                     className="min-w-0 flex-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                                   />
+                                  <LanguageAddStub />
                                   <div className="relative w-24 shrink-0">
                                     <input
                                       value={option.priceDelta}

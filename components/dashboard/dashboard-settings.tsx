@@ -10,6 +10,7 @@ import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { MAX_COVER_IMAGE_FILE_BYTES, isAllowedMenuImageType } from "@/lib/menu-images";
 import { MEAL_CARD_BRANDS, type MealCardBrandId } from "@/lib/tenant-payment";
 import DashboardOperationsSettings from "@/components/dashboard/dashboard-operations-settings";
+import LanguageAddStub from "@/components/dashboard/language-add-stub";
 import { type FormEvent, useEffect, useId, useState, useTransition } from "react";
 
 const LOGO_MAX_FILE_BYTES = 600 * 1024;
@@ -59,6 +60,7 @@ export default function DashboardSettings({
   const [coverUploading, setCoverUploading] = useState(false);
   const [publicDescription, setPublicDescription] = useState(tenant.publicDescription);
   const [googleMapsUrl, setGoogleMapsUrl] = useState(tenant.googleMapsUrl);
+  const [googleReviewsUrl, setGoogleReviewsUrl] = useState(tenant.googleReviewsUrl ?? "");
   const [seoIndexEnabled, setSeoIndexEnabled] = useState(tenant.seoIndexEnabled);
   const [hoursDayMode, setHoursDayMode] = useState<BusinessHoursDayMode>(tenant.hoursDayMode);
   const [openTime, setOpenTime] = useState(tenant.openTime);
@@ -80,6 +82,7 @@ export default function DashboardSettings({
     setCoverImageUrl(tenant.coverImageUrl);
     setPublicDescription(tenant.publicDescription);
     setGoogleMapsUrl(tenant.googleMapsUrl);
+    setGoogleReviewsUrl(tenant.googleReviewsUrl ?? "");
     setSeoIndexEnabled(tenant.seoIndexEnabled);
     setHoursDayMode(tenant.hoursDayMode);
     setOpenTime(tenant.openTime);
@@ -103,12 +106,17 @@ export default function DashboardSettings({
     const em = email.trim();
     const ph = phone.trim();
     const gm = googleMapsUrl.trim();
+    const gr = googleReviewsUrl.trim();
     if (!bn || !on || !em || !ph) {
       window.alert("İşletme adı, yetkili adı, e-posta ve telefon zorunludur.");
       return;
     }
     if (!isValidGoogleMapsUrl(gm)) {
       window.alert("Lütfen geçerli bir Google Maps bağlantısı girin.");
+      return;
+    }
+    if (!isValidGoogleMapsUrl(gr)) {
+      window.alert("Lütfen geçerli bir Google yorum bağlantısı girin.");
       return;
     }
     if (!paymentCash && !paymentDoorCard && !paymentMealCard) {
@@ -138,6 +146,7 @@ export default function DashboardSettings({
       coverImageUrl,
       publicDescription: publicDescription.trim().slice(0, MAX_PUBLIC_DESCRIPTION_LENGTH),
       googleMapsUrl: gm,
+      googleReviewsUrl: gr,
       seoIndexEnabled,
       hoursDayMode,
       openTime,
@@ -158,6 +167,7 @@ export default function DashboardSettings({
         coverImageUrl,
         publicDescription,
         googleMapsUrl: gm,
+        googleReviewsUrl: gr,
         seoIndexEnabled,
         hoursDayMode,
         openTime,
@@ -539,6 +549,7 @@ export default function DashboardSettings({
                   <p className="mt-1 text-[11px] text-secondary">
                     {publicDescription.length}/{MAX_PUBLIC_DESCRIPTION_LENGTH} karakter. QR menu ustunde ve SEO aciklamasinda kullanilir.
                   </p>
+                  <LanguageAddStub />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -555,6 +566,23 @@ export default function DashboardSettings({
                   />
                   <p className="mt-1 text-[11px] text-secondary">
                     Header&apos;daki konum butonu ve alt bilgi karti bu baglantiyi kullanir.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-reviews`}>
+                    Google yorum bağlantısı
+                  </label>
+                  <input
+                    id={`${baseId}-reviews`}
+                    type="url"
+                    value={googleReviewsUrl}
+                    onChange={(e) => setGoogleReviewsUrl(e.target.value)}
+                    placeholder="https://g.page/r/... veya Google işletme yorum linki"
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <p className="mt-1 text-[11px] text-secondary">
+                    QR menüdeki “Bizi değerlendirin” butonu bu adrese gider. Boş bırakılırsa buton gizlenir.
                   </p>
                 </div>
 

@@ -20,6 +20,7 @@ import {
   type MusteriNavTab,
 } from "@/lib/musteri/paths";
 import { getOAuthSiteBase } from "@/lib/site-url";
+import { useMenuT } from "@/lib/use-menu-locale";
 
 export type CustomerChromeSession = {
   kind: "guest" | "customer" | "restaurant" | "unknown";
@@ -80,6 +81,19 @@ function NavLink({
   cartQty: number;
   onCart: () => void;
 }) {
+  const { t } = useMenuT();
+  const label =
+    tab.href === "#sepet"
+      ? t("cart")
+      : tab.href === "/" || tab.href === "/musteri"
+        ? t("explore")
+        : tab.href.includes("/siparisler")
+          ? t("orders")
+          : tab.href.includes("/favoriler")
+            ? t("favorites")
+            : tab.href.includes("/adresler")
+              ? t("addresses")
+              : tab.label;
   const isCart = tab.href === "#sepet";
   const active = tabActive(pathname, tab.href);
   const needsGate = tab.requiresAuth && !isCustomer;
@@ -98,7 +112,7 @@ function NavLink({
             </span>
           ) : null}
         </span>
-        <span className={layout === "bottom" ? "mt-1 text-primary" : ""}>{tab.label}</span>
+        <span className={layout === "bottom" ? "mt-1 text-primary" : ""}>{label}</span>
       </>
     );
     if (layout === "bottom") {
@@ -122,7 +136,7 @@ function NavLink({
             </span>
           ) : null}
         </span>
-        {tab.label}
+        {label}
       </button>
     );
   }
@@ -142,7 +156,7 @@ function NavLink({
         >
           {tab.icon}
         </span>
-        <span>{tab.label}</span>
+        <span>{label}</span>
       </Link>
     );
   }
@@ -160,8 +174,8 @@ function NavLink({
       ) : (
         <span className="material-symbols-outlined text-[22px]">{tab.icon}</span>
       )}
-      {tab.label}
-      {needsGate ? <span className="ml-auto text-[10px] font-semibold text-secondary">Giriş</span> : null}
+      {label}
+      {needsGate ? <span className="ml-auto text-[10px] font-semibold text-secondary">{t("login")}</span> : null}
     </Link>
   );
 }
@@ -180,6 +194,7 @@ export function CustomerIdentityChip({
   const isCustomer = session.kind === "customer";
   const initials = customerInitials(session.firstName, session.lastName ?? "", session.email);
   const ui = useCustomerUi();
+  const { t } = useMenuT();
   const login = onLogin ?? ui?.openLogin;
   const register = onRegister ?? ui?.openRegister;
 
@@ -188,7 +203,7 @@ export function CustomerIdentityChip({
       <a
         href={resolveHref(MUSTERI_ACCOUNT_PATH, absolute)}
         className="inline-flex size-10 items-center justify-center rounded-full bg-primary text-sm font-extrabold text-white"
-        title="Hesabım"
+        title={t("account")}
       >
         {initials}
       </a>
@@ -203,11 +218,11 @@ export function CustomerIdentityChip({
           onClick={login}
           className="rounded-full border border-surface-container-highest bg-white px-3 py-1.5 text-xs font-bold"
         >
-          Giriş yap
+          {t("login")}
         </button>
       ) : (
         <a href={resolveHref("/musteri/giris", absolute)} className="rounded-full border border-surface-container-highest bg-white px-3 py-1.5 text-xs font-bold">
-          Giriş yap
+          {t("login")}
         </a>
       )}
       {register ? (
@@ -216,11 +231,11 @@ export function CustomerIdentityChip({
           onClick={register}
           className="rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-white"
         >
-          Kayıt ol
+          {t("register")}
         </button>
       ) : (
         <a href={resolveHref("/musteri/kayit", absolute)} className="rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-white">
-          Kayıt ol
+          {t("register")}
         </a>
       )}
     </div>

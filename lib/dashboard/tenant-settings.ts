@@ -26,6 +26,7 @@ const TENANT_SETTINGS_COLUMNS = [
   "cover_image_url",
   "public_description",
   "google_maps_url",
+  "google_reviews_url",
   "seo_index_enabled",
   "public_menu_enabled",
   "hours_day_mode",
@@ -59,6 +60,7 @@ export type TenantSettingsPatch = {
   coverImageUrl: string;
   publicDescription: string;
   googleMapsUrl: string;
+  googleReviewsUrl: string;
   seoIndexEnabled: boolean;
   hoursDayMode: BusinessHoursDayMode;
   openTime: string;
@@ -120,9 +122,13 @@ export async function updateTenantBusinessSettings(
     const coverImageUrl = patch.coverImageUrl.trim();
     const publicDescription = patch.publicDescription.trim().slice(0, MAX_PUBLIC_DESCRIPTION_LENGTH);
     const googleMapsUrl = normalizeGoogleMapsUrl(patch.googleMapsUrl);
+    const googleReviewsUrl = normalizeGoogleMapsUrl(patch.googleReviewsUrl);
     const seoIndexEnabled = patch.seoIndexEnabled === true;
     if (!isValidGoogleMapsUrl(googleMapsUrl)) {
       return { ok: false, error: "Lutfen gecerli bir Google Maps baglantisi girin." };
+    }
+    if (!isValidGoogleMapsUrl(googleReviewsUrl)) {
+      return { ok: false, error: "Lutfen gecerli bir Google yorum baglantisi girin." };
     }
 
     const { data: row, error: findErr } = await supabase
@@ -146,6 +152,7 @@ export async function updateTenantBusinessSettings(
         cover_image_url: coverImageUrl || null,
         public_description: publicDescription,
         google_maps_url: googleMapsUrl || null,
+        google_reviews_url: googleReviewsUrl || null,
         seo_index_enabled: seoIndexEnabled,
         hours_day_mode: hoursDayMode,
         open_time: openTime,

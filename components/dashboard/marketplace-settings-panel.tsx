@@ -23,6 +23,7 @@ import {
 } from "@/lib/fulfillment";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, getLaunchCities, getNeighborhoodsForDistrict } from "@/lib/turkey-geography";
 import { saveLocalTenant, type LocalTenantProfile } from "@/lib/local-tenant";
+import LanguageAddStub from "@/components/dashboard/language-add-stub";
 import { mergeDashboardTenantProfiles } from "@/lib/tenant-client-sync";
 import { type FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 
@@ -395,6 +396,7 @@ export default function MarketplaceSettingsPanel({
           <p className="mt-1 text-[11px] text-secondary">
             {publicDescription.length}/{MAX_PUBLIC_DESCRIPTION_LENGTH}
           </p>
+          <LanguageAddStub />
         </div>
 
         <div id="marketplace-location-fields" className="mt-5 grid scroll-mt-24 gap-4 sm:grid-cols-3">
