@@ -35,6 +35,7 @@ import CartCheckoutModal from "@/components/public-menu/cart-checkout-modal";
 import PublicMenuPwaCard, { usePublicMenuPwaInstall } from "@/components/public-menu/public-menu-pwa-card";
 import PwaIosInstallHelp from "@/components/public-menu/pwa-ios-install-help";
 import QrMenuHeaderActions from "@/components/public-menu/qr-menu-header-actions";
+import { isRestaurantMenuPwaHost } from "@/lib/pwa-host";
 import SiteLogo from "@/components/site-logo";
 import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
 import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
@@ -204,6 +205,10 @@ export default function PublicMenuClient({
   const [previewProduct, setPreviewProduct] = useState<LocalMenuProduct | null>(null);
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getClientOnlineStatus, () => true);
   const pwaInstall = usePublicMenuPwaInstall();
+  const [restaurantPwaHost, setRestaurantPwaHost] = useState(false);
+  useEffect(() => {
+    setRestaurantPwaHost(isRestaurantMenuPwaHost(window.location.host));
+  }, []);
 
   useEffect(() => {
     if (!pwaInstall.showIosHelp || pwaInstall.isInstalled) return;
@@ -820,6 +825,7 @@ export default function PublicMenuClient({
               appLabel={pwaInstall.buttonLabel}
               appIcon={pwaInstall.isInstalled ? "check_circle" : pwaInstall.isIos ? "help" : "download"}
               onInstall={() => void pwaInstall.handleInstallClick()}
+              showAppInstall={restaurantPwaHost}
             />
           </div>
           <div className={desktopSplit ? "mt-4 lg:hidden" : "relative mt-4"}>{searchField}</div>
@@ -1023,7 +1029,7 @@ export default function PublicMenuClient({
                 </div>
               </section>
             ) : null}
-            {!staffChrome && !isTableMenu ? (
+            {!staffChrome && !isTableMenu && restaurantPwaHost ? (
               <div className={desktopSplit ? "lg:hidden" : undefined}>
                 <PublicMenuPwaCard businessName={title} controller={pwaInstall} showAction={false} />
               </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import SiteLogo from "@/components/site-logo";
 import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
 import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
+import MarketplacePwaButton from "@/components/musteri/marketplace-pwa-button";
 import GuestFavoritesMigrator from "@/components/musteri/guest-favorites-migrator";
 import PartnerInviteBanner from "@/components/musteri/partner-invite-banner";
 import type { MusteriSession } from "@/lib/musteri/session";
@@ -30,6 +31,7 @@ export default function MusteriShell({ session, children }: Props) {
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2 sm:max-w-6xl sm:px-6">
           <SiteLogo variant="header" />
           <div className="flex items-center gap-3">
+            <MarketplacePwaButton />
             <CustomerIdentityChip session={chromeSession} />
             <CustomerNotificationsPanel enabled={session.kind === "customer"} />
           </div>

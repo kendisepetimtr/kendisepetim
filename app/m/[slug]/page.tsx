@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import PublicMenuClient from "@/components/public-menu/public-menu-client";
 import { getBusinessClosedMessage, isBusinessOpenNow } from "@/lib/business-hours";
-import { isValidMenuSlug } from "@/lib/menu-subdomain";
+import { isValidMenuSlug, parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
 import { loadMusteriSession } from "@/lib/musteri/session";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { buildLocalMenuState } from "@/lib/menu-map";
@@ -43,15 +44,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const indexEnabled = tenant?.public_menu_enabled === true && tenant?.seo_index_enabled === true;
   const isPublicMenuEnabled = tenant?.public_menu_enabled === true;
   const encodedSlug = encodeURIComponent(slug);
+  const dedicatedMenuHost = parseMenuSubdomainFromHost((await headers()).get("host")) === slug;
   const tenantFaviconUrl = isPublicMenuEnabled ? `/m/${encodedSlug}/favicon` : "/ks-logo.png";
   const tenantAppIconUrl = isPublicMenuEnabled ? `/m/${encodedSlug}/icon?size=192` : "/ks-logo.png";
-  const manifestUrl = isPublicMenuEnabled ? `/m/${encodedSlug}/manifest.webmanifest` : undefined;
+  const manifestUrl =
+    isPublicMenuEnabled && dedicatedMenuHost ? `/m/${encodedSlug}/manifest.webmanifest` : undefined;
   return {
     title: `${title} - Menu`,
     description,
     robots: { index: indexEnabled, follow: indexEnabled },
     applicationName: title,
     manifest: manifestUrl,
+    appleWebApp: dedicatedMenuHost
+      ? { capable: true, title, statusBarStyle: "default" }
+      : undefined,
     icons: {
       icon: [{ url: tenantAppIconUrl, type: "image/png" }],
       apple: [{ url: tenantAppIconUrl, type: "image/png" }],

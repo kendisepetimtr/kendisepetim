@@ -12,6 +12,7 @@ type Props = {
   appLabel: string;
   appIcon: string;
   onInstall: () => void;
+  showAppInstall?: boolean;
 };
 
 function actionClass(desktopSplit: boolean) {
@@ -41,6 +42,7 @@ export default function QrMenuHeaderActions({
   appLabel,
   appIcon,
   onInstall,
+  showAppInstall = true,
 }: Props) {
   return (
     <div
@@ -85,23 +87,25 @@ export default function QrMenuHeaderActions({
         <span className="text-[11px] font-black tracking-wide lg:text-sm">{locale.toUpperCase()}</span>
         {desktopSplit ? <Label>{t("language")}</Label> : null}
       </button>
-      <button
-        type="button"
-        onClick={onInstall}
-        disabled={appInstalled}
-        className={[
-          "inline-flex min-h-11 items-center justify-center rounded-2xl border px-3 py-2 text-xs font-bold transition",
-          appInstalled
-            ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
-            : "border-primary/15 bg-primary/8 text-primary hover:bg-primary/12",
-          desktopSplit ? "lg:min-h-[4.75rem] lg:w-full lg:flex-col lg:gap-1 lg:px-2 lg:py-3" : "",
-        ].join(" ")}
-        aria-label={appLabel}
-        title={appLabel}
-      >
-        <span className="material-symbols-outlined text-[18px] lg:text-[26px]">{appIcon}</span>
-        {desktopSplit ? <Label>{appInstalled ? t("appInstalled") : t("app")}</Label> : null}
-      </button>
+      {showAppInstall ? (
+        <button
+          type="button"
+          onClick={onInstall}
+          disabled={appInstalled}
+          className={[
+            "inline-flex min-h-11 items-center justify-center rounded-2xl border px-3 py-2 text-xs font-bold transition",
+            appInstalled
+              ? "cursor-default border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-primary/15 bg-primary/8 text-primary hover:bg-primary/12",
+            desktopSplit ? "lg:min-h-[4.75rem] lg:w-full lg:flex-col lg:gap-1 lg:px-2 lg:py-3" : "",
+          ].join(" ")}
+          aria-label={appLabel}
+          title={appLabel}
+        >
+          <span className="material-symbols-outlined text-[18px] lg:text-[26px]">{appIcon}</span>
+          {desktopSplit ? <Label>{appInstalled ? t("appInstalled") : t("app")}</Label> : null}
+        </button>
+      ) : null}
     </div>
   );
 }

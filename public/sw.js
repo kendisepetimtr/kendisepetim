@@ -1,6 +1,6 @@
-const STATIC_CACHE = "ks-qr-static-v4";
-const PAGE_CACHE = "ks-qr-pages-v4";
-const DATA_CACHE = "ks-qr-data-v4";
+const STATIC_CACHE = "ks-pwa-static-v5";
+const PAGE_CACHE = "ks-pwa-pages-v5";
+const DATA_CACHE = "ks-pwa-data-v5";
 const ACTIVE_CACHES = [STATIC_CACHE, PAGE_CACHE, DATA_CACHE];
 
 self.addEventListener("install", (event) => {
@@ -23,27 +23,60 @@ function isSameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
-/** Yalnizca QR menu PWA rotalarinda devreye gir; giris/panel/auth rotalarina dokunma. */
+function hostnameOf(hostname) {
+  return String(hostname || "").toLowerCase();
+}
+
+function isPartnerHost(hostname) {
+  const host = hostnameOf(hostname);
+  return host === "partner.kendisepetim.com" || host === "partner.localhost";
+}
+
+function isApexMarketplaceHost(hostname) {
+  const host = hostnameOf(hostname);
+  if (isPartnerHost(host)) return false;
+  return (
+    host === "kendisepetim.com" ||
+    host === "www.kendisepetim.com" ||
+    host === "localhost" ||
+    host === "127.0.0.1"
+  );
+}
+
 function isMenuSubdomainHost(hostname) {
-  const host = hostname.toLowerCase();
-  if (host === "kendisepetim.com" || host === "www.kendisepetim.com") return false;
+  const host = hostnameOf(hostname);
+  if (isApexMarketplaceHost(host) || isPartnerHost(host)) return false;
   if (host.endsWith(".localhost")) return true;
   if (host.endsWith(".kendisepetim.com")) return true;
   return false;
 }
 
+function isMarketplacePwaRequest(url) {
+  if (!isApexMarketplaceHost(url.hostname)) return false;
+  const path = url.pathname;
+  if (path.startsWith("/m/")) return false;
+  if (path.startsWith("/api/")) return false;
+  if (path.startsWith("/dashboard")) return false;
+  if (path.startsWith("/superadmin")) return false;
+  if (path.startsWith("/admin")) return false;
+  if (path.startsWith("/garson")) return false;
+  if (path.startsWith("/kasa")) return false;
+  if (path.startsWith("/giris")) return false;
+  if (path.startsWith("/kayit")) return false;
+  if (path.startsWith("/beklemede")) return false;
+  return true;
+}
+
 function isMenuPwaRequest(url) {
-  if (url.pathname.startsWith("/m/")) return true;
-  if (isMenuSubdomainHost(url.hostname) && url.pathname === "/") return true;
-  return false;
+  return isMenuSubdomainHost(url.hostname);
 }
 
 function isBypassedRequest(request, url) {
   if (request.method !== "GET") return true;
   if (!isSameOrigin(url)) return true;
-  if (!isMenuPwaRequest(url)) return true;
   if (url.pathname.startsWith("/api/")) return true;
-  return false;
+  if (isMarketplacePwaRequest(url) || isMenuPwaRequest(url)) return false;
+  return true;
 }
 
 async function putInCache(cacheName, request, response) {
