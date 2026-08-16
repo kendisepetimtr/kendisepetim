@@ -1,7 +1,7 @@
 import Link from "next/link";
 import GateAuthEntry from "@/components/landing/gate-auth-entry";
 import SiteLogo from "@/components/site-logo";
-import { ISLETME_HOME_PATH, MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
+import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
 
 export default function GateHome() {
   return (
@@ -42,7 +42,7 @@ export default function GateHome() {
             featured
           />
           <GateCard
-            href={ISLETME_HOME_PATH}
+            href="/kayit"
             icon="storefront"
             eyebrow="Restoranlar için"
             title="Yemek teslim et"

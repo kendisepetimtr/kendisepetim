@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AUTH_INTENT_COOKIE, parseAuthIntent } from "@/lib/auth-intent";
 import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
+import { isPartnerHost } from "@/lib/partner/host";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,11 @@ export default async function Home({ searchParams }: Props) {
     redirect(
       `${intent === "customer" ? MUSTERI_LOGIN_PATH : "/giris"}?durum=oauth-hata&mesaj=${encodeURIComponent(mesaj)}`,
     );
+  }
+
+  const host = (await headers()).get("host");
+  if (isPartnerHost(host)) {
+    redirect("/kayit");
   }
 
   return <GateHome />;

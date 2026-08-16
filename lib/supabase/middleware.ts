@@ -1,14 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import { parseMenuSubdomainFromHost } from "@/lib/menu-subdomain";
-import { getOwnerTenantByUserId } from "@/lib/owner-tenant";
+import { resolveOwnerDashboardUrl } from "@/lib/owner-tenant";
 import {
   type AuthCookieSetOptions,
   withSharedAuthCookieOptions,
 } from "@/lib/supabase/cookie-options";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
-  buildTenantPanelUrl,
   isCentralDashboardPath,
   pathRequiresOwnerAuth,
 } from "@/lib/tenant-routing";
@@ -53,13 +52,15 @@ async function resolveTenantDashboardRedirect(
   request: NextRequest,
   userId: string,
 ): Promise<NextResponse | null> {
-  const tenant = await getOwnerTenantByUserId(userId);
-  if (!tenant) return null;
-
-  const target = buildTenantPanelUrl(tenant.subdomain, "/dashboard", request.nextUrl.origin);
-  if (target === request.url) return null;
-
-  return NextResponse.redirect(target);
+  const target = await resolveOwnerDashboardUrl(userId, request.nextUrl.origin);
+  if (target === request.url || target === request.nextUrl.pathname + request.nextUrl.search) return null;
+  try {
+    const dest = target.startsWith("http") ? target : new URL(target, request.nextUrl.origin).toString();
+    if (dest === request.url) return null;
+    return NextResponse.redirect(dest);
+  } catch {
+    return null;
+  }
 }
 
 /**

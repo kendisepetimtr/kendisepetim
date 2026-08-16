@@ -2,6 +2,8 @@
  * public.tenants satırı — supabase/migrations ile uyumlu.
  * Şema değişince burayı ve migration'ı birlikte güncelleyin.
  */
+import type { ApplicationStatus } from "@/lib/partner/status";
+
 export type TenantPlan = "free" | "premium" | "lifetime";
 
 export type TenantHoursDayMode = "calendar" | "shift";
@@ -13,8 +15,17 @@ export type TenantRow = {
   business_name: string;
   subdomain: string;
   owner_name: string;
+  owner_last_name?: string;
   email: string;
   phone: string;
+  business_phone?: string;
+  business_type?: "restaurant";
+  branch_count?: number;
+  has_device_internet?: boolean | null;
+  lighting_accepted_at?: string | null;
+  application_status?: ApplicationStatus;
+  application_note?: string;
+  rejected_reason?: string;
   owner_user_id: string | null;
   logo_url: string | null;
   cover_image_url: string | null;

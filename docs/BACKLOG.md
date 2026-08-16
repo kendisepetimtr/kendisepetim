@@ -6,7 +6,7 @@ Uygulanmamış ama planı net olan işler. v3 ayrıntısı süperadmin **Yapıla
 
 | Kova | Ne zaman | Maddeler |
 |------|----------|----------|
-| Partner | Şimdi (onay sonrası) | Host, başvuru formu, beklemede hesap, superadmin kuyruk, şifre sıfırlama |
+| Partner | Kodlandı, SQL sizin | Host, başvuru formu, beklemede hesap, superadmin kuyruk, şifre sıfırlama |
 | Pazaryeri | Partner oturunca | www müşteri ana sayfa, sepet/sipariş |
 | Restoran / QR | Sipariş akışıyla | Mutfak kuyruğu, slug = menü + sipariş |
 | Hukuk / ödeme | Mağaza ve tahsilat öncesi | Aydınlatma, iyzico/PayTR |

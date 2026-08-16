@@ -1,6 +1,7 @@
 /** Alt alan adı olarak kullanılmaması gereken kelimeler (çakışma / güvenlik) */
 export const RESERVED_SUBDOMAINS = new Set([
   "www",
+  "partner",
   "api",
   "admin",
   "superadmin",

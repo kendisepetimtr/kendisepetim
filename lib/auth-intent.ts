@@ -16,6 +16,7 @@ export function authIntentForPathname(pathname: string): AuthIntent | null {
   if (isMusteriAuthPath(pathname)) return "customer";
   if (pathname === "/giris" || pathname.startsWith("/giris/")) return "restaurant";
   if (pathname === "/kayit" || pathname.startsWith("/kayit/")) return "restaurant";
+  if (pathname === "/beklemede" || pathname.startsWith("/beklemede/")) return "restaurant";
   return null;
 }
 

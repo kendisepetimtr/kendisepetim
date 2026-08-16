@@ -169,6 +169,73 @@ export async function superadminSetDashboard(tenantId: string, enabled: boolean)
   return {};
 }
 
+export async function superadminApproveApplication(tenantId: string): Promise<{ error?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const svc = await guardAndService();
+  const { error } = await svc
+    .from("tenants")
+    .update({
+      application_status: "approved",
+      dashboard_enabled: true,
+      public_menu_enabled: true,
+      rejected_reason: "",
+    })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminRejectApplication(
+  tenantId: string,
+  reason: string,
+): Promise<{ error?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const svc = await guardAndService();
+  const { error } = await svc
+    .from("tenants")
+    .update({
+      application_status: "rejected",
+      dashboard_enabled: false,
+      public_menu_enabled: false,
+      marketplace_enabled: false,
+      rejected_reason: reason.trim().slice(0, 500),
+    })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidateSuperadminPaths();
+  return {};
+}
+
+export async function superadminResetTenantPassword(
+  tenantId: string,
+): Promise<{ error?: string; password?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const svc = await guardAndService();
+  const { data: tenant, error: loadErr } = await svc
+    .from("tenants")
+    .select("id, owner_user_id")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (loadErr) return { error: loadErr.message };
+  if (!tenant?.owner_user_id) return { error: "Bu işletmeye bağlı kullanıcı yok." };
+
+  const { generateOneTimePartnerPassword } = await import("@/lib/partner/password");
+  const password = generateOneTimePartnerPassword();
+  const { error: authErr } = await svc.auth.admin.updateUserById(tenant.owner_user_id, { password });
+  if (authErr) return { error: authErr.message };
+
+  await svc.from("tenant_password_reset_events").insert({
+    tenant_id: tenantId,
+    owner_user_id: tenant.owner_user_id,
+    actor_label: "superadmin",
+    note: "one_time_password",
+  });
+
+  revalidateSuperadminPaths();
+  return { password };
+}
+
 export async function superadminSetOwnerAdminPin(
   tenantId: string,
   pinRaw: string,

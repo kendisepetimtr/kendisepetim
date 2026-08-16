@@ -26,6 +26,15 @@ export function isValidTrPhone(input: string): boolean {
   return normalizeTrPhone(input) !== null;
 }
 
+/** İş telefonu: 10 hane, cep zorunluluğu yok (sabit hat dahil). */
+export function normalizeTrBusinessPhone(input: string): string | null {
+  let d = digitsOnly(input);
+  if (d.startsWith("90")) d = d.slice(2);
+  else if (d.startsWith("0")) d = d.slice(1);
+  if (d.length !== 10) return null;
+  return `+90${d}`;
+}
+
 /** Görsel biçim: "+90 5XX XXX XX XX". Geçersizse girişi olduğu gibi döndürür. */
 export function formatTrPhoneDisplay(input: string): string {
   const normalized = normalizeTrPhone(input);

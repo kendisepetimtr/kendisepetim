@@ -3,11 +3,14 @@
  * isteklerini QR menu tenant'ına eşler.
  */
 
+import { isReservedSubdomain } from "@/lib/superadmin/reserved-subdomains";
+
 const SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/i;
 const PROD_MENU_DOMAIN = "kendisepetim.com";
 
 export function isValidMenuSlug(slug: string): boolean {
-  return SLUG_RE.test(slug) && slug.toLowerCase() !== "www";
+  const normalized = slug.toLowerCase();
+  return SLUG_RE.test(slug) && !isReservedSubdomain(normalized);
 }
 
 /** Host başlığından (örn. `burger.localhost:3000`) menü alt alan adını çıkarır. */

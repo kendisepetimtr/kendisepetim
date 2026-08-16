@@ -1,6 +1,9 @@
 "use client";
 
 import {
+  superadminApproveApplication,
+  superadminRejectApplication,
+  superadminResetTenantPassword,
   superadminSetMarketplace,
   superadminSetDashboard,
   superadminSetOwnerAdminPin,
@@ -9,6 +12,7 @@ import {
   superadminSetTrialEndsAt,
   superadminUpdateSubdomain,
 } from "@/app/superadmin/actions";
+import { APPLICATION_STATUS_LABELS, parseApplicationStatus } from "@/lib/partner/status";
 import type { TenantPlan, TenantRow } from "@/lib/supabase/tenant-types";
 import {
   getTenantAccessTier,
@@ -36,6 +40,10 @@ export default function SuperadminTenantCards({
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [oneTimePassword, setOneTimePassword] = useState<{ tenantId: string; password: string } | null>(
+    null,
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [subInputs, setSubInputs] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialTenants.map((t) => [t.id, t.subdomain])),
@@ -53,6 +61,8 @@ export default function SuperadminTenantCards({
 
   const q = search.trim().toLowerCase();
   const filtered = initialTenants.filter((t) => {
+    const status = parseApplicationStatus(t.application_status);
+    if (statusFilter !== "all" && status !== statusFilter) return false;
     if (!q) return true;
     return (
       t.business_name.toLowerCase().includes(q) ||
@@ -61,6 +71,7 @@ export default function SuperadminTenantCards({
       t.email.toLowerCase().includes(q)
     );
   });
+  const pendingCount = initialTenants.filter((t) => parseApplicationStatus(t.application_status) === "pending").length;
 
   useEffect(() => {
     if (expandedId && !filtered.some((t) => t.id === expandedId)) {
@@ -68,12 +79,15 @@ export default function SuperadminTenantCards({
     }
   }, [filtered, expandedId]);
 
-  function run(p: Promise<{ error?: string }>) {
+  function run(p: Promise<{ error?: string; password?: string }>, tenantId?: string) {
     startTransition(async () => {
       setErr(null);
       const r = await p;
       if (r.error) setErr(r.error);
-      else router.refresh();
+      else {
+        if (r.password && tenantId) setOneTimePassword({ tenantId, password: r.password });
+        router.refresh();
+      }
     });
   }
 
@@ -86,14 +100,34 @@ export default function SuperadminTenantCards({
       <header className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="font-headline text-2xl font-extrabold tracking-tight sm:text-3xl">İşletmeler</h1>
-          <p className="mt-1 text-sm text-secondary">{initialTenants.length} kayıtlı restoran</p>
+          <p className="mt-1 text-sm text-secondary">
+            {initialTenants.length} kayıtlı restoran
+            {pendingCount ? ` · ${pendingCount} bekleyen başvuru` : ""}
+          </p>
         </div>
+        <div className="flex w-full flex-col gap-2 sm:max-w-sm">
+          <div className="flex flex-wrap gap-1.5">
+            {(["all", "pending", "approved", "rejected"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStatusFilter(key)}
+                className={[
+                  "rounded-full px-3 py-1 text-[11px] font-bold uppercase",
+                  statusFilter === key ? "bg-primary text-white" : "bg-surface-container-high text-secondary",
+                ].join(" ")}
+              >
+                {key === "all" ? "Tümü" : APPLICATION_STATUS_LABELS[key]}
+              </button>
+            ))}
+          </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="İşletme, subdomain veya sahip ara…"
           className="w-full rounded-xl border border-surface-container-highest bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-sm"
         />
+        </div>
       </header>
 
       {loadError ? (
@@ -161,6 +195,10 @@ export default function SuperadminTenantCards({
                           <Badge active={t.public_menu_enabled} label="QR" />
                           <Badge active={t.marketplace_enabled} label="Market" />
                           <Badge active={t.dashboard_enabled} label="Panel" />
+                          <Badge
+                            active={parseApplicationStatus(t.application_status) === "approved"}
+                            label={APPLICATION_STATUS_LABELS[parseApplicationStatus(t.application_status)]}
+                          />
                         </div>
                       </div>
                       <div className="flex shrink-0 items-start gap-3 sm:gap-4">
@@ -242,6 +280,9 @@ export default function SuperadminTenantCards({
                         onPinChange={(v) => setPinInputs((s) => ({ ...s, [t.id]: v }))}
                         onTrialChange={(v) => setTrialInputs((s) => ({ ...s, [t.id]: v }))}
                         run={run}
+                        oneTimePassword={
+                          oneTimePassword?.tenantId === t.id ? oneTimePassword.password : null
+                        }
                       />
                     </div>
                   ) : null}
@@ -286,6 +327,7 @@ function TenantAccordionBody({
   onPinChange,
   onTrialChange,
   run,
+  oneTimePassword,
 }: {
   tenant: TenantRow;
   pending: boolean;
@@ -295,15 +337,69 @@ function TenantAccordionBody({
   onSubChange: (v: string) => void;
   onPinChange: (v: string) => void;
   onTrialChange: (v: string) => void;
-  run: (p: Promise<{ error?: string }>) => void;
+  run: (p: Promise<{ error?: string; password?: string }>, tenantId?: string) => void;
+  oneTimePassword: string | null;
 }) {
   const baseId = useId();
   const tier = getTenantAccessTier(t);
   const daysLeft = getTrialDaysRemaining(t);
   const savedTrial = toDateInputValue(t.trial_ends_at);
+  const appStatus = parseApplicationStatus(t.application_status);
 
   return (
     <div className="space-y-6">
+      <Section title="Partner başvuru" hint="Onaylanmadan QR ve panel açılmaz. Şifre düz metin saklanmaz.">
+        <div className="space-y-3 rounded-xl border border-surface-container-highest bg-surface-container-lowest p-4">
+          <p className="text-sm">
+            Durum: <span className="font-bold">{APPLICATION_STATUS_LABELS[appStatus]}</span>
+          </p>
+          <p className="text-xs text-secondary">
+            Cep: {t.phone || "—"} · İş tel: {t.business_phone || "—"} · Cihaz/internet:{" "}
+            {t.has_device_internet === true ? "Evet" : t.has_device_internet === false ? "Hayır" : "—"}
+          </p>
+          {t.has_device_internet === false ? (
+            <p className="text-xs font-semibold text-amber-800">Cihaz taahhüdü hayır — onaylamadan önce arayın.</p>
+          ) : null}
+          {appStatus !== "approved" ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(superadminApproveApplication(t.id))}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
+              >
+                Onayla (QR + panel)
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(superadminRejectApplication(t.id, "Başvuru reddedildi"))}
+                className="rounded-lg border border-error/40 px-4 py-2 text-sm font-bold text-error disabled:opacity-40"
+              >
+                Reddet
+              </button>
+            </div>
+          ) : null}
+          <div className="border-t border-surface-container-highest pt-3">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-secondary">Şifre sıfırla</p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => run(superadminResetTenantPassword(t.id), t.id)}
+              className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary disabled:opacity-40"
+            >
+              Tek kullanımlık şifre üret
+            </button>
+            {oneTimePassword ? (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 font-mono text-sm text-amber-950">
+                Bir kez gösterilir: {oneTimePassword}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-secondary">Üretilen şifre yalnızca bu ekranda bir kez görünür; veritabanında saklanmaz.</p>
+            )}
+          </div>
+        </div>
+      </Section>
       <Section title="Erişim" hint="QR menü, marketplace ve işletme paneli">
         <div className="space-y-1 rounded-xl border border-surface-container-highest bg-surface-container-lowest p-1 sm:p-2">
           <ToggleRow

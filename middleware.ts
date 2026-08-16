@@ -12,6 +12,11 @@ import {
   parseAuthIntent,
 } from "@/lib/auth-intent";
 import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
+import {
+  getPartnerOrigin,
+  isPartnerHost,
+  isRestaurantPortalPath,
+} from "@/lib/partner/host";
 
 function getCanonicalSiteUrlFromEnv(): string {
   return getCanonicalSiteUrl();
@@ -30,14 +35,21 @@ function getOAuthOrigin(request: NextRequest): string {
   return request.nextUrl.origin;
 }
 
-/** Tenant subdomain'deki /giris vb. → apex (OAuth PKCE + redirect URL tutarlılığı). */
+/** Tenant subdomain'deki /giris vb. → partner (restoran) veya apex (müşteri). */
 function redirectTenantAuthToCanonical(request: NextRequest): NextResponse | null {
   const slug = parseMenuSubdomainFromHost(request.headers.get("host"));
   if (!slug) return null;
 
   const hostname = request.nextUrl.hostname.toLowerCase();
-  if (!hostname.endsWith(".kendisepetim.com")) return null;
+  if (!hostname.endsWith(".kendisepetim.com") && !hostname.endsWith(".localhost")) return null;
   if (!isCentralAuthPath(request.nextUrl.pathname)) return null;
+
+  if (isRestaurantPortalPath(request.nextUrl.pathname)) {
+    const partnerOrigin = getPartnerOrigin(request.nextUrl.origin);
+    const url = new URL(request.nextUrl.pathname, partnerOrigin);
+    url.search = request.nextUrl.search;
+    return NextResponse.redirect(url);
+  }
 
   const canonical = getCanonicalSiteUrlFromEnv();
   if (!canonical) return null;
@@ -108,9 +120,25 @@ function redirectOAuthQueryErrorToLogin(request: NextRequest): NextResponse | nu
   return NextResponse.redirect(url);
 }
 
+/** Apex / www restoran kayıt-giriş → partner host. */
+function redirectRestaurantPortalToPartner(request: NextRequest): NextResponse | null {
+  if (isPartnerHost(request.headers.get("host"))) return null;
+  if (!isRestaurantPortalPath(request.nextUrl.pathname)) return null;
+
+  const partnerOrigin = getPartnerOrigin(request.nextUrl.origin);
+  if (request.nextUrl.origin === partnerOrigin) return null;
+
+  const url = new URL(request.nextUrl.pathname, partnerOrigin);
+  url.search = request.nextUrl.search;
+  return NextResponse.redirect(url);
+}
+
 export async function middleware(request: NextRequest) {
   const tenantAuthRedirect = redirectTenantAuthToCanonical(request);
   if (tenantAuthRedirect) return tenantAuthRedirect;
+
+  const partnerPortalRedirect = redirectRestaurantPortalToPartner(request);
+  if (partnerPortalRedirect) return partnerPortalRedirect;
 
   const localhostBounce = redirectLocalhostAuthParamsToCanonical(request);
   if (localhostBounce) return localhostBounce;
@@ -121,17 +149,22 @@ export async function middleware(request: NextRequest) {
   const oauthRedirect = redirectOAuthQueryErrorToLogin(request);
   if (oauthRedirect) return oauthRedirect;
 
-  const host = request.nextUrl.host;
+  const host = request.headers.get("host") ?? request.nextUrl.host;
   const slug = parseMenuSubdomainFromHost(host);
   let rewrite: URL | undefined;
-  if (slug) {
+  if (isPartnerHost(host) && (request.nextUrl.pathname === "/" || request.nextUrl.pathname === "")) {
+    const u = request.nextUrl.clone();
+    u.pathname = "/kayit";
+    rewrite = u;
+  } else if (slug) {
     const u = request.nextUrl.clone();
     if (applyTenantSubdomainRewrite(slug, u)) {
       rewrite = u;
     }
   }
   const response = await updateSession(request, { rewrite, tenantSlug: slug ?? undefined });
-  const intent = authIntentForPathname(request.nextUrl.pathname);
+  const intentPath = rewrite?.pathname ?? request.nextUrl.pathname;
+  const intent = authIntentForPathname(intentPath) ?? (isPartnerHost(host) ? "restaurant" : null);
   if (intent) {
     response.cookies.set(
       AUTH_INTENT_COOKIE,

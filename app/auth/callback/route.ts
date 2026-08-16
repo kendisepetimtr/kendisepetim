@@ -135,6 +135,17 @@ export async function GET(request: NextRequest) {
       copyResponseCookies(response, kayit, hostname);
       return kayit;
     }
+
+    if (kind === "restaurant") {
+      const { resolveOwnerDashboardUrl } = await import("@/lib/owner-tenant");
+      const dest = await resolveOwnerDashboardUrl(user.id, request.nextUrl.origin);
+      if (dest.startsWith("http")) {
+        const to = NextResponse.redirect(dest);
+        copyResponseCookies(response, to, hostname);
+        return to;
+      }
+      return sendTo(dest);
+    }
   }
 
   return response;
