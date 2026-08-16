@@ -44,6 +44,13 @@ import {
   isRestaurantFavorited,
 } from "@/lib/guest-favorites";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import {
+  clearMarketplaceCart,
+  confirmRestaurantCartSwitch,
+  getMarketplaceCart,
+  persistMenuCartToMarketplace,
+  type MarketplaceCartDetail,
+} from "@/lib/marketplace-cart";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -120,6 +127,7 @@ type PublicMenuClientProps = {
   initialCustomerSession?: {
     kind: "guest" | "customer" | "restaurant" | "unknown";
     firstName: string;
+    lastName?: string;
     email: string | null;
   };
 };
@@ -174,10 +182,14 @@ export default function PublicMenuClient({
   const [customerFirstName, setCustomerFirstName] = useState(
     () => initialCustomerSession?.firstName ?? "",
   );
+  const [customerLastName, setCustomerLastName] = useState(
+    () => initialCustomerSession?.lastName ?? "",
+  );
   const [customerEmail, setCustomerEmail] = useState<string | null>(
     () => initialCustomerSession?.email ?? null,
   );
   const [cart, setCart] = useState<CartState>({});
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [clockTick, setClockTick] = useState(0);
   const [customizeProduct, setCustomizeProduct] = useState<LocalMenuProduct | null>(null);
@@ -220,11 +232,13 @@ export default function PublicMenuClient({
           ok?: boolean;
           kind?: string;
           firstName?: string;
+          lastName?: string;
           email?: string;
         };
         if (res.ok && data.ok && data.kind === "customer") {
           setCustomerKind("customer");
           setCustomerFirstName(data.firstName ?? "");
+          setCustomerLastName(data.lastName ?? "");
           setCustomerEmail(data.email ?? null);
           const favRes = await fetch("/api/musteri/favorites", {
             credentials: "include",
@@ -278,6 +292,50 @@ export default function PublicMenuClient({
     });
     setCheckoutOpen(true);
   }, [staffChrome, menu.products]);
+
+  useEffect(() => {
+    if (staffChrome) {
+      setCartHydrated(true);
+      return;
+    }
+    const stored = getMarketplaceCart();
+    if (!stored || stored.subdomain !== slug) {
+      setCartHydrated(true);
+      return;
+    }
+    if (stored.detail && Object.keys(stored.detail).length > 0) {
+      const next: CartState = {};
+      for (const [key, entry] of Object.entries(stored.detail)) {
+        next[key] = {
+          productId: entry.productId,
+          qty: entry.qty,
+          removedIngredients: entry.removedIngredients ?? [],
+          selectedOptions: (entry.selectedOptions ?? []).map((o) => ({
+            groupId: o.groupId,
+            groupName: o.groupName,
+            optionId: o.optionId,
+            optionLabel: o.optionLabel,
+            priceDelta: Number(o.priceDelta) || 0,
+          })),
+        };
+      }
+      setCart(next);
+      setCartHydrated(true);
+      return;
+    }
+    const next: CartState = {};
+    for (const line of stored.lines) {
+      const key = buildCartKey(line.productId, [], []);
+      next[key] = {
+        productId: line.productId,
+        qty: line.qty,
+        removedIngredients: [],
+        selectedOptions: [],
+      };
+    }
+    setCart(next);
+    setCartHydrated(true);
+  }, [staffChrome, slug]);
 
   const openStatus = useMemo(() => {
     if (clockTick === 0) return initialOpenStatus;
@@ -338,13 +396,52 @@ export default function PublicMenuClient({
     0,
   );
 
+  useEffect(() => {
+    if (staffChrome || !cartHydrated) return;
+    const detail: MarketplaceCartDetail = {};
+    const lines = cartLines.map((l) => {
+      detail[l.key] = {
+        productId: l.product.id,
+        qty: l.qty,
+        removedIngredients: l.removedIngredients,
+        selectedOptions: l.selectedOptions,
+      };
+      return {
+        productId: l.product.id,
+        name: l.product.name,
+        qty: l.qty,
+        unitPrice: getPrimaryMenuDisplayPriceWithVariations(l.product, fulfillmentFlags, l.selectedOptions),
+      };
+    });
+    persistMenuCartToMarketplace({
+      subdomain: slug,
+      restaurantName: title,
+      lines,
+      detail,
+    });
+  }, [staffChrome, cartHydrated, cartLines, slug, title, fulfillmentFlags]);
+
   function addConfiguredProductToCart(
     productId: string,
     removedIngredients: string[] = [],
     selectedOptions: SelectedVariation[] = [],
   ) {
     if (!orderingEnabled) return;
+    if (!confirmRestaurantCartSwitch(slug, title)) return;
+    const existing = getMarketplaceCart();
     const key = buildCartKey(productId, removedIngredients, selectedOptions);
+    if (existing && existing.subdomain !== slug) {
+      clearMarketplaceCart();
+      setCart({
+        [key]: {
+          productId,
+          qty: 1,
+          removedIngredients,
+          selectedOptions,
+        },
+      });
+      return;
+    }
     setCart((c) => ({
       ...c,
       [key]: {
@@ -546,7 +643,7 @@ export default function PublicMenuClient({
     </nav>
   ) : null;
 
-  return (
+  const menuBody = (
     <div
       className={[
         "relative min-h-screen bg-background font-body text-on-background",
@@ -560,7 +657,12 @@ export default function PublicMenuClient({
       {!staffChrome ? (
         <div className="sticky top-0 z-40 flex items-center justify-between gap-2 border-b border-surface-container-highest/80 bg-background/90 px-4 py-2 backdrop-blur">
           <CustomerIdentityChip
-            session={{ kind: customerKind, firstName: customerFirstName, email: customerEmail }}
+            session={{
+              kind: customerKind,
+              firstName: customerFirstName,
+              lastName: customerLastName,
+              email: customerEmail,
+            }}
             absolute
           />
           <div className="flex items-center gap-2">
@@ -571,7 +673,7 @@ export default function PublicMenuClient({
               aria-label={restaurantFav ? "Restoranı favoriden çıkar" : "Restoranı favorile"}
             >
               <span
-                className={["material-symbols-outlined text-[20px]", restaurantFav ? "text-primary" : "text-secondary"].join(" ")}
+                className={["material-symbols-outlined text-[20px]", restaurantFav ? "text-[#bc000c]" : "text-secondary"].join(" ")}
                 style={restaurantFav ? { fontVariationSettings: "'FILL' 1" } : undefined}
               >
                 favorite
@@ -580,14 +682,6 @@ export default function PublicMenuClient({
             <CustomerNotificationsPanel enabled={customerKind === "customer"} />
           </div>
         </div>
-      ) : null}
-
-      {!staffChrome ? (
-        <CustomerChrome
-          session={{ kind: customerKind, firstName: customerFirstName, email: customerEmail }}
-          variant="overlay"
-          absoluteLinks
-        />
       ) : null}
 
       <div
@@ -881,7 +975,7 @@ export default function PublicMenuClient({
                           <span
                             className={[
                               "material-symbols-outlined text-lg",
-                              favorites.has(p.id) ? "text-primary" : "text-secondary",
+                              favorites.has(p.id) ? "text-[#bc000c]" : "text-secondary",
                             ].join(" ")}
                             style={favorites.has(p.id) ? { fontVariationSettings: "'FILL' 1" } : undefined}
                           >
@@ -1089,6 +1183,22 @@ export default function PublicMenuClient({
         />
       ) : null}
     </div>
+  );
+
+  if (staffChrome) return menuBody;
+  return (
+    <CustomerChrome
+      session={{
+        kind: customerKind,
+        firstName: customerFirstName,
+        lastName: customerLastName,
+        email: customerEmail,
+      }}
+      variant="overlay"
+      absoluteLinks
+    >
+      {menuBody}
+    </CustomerChrome>
   );
 }
 

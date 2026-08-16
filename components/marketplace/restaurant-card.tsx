@@ -1,17 +1,60 @@
+"use client";
+
 import Link from "next/link";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import type { MarketplaceListing } from "@/lib/marketplace";
+import { formatTry } from "@/lib/orders-report";
+import { formatDistanceKm } from "@/lib/geo";
+import {
+  isRestaurantFavorited,
+  toggleGuestRestaurantFavorite,
+} from "@/lib/guest-favorites";
+import { useEffect, useState } from "react";
 
 type RestaurantCardProps = {
   listing: MarketplaceListing;
+  distanceKm?: number | null;
+  isCustomer?: boolean;
 };
 
-export default function RestaurantCard({ listing }: RestaurantCardProps) {
+export default function RestaurantCard({ listing, distanceKm = null, isCustomer = false }: RestaurantCardProps) {
   const menuUrl = getPrimaryPublicMenuUrl(listing.subdomain);
+  const [fav, setFav] = useState(false);
+
+  useEffect(() => {
+    setFav(isRestaurantFavorited(listing.subdomain));
+  }, [listing.subdomain]);
+
+  async function toggleFav(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const was = fav;
+    setFav(!was);
+    if (isCustomer) {
+      await fetch("/api/musteri/favorites", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: was ? "remove" : "add",
+          kind: "restaurant",
+          subdomain: listing.subdomain,
+          restaurantName: listing.businessName,
+        }),
+      });
+      return;
+    }
+    toggleGuestRestaurantFavorite({ subdomain: listing.subdomain, restaurantName: listing.businessName });
+  }
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm transition hover:shadow-md">
-      <div className="relative h-40 bg-surface-container-low">
+    <article
+      className={[
+        "group overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm transition hover:shadow-md",
+        listing.isOpen ? "" : "opacity-70",
+      ].join(" ")}
+    >
+      <div className={["relative h-40 bg-surface-container-low", listing.isOpen ? "" : "grayscale"].join(" ")}>
         {listing.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={listing.coverImageUrl} alt="" className="h-full w-full object-cover transition group-hover:scale-[1.02]" />
@@ -28,6 +71,19 @@ export default function RestaurantCard({ listing }: RestaurantCardProps) {
         >
           {listing.isOpen ? "Açık" : "Kapalı"}
         </span>
+        <button
+          type="button"
+          onClick={(e) => void toggleFav(e)}
+          className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-full bg-white/95 shadow-sm"
+          aria-label={fav ? "Favoriden çıkar" : "Favorilere ekle"}
+        >
+          <span
+            className={["material-symbols-outlined text-[20px]", fav ? "text-[#bc000c]" : "text-secondary"].join(" ")}
+            style={fav ? { fontVariationSettings: "'FILL' 1" } : undefined}
+          >
+            favorite
+          </span>
+        </button>
       </div>
 
       <div className="p-4">
@@ -44,7 +100,10 @@ export default function RestaurantCard({ listing }: RestaurantCardProps) {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-headline text-base font-bold text-on-background">{listing.businessName}</h3>
-            <p className="mt-0.5 text-xs text-secondary">{listing.neighborhood}</p>
+            <p className="mt-0.5 text-xs text-secondary">
+              {listing.neighborhood}
+              {distanceKm != null ? ` · ${formatDistanceKm(distanceKm)}` : ""}
+            </p>
           </div>
         </div>
 
@@ -61,15 +120,12 @@ export default function RestaurantCard({ listing }: RestaurantCardProps) {
           </div>
         ) : null}
 
-        {listing.signatureDishName ? (
-          <p className="mt-3 text-xs text-secondary">
-            <span className="font-semibold text-on-background">{listing.signatureDishName}</span>
-          </p>
-        ) : null}
-
         <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-secondary">
+          {listing.minOrderAmount != null && listing.minOrderAmount > 0 ? (
+            <span>Min. {formatTry(listing.minOrderAmount)}</span>
+          ) : null}
           {listing.fulfillmentDeliveryEnabled ? (
-            <span>{listing.deliveryRadiusKm} km teslimat</span>
+            <span>Teslimat {listing.deliveryRadiusKm} km</span>
           ) : null}
           {listing.fulfillmentPickupEnabled ? <span>Gel-al</span> : null}
         </div>
@@ -78,7 +134,7 @@ export default function RestaurantCard({ listing }: RestaurantCardProps) {
           href={menuUrl}
           className="mt-4 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-container"
         >
-          Menüye git
+          {listing.isOpen ? "Menüye git" : "Şu an kapalı, menüye bak"}
           <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
         </Link>
       </div>

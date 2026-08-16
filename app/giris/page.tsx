@@ -3,13 +3,27 @@ import LoginForm from "@/components/login-form";
 import SiteLogo from "@/components/site-logo";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { isPartnerHost } from "@/lib/partner/host";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Restoran girişi",
-  description: "KendiSepetim işletme paneli girişi. Müşteri siparişi için ayrı giriş kullanın.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const partner = isPartnerHost((await headers()).get("host"));
+  if (partner) {
+    return {
+      title: "Partner girişi",
+      description: "KendiSepetim restoran paneli girişi.",
+      robots: { index: true, follow: true },
+      alternates: { canonical: "https://partner.kendisepetim.com/giris" },
+    };
+  }
+  return {
+    title: "Restoran girişi",
+    description: "KendiSepetim işletme paneli girişi.",
+    robots: { index: false, follow: false },
+  };
+}
 
 type Props = {
   searchParams?: Promise<{

@@ -64,6 +64,9 @@ function rowToListing(tenant: TenantRow, productCount: number, products: MenuPro
     isOpen: isBusinessOpenNow(tenant.open_time, tenant.close_time),
     signatureDishName: signature?.name ?? null,
     signatureDishPrice: signature?.price ?? null,
+    latitude: tenant.latitude ?? null,
+    longitude: tenant.longitude ?? null,
+    minOrderAmount: tenant.min_order_amount != null ? Number(tenant.min_order_amount) : null,
   };
 }
 

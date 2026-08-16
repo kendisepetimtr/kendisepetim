@@ -1,4 +1,5 @@
-import GateHome from "@/components/landing/gate-home";
+import MusteriAuthGate from "@/components/musteri/musteri-auth-gate";
+import MusteriExplore from "@/components/musteri/musteri-explore";
 import { AUTH_CALLBACK_PATH, DEFAULT_POST_LOGIN_PATH } from "@/lib/supabase/auth-urls";
 import { getCanonicalSiteUrl, isLocalHost } from "@/lib/site-url";
 import { cookies, headers } from "next/headers";
@@ -7,11 +8,16 @@ import type { Metadata } from "next";
 import { AUTH_INTENT_COOKIE, parseAuthIntent } from "@/lib/auth-intent";
 import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
 import { isPartnerHost } from "@/lib/partner/host";
+import { fetchMarketplaceListings } from "@/lib/marketplace-query";
+import { loadMusteriSession } from "@/lib/musteri/session";
+import { signOutDashboardSession } from "@/lib/dashboard/sign-out";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  description: "Yemek sipariş ver veya restoranını dijitalleştir. İki kapı, iki hesap.",
+  title: "Yakınınızdaki mutfak, kendi sepetiniz",
+  description:
+    "Mahallenizdeki restoranlardan gel-al veya işletme teslimatı ile sipariş verin. KendiSepetim.",
 };
 
 type Props = {
@@ -23,7 +29,6 @@ type Props = {
   }>;
 };
 
-/** Supabase bazen kodu /?code=... olarak birakir; oturum acmak icin callback'e yonlendir. */
 export default async function Home({ searchParams }: Props) {
   const q = searchParams ? await searchParams : {};
   const intent = parseAuthIntent((await cookies()).get(AUTH_INTENT_COOKIE)?.value);
@@ -62,5 +67,16 @@ export default async function Home({ searchParams }: Props) {
     redirect("/kayit");
   }
 
-  return <GateHome />;
+  const session = await loadMusteriSession();
+  if (session.blocked) {
+    await signOutDashboardSession();
+    redirect(`${MUSTERI_LOGIN_PATH}?durum=hesap-engelli`);
+  }
+
+  const listings = await fetchMarketplaceListings();
+  return (
+    <MusteriAuthGate session={session}>
+      <MusteriExplore initialListings={listings} isCustomer={session.kind === "customer"} />
+    </MusteriAuthGate>
+  );
 }

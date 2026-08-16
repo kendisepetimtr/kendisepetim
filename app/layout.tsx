@@ -23,11 +23,11 @@ export const metadata: Metadata = {
     apple: [{ url: "/ks-logo.png", type: "image/png" }],
   },
   title: {
-    default: "KendiSepetim | Restoran Yönetiminde Dijital Dönüşüm",
+    default: "KendiSepetim | Yakınınızdaki mutfak, kendi sepetiniz",
     template: "%s | KendiSepetim",
   },
   description:
-    "QR menü, masa yönetimi, garson ve kurye panelleri ile restoranınızı tek platformdan yönetin. KendiSepetim ile verimliliği artırın.",
+    "Mahallenizdeki restoranlardan daha uygun ve daha hızlı yemek siparişi. Gel-al veya işletme teslimatı — KendiSepetim.",
 };
 
 export default function RootLayout({
@@ -43,7 +43,7 @@ export default function RootLayout({
         {/* Material Symbols Outlined is not exposed via next/font/google */}
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=swap"
           rel="stylesheet"
         />
       </head>

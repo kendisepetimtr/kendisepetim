@@ -11,10 +11,20 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Partner başvurusu",
-  description: "Restoranınızı KendiSepetim partneri olarak kaydedin. QR menü ücretsizdir.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Restoran partner başvurusu",
+    description:
+      "KendiSepetim partneri olun. QR menü ücretsiz; gel-al ve kendi kuryenizle paket. Restoran başvurusu partner.kendisepetim.com üzerinden.",
+    robots: { index: true, follow: true },
+    alternates: { canonical: "https://partner.kendisepetim.com" },
+    openGraph: {
+      title: "KendiSepetim Partner",
+      description: "Restoranınızı KendiSepetim’e taşıyın. QR menü ücretsizdir.",
+      url: "https://partner.kendisepetim.com",
+    },
+  };
+}
 
 export default async function RegisterPage() {
   const supabaseConfigured = !!getSupabaseEnv();

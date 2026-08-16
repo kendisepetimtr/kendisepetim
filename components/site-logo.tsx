@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-type SiteLogoVariant = "landing" | "footer" | "compact" | "auth" | "panel";
+type SiteLogoVariant = "landing" | "footer" | "compact" | "auth" | "panel" | "header";
 
 const variantStyles: Record<
   SiteLogoVariant,
@@ -24,6 +24,12 @@ const variantStyles: Record<
     imgClass: "h-[96px] w-[96px]",
     size: 96,
     priority: false,
+  },
+  header: {
+    text: "font-headline text-2xl font-extrabold tracking-tight text-primary sm:text-3xl",
+    imgClass: "h-14 w-14 sm:h-16 sm:w-16",
+    size: 64,
+    priority: true,
   },
   auth: {
     text: "font-headline text-lg font-bold tracking-tight text-[#bc000c]",

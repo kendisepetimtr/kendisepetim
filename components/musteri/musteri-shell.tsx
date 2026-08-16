@@ -4,8 +4,10 @@ import Link from "next/link";
 import SiteLogo from "@/components/site-logo";
 import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
 import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
+import GuestFavoritesMigrator from "@/components/musteri/guest-favorites-migrator";
+import PartnerInviteBanner from "@/components/musteri/partner-invite-banner";
 import type { MusteriSession } from "@/lib/musteri/session";
-import { MUSTERI_HOME_PATH, MUSTERI_LOGIN_PATH, MUSTERI_REGISTER_PATH } from "@/lib/musteri/paths";
+import { MUSTERI_LOGIN_PATH, MUSTERI_REGISTER_PATH } from "@/lib/musteri/paths";
 
 type Props = {
   session: MusteriSession;
@@ -16,16 +18,17 @@ export default function MusteriShell({ session, children }: Props) {
   const chromeSession = {
     kind: session.kind,
     firstName: session.firstName,
+    lastName: session.lastName,
     email: session.email,
   };
 
   return (
     <CustomerChrome session={chromeSession} variant="shell">
+      <GuestFavoritesMigrator enabled={session.kind === "customer"} />
+      <PartnerInviteBanner />
       <header className="sticky top-0 z-40 border-b border-surface-container-highest/80 bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-2 sm:max-w-6xl sm:px-6">
-          <Link href={MUSTERI_HOME_PATH}>
-            <SiteLogo variant="compact" />
-          </Link>
+          <SiteLogo variant="header" />
           <div className="flex items-center gap-3">
             <CustomerIdentityChip session={chromeSession} />
             <CustomerNotificationsPanel enabled={session.kind === "customer"} />

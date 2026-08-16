@@ -23,14 +23,15 @@ export type MusteriNavTab = {
 };
 
 export const MUSTERI_NAV_TABS: MusteriNavTab[] = [
-  { href: MUSTERI_HOME_PATH, label: "Keşfet", icon: "restaurant", requiresAuth: false },
+  { href: "/", label: "Keşfet", icon: "restaurant", requiresAuth: false },
   { href: MUSTERI_ORDERS_PATH, label: "Siparişlerim", icon: "receipt_long", requiresAuth: true },
-  { href: MUSTERI_FAVORITES_PATH, label: "Favoriler", icon: "favorite", requiresAuth: true, center: true },
+  { href: "#sepet", label: "Sepet", icon: "shopping_bag", requiresAuth: false, center: true },
+  { href: MUSTERI_FAVORITES_PATH, label: "Favoriler", icon: "favorite", requiresAuth: true },
   { href: MUSTERI_ADDRESSES_PATH, label: "Adreslerim", icon: "location_on", requiresAuth: true },
-  { href: MUSTERI_ACCOUNT_PATH, label: "Hesabım", icon: "person", requiresAuth: true },
 ];
 
 export function isMusteriAppPath(pathname: string): boolean {
+  if (pathname === "/") return true;
   return pathname === MUSTERI_HOME_PATH || pathname.startsWith(`${MUSTERI_HOME_PATH}/`);
 }
 
@@ -54,6 +55,9 @@ export function musteriLoginWithNext(nextPath: string): string {
 }
 
 export function tabActive(pathname: string, href: string): boolean {
-  if (href === MUSTERI_HOME_PATH) return pathname === MUSTERI_HOME_PATH;
+  if (href === "/" || href === MUSTERI_HOME_PATH) {
+    return pathname === "/" || pathname === MUSTERI_HOME_PATH;
+  }
+  if (href === "#sepet") return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }

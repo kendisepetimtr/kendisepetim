@@ -97,4 +97,7 @@ export type MarketplaceListing = {
   isOpen: boolean;
   signatureDishName: string | null;
   signatureDishPrice: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  minOrderAmount: number | null;
 };

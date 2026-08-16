@@ -146,6 +146,7 @@ export default async function TableMenuPage({ params }: Props) {
       initialCustomerSession={{
         kind: musteriSession.kind,
         firstName: musteriSession.firstName,
+        lastName: musteriSession.lastName,
         email: musteriSession.email,
       }}
     />
