@@ -6,7 +6,8 @@ import {
   addressHasCoordinates,
   type CustomerAddress,
 } from "@/lib/customer-address";
-import CustomerLocationField from "@/components/customer/customer-location-field";
+import CustomerAddressMap from "@/components/customer/customer-address-map";
+import type { ResolvedAddress } from "@/lib/geocoding/client";
 import { asGeoPoint, type GeoPoint } from "@/lib/geo";
 import {
   deleteGuestAddress,
@@ -18,9 +19,8 @@ import {
   deleteCustomerAddressAction,
   saveCustomerAddressAction,
 } from "@/app/musteri/actions";
-import { MURATPASA_NEIGHBORHOODS } from "@/lib/turkey-geography";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 type Saved = {
   id: string;
@@ -212,7 +212,6 @@ function AddressEditor({
   const [label, setLabel] = useState(initial.label);
   const [address, setAddress] = useState(initial.address);
   const [isDefault, setIsDefault] = useState(initial.isDefault);
-  const neighborhoods = useMemo(() => [...MURATPASA_NEIGHBORHOODS], []);
 
   function setField<K extends keyof CustomerAddress>(key: K, value: CustomerAddress[K]) {
     setAddress((prev) => ({ ...prev, [key]: value }));
@@ -225,6 +224,16 @@ function AddressEditor({
       ...prev,
       latitude: point?.lat ?? null,
       longitude: point?.lng ?? null,
+    }));
+  }
+
+  /** Mahalle pinden yazılır; sokak yalnızca doluysa — sağlayıcı sık sık boş döndürüyor. */
+  function handleAddressResolved(resolved: ResolvedAddress | null) {
+    if (!resolved) return;
+    setAddress((prev) => ({
+      ...prev,
+      neighborhood: resolved.neighborhood || prev.neighborhood,
+      street: resolved.street || prev.street,
     }));
   }
 
@@ -243,32 +252,38 @@ function AddressEditor({
         className="w-full rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
         required
       />
-      <select
-        value={address.neighborhood}
-        onChange={(e) => setField("neighborhood", e.target.value)}
-        className="w-full rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
-        required
-      >
-        <option value="">Mahalle seçin</option>
-        {neighborhoods.map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
-      <input
-        value={address.street}
-        onChange={(e) => setField("street", e.target.value)}
-        placeholder="Sokak / cadde"
-        className="w-full rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
-        required
-      />
-      <CustomerLocationField
-        value={savedPoint}
-        onChange={handleLocationChange}
+      <CustomerAddressMap
+        point={savedPoint}
+        onPointChange={handleLocationChange}
+        onAddressResolved={handleAddressResolved}
         title="Adres konumu"
-        description="Bir kez işaretleyin — bu adresle verdiğiniz siparişlerde tekrar sorulmaz."
+        description="Bir kez işaretleyin — bu adresle verdiğiniz siparişlerde tekrar sorulmaz. Mahalle buradan belirlenir."
       />
+      <div>
+        <input
+          value={address.neighborhood}
+          readOnly
+          aria-readonly
+          placeholder="Mahalle — haritadan konum seçin"
+          className="w-full cursor-not-allowed rounded-xl border border-surface-container-highest bg-surface-container-low px-3 py-2.5 text-sm font-medium"
+          required
+        />
+        <p className="mt-1 text-[11px] text-secondary">
+          Haritadaki pine göre otomatik dolar; değiştirmek için pini taşıyın.
+        </p>
+      </div>
+      <div>
+        <input
+          value={address.street}
+          onChange={(e) => setField("street", e.target.value)}
+          placeholder="Sokak / cadde"
+          className="w-full rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
+          required
+        />
+        <p className="mt-1 text-[11px] text-secondary">
+          Haritadan otomatik gelir. Boş kaldıysa veya yanlışsa düzeltebilirsiniz.
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <input
           value={address.buildingNo}

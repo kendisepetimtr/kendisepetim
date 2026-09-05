@@ -11,7 +11,17 @@ type CustomerIdentityAddressFormProps = {
   showPrefillNotice?: boolean;
   showOrderNote?: boolean;
   showCourierNote?: boolean;
-  /** Teslimat konumu alanı (GPS + harita). Verilmezse konum bölümü hiç çizilmez. */
+  /**
+   * Adres bloğunun en üstüne çizilen harita. Verildiğinde mahalle pinden
+   * türetilir; verilmezse (kasa akışı) alanlar serbest metin kalır.
+   */
+  addressMapSlot?: ReactNode;
+  /** Mahalle haritadan geliyor — kullanıcı elle değiştiremez, iki adres oluşamaz. */
+  neighborhoodReadOnly?: boolean;
+  /**
+   * Kasa akışı: adres serbest metin kalır, konum yalnızca opsiyonel bir ek.
+   * Adres kartından sonra çizilir. Müşteri tarafında `addressMapSlot` kullanın.
+   */
   locationSlot?: ReactNode;
   hideAddress?: boolean;
   /** Kayıtlı müşteri: ad / soyad / telefon / e-posta alanlarını gizle */
@@ -33,6 +43,8 @@ export default function CustomerIdentityAddressForm({
   showPrefillNotice = false,
   showOrderNote = false,
   showCourierNote = false,
+  addressMapSlot = null,
+  neighborhoodReadOnly = false,
   locationSlot = null,
   hideAddress = false,
   hideIdentity = false,
@@ -44,6 +56,10 @@ export default function CustomerIdentityAddressForm({
 
   const inputCls =
     "mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+
+  /** Haritadan türeyen alan — düzenlenemediği görsel olarak da belli olsun. */
+  const readOnlyInputCls =
+    "mt-1 w-full cursor-not-allowed rounded-xl border border-surface-container-highest bg-surface-container-low px-3 py-2 text-sm font-medium text-on-background focus:outline-none";
 
   const phoneField = (
     <div>
@@ -138,9 +154,19 @@ export default function CustomerIdentityAddressForm({
         </>
       )}
 
+      {/* Konum kaynağı adres kartından bağımsız: kayıtlı adres seçilse de pin görünmeli. */}
+      {addressMapSlot}
+
       {hideAddress ? null : (
       <div className="rounded-2xl border border-surface-container-high bg-surface-container-low/40 p-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-secondary">Adres</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-secondary">
+          {addressMapSlot ? "Adres detayları" : "Adres"}
+        </p>
+        {addressMapSlot ? (
+          <p className="mt-1 text-xs leading-relaxed text-secondary">
+            Mahalle yukarıdaki haritadan gelir. Kalan alanları siz doldurun.
+          </p>
+        ) : null}
         <div className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-mah`}>
@@ -151,9 +177,17 @@ export default function CustomerIdentityAddressForm({
               value={values.neighborhood}
               onChange={(e) => onChange(patch(values, { neighborhood: e.target.value }))}
               required
+              readOnly={neighborhoodReadOnly}
+              aria-readonly={neighborhoodReadOnly || undefined}
+              placeholder={neighborhoodReadOnly ? "Haritadan konum seçin" : undefined}
               autoComplete="address-level3"
-              className={inputCls}
+              className={neighborhoodReadOnly ? readOnlyInputCls : inputCls}
             />
+            {neighborhoodReadOnly ? (
+              <p className="mt-1 text-[11px] text-secondary">
+                Haritadaki pine göre otomatik dolar; değiştirmek için pini taşıyın.
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-sk`}>
@@ -167,6 +201,12 @@ export default function CustomerIdentityAddressForm({
               autoComplete="street-address"
               className={inputCls}
             />
+            {addressMapSlot ? (
+              <p className="mt-1 text-[11px] text-secondary">
+                Haritadan otomatik gelir. Boş kaldıysa veya yanlışsa düzeltebilirsiniz — kurye yine
+                haritadaki pine gider.
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -297,10 +337,10 @@ export default function CustomerIdentityAddressForm({
             placeholder="Örn. zil çalışmıyor, kapıcıya bırakın, arayın…"
             className={`${inputCls} resize-y`}
           />
-          {locationSlot ? (
+          {addressMapSlot || locationSlot ? (
             <p className="mt-1 text-[11px] text-secondary">
-              İşaretlediğiniz teslimat konumu bu nota harita bağlantısı olarak eklenir; kurye adresi
-              daha kolay bulsun diye.
+              Kurye fişinde haritadaki konumun QR kodu zaten yer alır; buraya zil, kapı, kat gibi
+              tarif bilgilerini yazın.
             </p>
           ) : null}
         </div>

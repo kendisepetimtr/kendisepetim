@@ -2,7 +2,9 @@
 
 import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
 import CustomerIdentityAddressForm from "@/components/customer/customer-identity-address-form";
+import CustomerAddressMap from "@/components/customer/customer-address-map";
 import CustomerLocationField from "@/components/customer/customer-location-field";
+import type { ResolvedAddress } from "@/lib/geocoding/client";
 import {
   addressHasCoordinates,
   applyAddressToFormValues,
@@ -12,7 +14,6 @@ import {
   validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
 import { asGeoPoint, type GeoPoint } from "@/lib/geo";
-import { withCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
 import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
@@ -139,9 +140,11 @@ export default function CartCheckoutModal({
     [fulfillmentFlags.latitude, fulfillmentFlags.longitude],
   );
   /** Konum yalnızca paket siparişte gerekir; masa ve gel-al'da istenmez. */
-  const showLocationField = isCashierOrder
-    ? fulfillmentType === "delivery"
-    : !isTableOrder && fulfillmentType === "delivery";
+  const isDeliveryOrder = fulfillmentType === "delivery";
+  /** Müşteri: harita tek kaynak — mahalle pinden gelir, çelişen ikinci adres oluşamaz. */
+  const showAddressMap = !isCashierOrder && !isTableOrder && isDeliveryOrder;
+  /** Kasa: adres serbest metin kalır, konum yalnızca opsiyonel ek. */
+  const showCashierLocationField = isCashierOrder && isDeliveryOrder;
 
   const applySavedAddress = useCallback((addr: CustomerSavedAddress) => {
     setSelectedAddressId(addr.id);
@@ -151,14 +154,11 @@ export default function CartCheckoutModal({
 
     setCustomerLatitude(point?.lat ?? null);
     setCustomerLongitude(point?.lng ?? null);
-    setFormValues((prev) => {
-      const withAddr = applyAddressToFormValues(prev, addr.address);
-      return { ...withAddr, courierNote: withCourierLocationNoteLine(withAddr.courierNote, point) };
-    });
+    setFormValues((prev) => applyAddressToFormValues(prev, addr.address));
     setLocMsg(
       point
         ? "Kayıtlı adresteki konum kullanılacak."
-        : "Bu kayıtlı adreste konum yok — aşağıdan alın veya haritadan işaretleyin.",
+        : "Bu kayıtlı adreste konum yok — yukarıdaki haritadan işaretleyin.",
     );
   }, []);
 
@@ -349,15 +349,26 @@ export default function CartCheckoutModal({
     onClose();
   }
 
-  /** GPS ya da haritadan gelen nokta — kurye not satırı da burada tek elden güncellenir. */
+  /** Pin değişti (GPS ya da harita). Adres metni ayrıca handleAddressResolved ile gelir. */
   function handleLocationChange(point: GeoPoint | null) {
     setCustomerLatitude(point?.lat ?? null);
     setCustomerLongitude(point?.lng ?? null);
+    setLocMsg(null);
+  }
+
+  /**
+   * Haritadaki pinin adres karşılığı. Mahalle her zaman pinden yazılır —
+   * kullanıcı elle değiştiremediği için adres ile pin çelişemez.
+   * Sokak yalnızca doluysa yazılır: sağlayıcı sokağı sık sık boş döndürüyor
+   * ve zorunlu alanı silmek kullanıcıyı tıkardı.
+   */
+  function handleAddressResolved(address: ResolvedAddress | null) {
+    if (!address) return;
     setFormValues((v) => ({
       ...v,
-      courierNote: withCourierLocationNoteLine(v.courierNote, point),
+      neighborhood: address.neighborhood || v.neighborhood,
+      street: address.street || v.street,
     }));
-    setLocMsg(null);
   }
 
   async function handleConfirmOrder() {
@@ -465,9 +476,15 @@ export default function CartCheckoutModal({
       return;
     }
 
-    const err = validateCustomerFormForFulfillment(formValues, fulfillmentType);
-    if (err) {
-      window.alert(err);
+    /*
+     * Konum önce kontrol edilir: mahalle haritadan dolduğu için pin yoksa
+     * "Mahalle zorunludur" demek kullanıcıyı elle dolduramayacağı bir alana
+     * yönlendirirdi. Doğru yönlendirme haritayı göstermektir.
+     */
+    if (fulfillmentType === "delivery" && (customerLatitude == null || customerLongitude == null)) {
+      window.alert(
+        "Teslimat konumu gerekli. «Konumumu al» ile paylaşın; konum alınamıyorsa haritadan adresinizi işaretleyin.",
+      );
       return;
     }
     if (
@@ -479,10 +496,10 @@ export default function CartCheckoutModal({
       window.alert("Teslimat için kayıtlı bir adres seçin.");
       return;
     }
-    if (fulfillmentType === "delivery" && (customerLatitude == null || customerLongitude == null)) {
-      window.alert(
-        "Teslimat konumu gerekli. «Konum al» ile paylaşın; konum alınamıyorsa «Haritadan seç» ile adresinizi işaretleyin.",
-      );
+
+    const err = validateCustomerFormForFulfillment(formValues, fulfillmentType);
+    if (err) {
+      window.alert(err);
       return;
     }
     if (!payMethod && !isTableOrder) {
@@ -1003,8 +1020,21 @@ export default function CartCheckoutModal({
                     fulfillmentType === "pickup" ||
                     (loggedInCustomer && !isCashierOrder && savedAddresses.length > 0 && fulfillmentType === "delivery")
                   }
+                  neighborhoodReadOnly={showAddressMap}
+                  addressMapSlot={
+                    showAddressMap ? (
+                      <CustomerAddressMap
+                        point={customerPoint}
+                        onPointChange={handleLocationChange}
+                        onAddressResolved={handleAddressResolved}
+                        restaurant={restaurantPoint}
+                        radiusKm={fulfillmentFlags.deliveryRadiusKm}
+                        note={locMsg}
+                      />
+                    ) : null
+                  }
                   locationSlot={
-                    showLocationField ? (
+                    showCashierLocationField ? (
                       <CustomerLocationField
                         value={customerPoint}
                         onChange={handleLocationChange}
