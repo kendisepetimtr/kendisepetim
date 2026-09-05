@@ -3,20 +3,10 @@
 import { DEFAULT_MAP_CENTER } from "@/lib/turkey-geography";
 import type { GeoPoint } from "@/lib/geo";
 import { MAX_DELIVERY_RADIUS_KM, MIN_DELIVERY_RADIUS_KM } from "@/lib/fulfillment";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
 import { Circle, MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
-
-const markerIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
+import { restaurantPinIcon } from "@/lib/leaflet-icons";
 
 type LocationMapPickerProps = {
   latitude: number | null;
@@ -81,7 +71,7 @@ export default function LocationMapPicker({
         <MapClickHandler onPick={onChange} />
         {latitude != null && longitude != null ? (
           <>
-            <Marker position={[latitude, longitude]} icon={markerIcon} />
+            <Marker position={[latitude, longitude]} icon={restaurantPinIcon()} />
             {showRadius ? (
               <Circle
                 center={[latitude, longitude]}

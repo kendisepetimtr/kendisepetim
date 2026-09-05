@@ -2,6 +2,7 @@
 
 import CheckoutPaymentSelector from "@/components/customer/checkout-payment-selector";
 import CustomerIdentityAddressForm from "@/components/customer/customer-identity-address-form";
+import CustomerLocationField from "@/components/customer/customer-location-field";
 import {
   addressHasCoordinates,
   applyAddressToFormValues,
@@ -10,7 +11,8 @@ import {
   type CustomerFormValues,
   validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
-import { formatCourierLocationNoteLine } from "@/lib/maps-links";
+import { asGeoPoint, type GeoPoint } from "@/lib/geo";
+import { withCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
 import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
@@ -118,36 +120,43 @@ export default function CartCheckoutModal({
   const [formValues, setFormValues] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">("");
   const [mealBrand, setMealBrand] = useState<MealCardBrandId | "">("");
-  const [locLoading, setLocLoading] = useState(false);
   const [locMsg, setLocMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loggedInCustomer, setLoggedInCustomer] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<CustomerSavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
 
+  const customerPoint = useMemo(
+    () => asGeoPoint(customerLatitude, customerLongitude),
+    [customerLatitude, customerLongitude],
+  );
+  /** İşletme konumu tanımlıysa haritada dükkânı ve teslimat dairesini de gösteririz. */
+  const restaurantPoint = useMemo(
+    () => asGeoPoint(fulfillmentFlags.latitude, fulfillmentFlags.longitude),
+    [fulfillmentFlags.latitude, fulfillmentFlags.longitude],
+  );
+  /** Konum yalnızca paket siparişte gerekir; masa ve gel-al'da istenmez. */
+  const showLocationField = isCashierOrder
+    ? fulfillmentType === "delivery"
+    : !isTableOrder && fulfillmentType === "delivery";
+
   const applySavedAddress = useCallback((addr: CustomerSavedAddress) => {
     setSelectedAddressId(addr.id);
-    if (addressHasCoordinates(addr.address)) {
-      const lat = addr.address.latitude as number;
-      const lng = addr.address.longitude as number;
-      setCustomerLatitude(lat);
-      setCustomerLongitude(lng);
-      const line = formatCourierLocationNoteLine(lat, lng);
-      setFormValues((prev) => {
-        const withAddr = applyAddressToFormValues(prev, addr.address);
-        const note = withAddr.courierNote.trim();
-        return {
-          ...withAddr,
-          courierNote: note.includes(line) ? note : note ? `${note}\n\n${line}` : line,
-        };
-      });
-      setLocMsg("Kayıtlı adresteki konum kullanılacak.");
-    } else {
-      setCustomerLatitude(null);
-      setCustomerLongitude(null);
-      setFormValues((prev) => applyAddressToFormValues(prev, addr.address));
-      setLocMsg(null);
-    }
+    const point = addressHasCoordinates(addr.address)
+      ? { lat: addr.address.latitude as number, lng: addr.address.longitude as number }
+      : null;
+
+    setCustomerLatitude(point?.lat ?? null);
+    setCustomerLongitude(point?.lng ?? null);
+    setFormValues((prev) => {
+      const withAddr = applyAddressToFormValues(prev, addr.address);
+      return { ...withAddr, courierNote: withCourierLocationNoteLine(withAddr.courierNote, point) };
+    });
+    setLocMsg(
+      point
+        ? "Kayıtlı adresteki konum kullanılacak."
+        : "Bu kayıtlı adreste konum yok — aşağıdan alın veya haritadan işaretleyin.",
+    );
   }, []);
 
   const hydrateCheckout = useCallback(async () => {
@@ -336,32 +345,15 @@ export default function CartCheckoutModal({
     onClose();
   }
 
-  function handleRequestLocation() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocMsg("Bu cihaz konum paylaşımını desteklemiyor.");
-      return;
-    }
-    setLocLoading(true);
+  /** GPS ya da haritadan gelen nokta — kurye not satırı da burada tek elden güncellenir. */
+  function handleLocationChange(point: GeoPoint | null) {
+    setCustomerLatitude(point?.lat ?? null);
+    setCustomerLongitude(point?.lng ?? null);
+    setFormValues((v) => ({
+      ...v,
+      courierNote: withCourierLocationNoteLine(v.courierNote, point),
+    }));
     setLocMsg(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setCustomerLatitude(latitude);
-        setCustomerLongitude(longitude);
-        const line = formatCourierLocationNoteLine(latitude, longitude);
-        setFormValues((v) => ({
-          ...v,
-          courierNote: v.courierNote.trim() ? `${v.courierNote.trim()}\n\n${line}` : line,
-        }));
-        setLocMsg("Konum alındı. Teslimat mesafesi siparişte doğrulanır.");
-        setLocLoading(false);
-      },
-      () => {
-        setLocMsg("Konum alınamadı; tarayıcı iznini kontrol edin.");
-        setLocLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 },
-    );
   }
 
   async function handleConfirmOrder() {
@@ -484,7 +476,9 @@ export default function CartCheckoutModal({
       return;
     }
     if (fulfillmentType === "delivery" && (customerLatitude == null || customerLongitude == null)) {
-      window.alert("Teslimat için «Konum al» ile adresinizi paylaşın.");
+      window.alert(
+        "Teslimat konumu gerekli. «Konum al» ile paylaşın; konum alınamıyorsa «Haritadan seç» ile adresinizi işaretleyin.",
+      );
       return;
     }
     if (!payMethod && !isTableOrder) {
@@ -1005,15 +999,17 @@ export default function CartCheckoutModal({
                     fulfillmentType === "pickup" ||
                     (loggedInCustomer && !isCashierOrder && savedAddresses.length > 0 && fulfillmentType === "delivery")
                   }
-                  showLocationButton={
-                    (isCashierOrder
-                      ? fulfillmentType === "delivery"
-                      : !isTableOrder && fulfillmentType === "delivery") &&
-                    (customerLatitude == null || customerLongitude == null)
+                  locationSlot={
+                    showLocationField ? (
+                      <CustomerLocationField
+                        value={customerPoint}
+                        onChange={handleLocationChange}
+                        restaurant={restaurantPoint}
+                        radiusKm={fulfillmentFlags.deliveryRadiusKm}
+                        note={locMsg}
+                      />
+                    ) : null
                   }
-                  locationLoading={locLoading}
-                  locationMessage={locMsg}
-                  onRequestLocation={handleRequestLocation}
                   phoneFieldSlot={
                     isCashierOrder &&
                     fulfillmentType === "delivery" &&

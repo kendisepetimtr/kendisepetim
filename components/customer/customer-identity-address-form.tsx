@@ -11,7 +11,8 @@ type CustomerIdentityAddressFormProps = {
   showPrefillNotice?: boolean;
   showOrderNote?: boolean;
   showCourierNote?: boolean;
-  showLocationButton?: boolean;
+  /** Teslimat konumu alanı (GPS + harita). Verilmezse konum bölümü hiç çizilmez. */
+  locationSlot?: ReactNode;
   hideAddress?: boolean;
   /** Kayıtlı müşteri: ad / soyad / telefon / e-posta alanlarını gizle */
   hideIdentity?: boolean;
@@ -19,9 +20,6 @@ type CustomerIdentityAddressFormProps = {
   phoneFirst?: boolean;
   /** Telefon alanının hemen altına ek içerik (öneri listesi vb.) */
   phoneFieldSlot?: ReactNode;
-  locationLoading?: boolean;
-  locationMessage?: string | null;
-  onRequestLocation?: () => void;
 };
 
 function patch(values: CustomerFormValues, partial: Partial<CustomerFormValues>): CustomerFormValues {
@@ -35,14 +33,11 @@ export default function CustomerIdentityAddressForm({
   showPrefillNotice = false,
   showOrderNote = false,
   showCourierNote = false,
-  showLocationButton = false,
+  locationSlot = null,
   hideAddress = false,
   hideIdentity = false,
   phoneFirst = false,
   phoneFieldSlot = null,
-  locationLoading = false,
-  locationMessage = null,
-  onRequestLocation,
 }: CustomerIdentityAddressFormProps) {
   const reactId = useId();
   const base = idPrefix ?? `cust-${reactId}`;
@@ -160,37 +155,19 @@ export default function CustomerIdentityAddressForm({
               className={inputCls}
             />
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <div className="min-w-0 flex-1">
-              <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-sk`}>
-                Sokak / cadde <span className="text-error">*</span>
-              </label>
-              <input
-                id={`${base}-sk`}
-                value={values.street}
-                onChange={(e) => onChange(patch(values, { street: e.target.value }))}
-                required
-                autoComplete="street-address"
-                className={inputCls}
-              />
-            </div>
-            {showLocationButton && !hideAddress ? (
-              <div className="shrink-0 sm:pt-5">
-                <button
-                  type="button"
-                  onClick={onRequestLocation}
-                  disabled={locationLoading}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/[0.08] px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/[0.12] disabled:opacity-60 sm:w-auto"
-                >
-                  <span className="material-symbols-outlined text-[18px]">my_location</span>
-                  {locationLoading ? "Konum alınıyor…" : "Konum al"}
-                </button>
-              </div>
-            ) : null}
+          <div>
+            <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-sk`}>
+              Sokak / cadde <span className="text-error">*</span>
+            </label>
+            <input
+              id={`${base}-sk`}
+              value={values.street}
+              onChange={(e) => onChange(patch(values, { street: e.target.value }))}
+              required
+              autoComplete="street-address"
+              className={inputCls}
+            />
           </div>
-          {showLocationButton && !hideAddress && locationMessage ? (
-            <p className="text-[11px] leading-relaxed text-secondary">{locationMessage}</p>
-          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-secondary" htmlFor={`${base}-bno`}>
@@ -289,26 +266,7 @@ export default function CustomerIdentityAddressForm({
       </div>
       )}
 
-      {showLocationButton && hideAddress ? (
-        <div className="rounded-2xl border border-primary/25 bg-primary/[0.05] p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-secondary">Teslimat konumu</p>
-          <p className="mt-1 text-xs text-secondary">
-            Seçili adreste konum yok. Kurye için tam noktanızı paylaşın.
-          </p>
-          <button
-            type="button"
-            onClick={onRequestLocation}
-            disabled={locationLoading}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-white px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/[0.08] disabled:opacity-60 sm:w-auto"
-          >
-            <span className="material-symbols-outlined text-[18px]">my_location</span>
-            {locationLoading ? "Konum alınıyor…" : "Konum al"}
-          </button>
-          {locationMessage ? (
-            <p className="mt-2 text-[11px] leading-relaxed text-secondary">{locationMessage}</p>
-          ) : null}
-        </div>
-      ) : null}
+      {locationSlot}
 
       {showOrderNote ? (
         <div>
@@ -339,9 +297,10 @@ export default function CustomerIdentityAddressForm({
             placeholder="Örn. zil çalışmıyor, kapıcıya bırakın, arayın…"
             className={`${inputCls} resize-y`}
           />
-          {showLocationButton ? (
+          {locationSlot ? (
             <p className="mt-1 text-[11px] text-secondary">
-              «Konum al» ile paylaştığınız tam nokta bu nota eklenir; kurye adresi daha kolay bulsun diye.
+              İşaretlediğiniz teslimat konumu bu nota harita bağlantısı olarak eklenir; kurye adresi
+              daha kolay bulsun diye.
             </p>
           ) : null}
         </div>
