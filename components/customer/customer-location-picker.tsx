@@ -69,6 +69,45 @@ function KeepSizeCorrect() {
   return null;
 }
 
+/**
+ * Haritayı kaydırıp pini ekrandan kaçıran kullanıcıyı geri getirir.
+ * Sürüklemek isterken haritayı kaydırmak çok kolay; bu düğme olmadan
+ * kullanıcı işaretlediği noktayı bir daha bulamıyordu.
+ */
+function RecenterButton({ point }: { point: GeoPoint | null }) {
+  const map = useMap();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    const element = buttonRef.current;
+    if (!element) return;
+    /*
+     * Leaflet tıklama dinleyicisini doğrudan harita kabına takıyor; React'in
+     * sentetik olayları kökte toplandığı için stopPropagation Leaflet'e geç
+     * kalıyor ve düğmeye basmak "haritaya tıklama" sayılıp pini oraya taşıyordu.
+     * Leaflet'in kendi yardımcısı native seviyede durduruyor.
+     */
+    L.DomEvent.disableClickPropagation(element);
+    L.DomEvent.disableScrollPropagation(element);
+  }, [point]);
+
+  if (!point) return null;
+
+  return (
+    <button
+      type="button"
+      ref={buttonRef}
+      onClick={() => {
+        map.setView([point.lat, point.lng], Math.max(map.getZoom(), 16), { animate: true });
+      }}
+      className="absolute right-3 top-3 z-[1000] inline-flex items-center gap-1 rounded-lg border border-surface-container-highest bg-white/95 px-2.5 py-1.5 text-[11px] font-bold text-on-background shadow-sm hover:bg-white"
+    >
+      <span className="material-symbols-outlined text-[14px]">my_location</span>
+      Pine dön
+    </button>
+  );
+}
+
 /** Konum dışarıdan gelirse (GPS) haritayı oraya taşı — kullanıcı sürüklerken karışma. */
 function FollowExternalChanges({ point }: { point: GeoPoint | null }) {
   const map = useMap();
@@ -124,6 +163,7 @@ export default function CustomerLocationPicker({
         <KeepSizeCorrect />
         <FollowExternalChanges point={value} />
         <ClickToPlace onPick={onChange} />
+        <RecenterButton point={value} />
 
         {restaurant ? (
           <>
@@ -160,7 +200,7 @@ export default function CustomerLocationPicker({
 
       <p className="border-t border-surface-container-highest bg-surface-container-low px-3 py-2 text-[11px] leading-relaxed text-secondary">
         {value
-          ? "Kırmızı pini sürükleyerek veya haritaya dokunarak noktayı düzeltebilirsiniz."
+          ? "Noktayı düzeltmek için haritada doğru yere dokunun; pini sürükleyerek de taşıyabilirsiniz."
           : "Teslimat adresinizi haritada bulup dokunun; kırmızı pin oraya yerleşir."}
         {restaurant ? " Mavi daire işletmenin teslimat alanıdır." : ""}
       </p>

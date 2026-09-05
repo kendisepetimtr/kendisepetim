@@ -45,9 +45,9 @@ export class CustomerGeoError extends Error {
 export function customerGeoErrorMessage(code: CustomerGeoErrorCode): string {
   switch (code) {
     case "unsupported":
-      return "Bu tarayıcı konum paylaşımını desteklemiyor. Aşağıdaki haritadan konumunuzu işaretleyebilirsiniz.";
+      return "Bu tarayıcı konum paylaşımını desteklemiyor. Haritadan konumunuzu işaretleyebilirsiniz.";
     case "insecure":
-      return "Konum yalnızca güvenli (https) bağlantıda alınabilir. Aşağıdaki haritadan konumunuzu işaretleyin.";
+      return "Konum yalnızca güvenli (https) bağlantıda alınabilir. Haritadan konumunuzu işaretleyin.";
     case "denied":
       return "Tarayıcı konum iznini reddetti. iPhone'da Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari Web Siteleri açık olmalı; siteyi ana ekrana eklediyseniz izni orada ayrıca vermeniz gerekir. Dilerseniz haritadan işaretleyin.";
     case "unavailable":
