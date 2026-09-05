@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
+import { getPublicMenuCheckoutUrl } from "@/lib/public-menu-urls";
 import {
   clearMarketplaceCart,
   getMarketplaceCart,
@@ -70,11 +70,11 @@ export default function CustomerCartDrawer({
                 <span>{formatTry(total)}</span>
               </p>
               <Link
-                href={getPrimaryPublicMenuUrl(cart.subdomain)}
+                href={getPublicMenuCheckoutUrl(cart.subdomain)}
                 className="flex w-full items-center justify-center rounded-xl bg-primary py-3 text-sm font-bold text-white"
                 onClick={onClose}
               >
-                Restoranda devam et
+                Siparişi onayla
               </Link>
               <button
                 type="button"

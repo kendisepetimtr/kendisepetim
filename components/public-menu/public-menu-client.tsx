@@ -283,26 +283,37 @@ export default function PublicMenuClient({
     if (staffChrome || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const tekrar = params.get("tekrar");
-    if (!tekrar) return;
-    const ids = tekrar.split(",").map((s) => s.trim()).filter(Boolean);
-    if (ids.length === 0) return;
-    setCart((prev) => {
-      const next = { ...prev };
-      for (const productId of ids) {
-        const product = menu.products.find((p) => p.id === productId && !p.hidden);
-        if (!product) continue;
-        const key = buildCartKey(productId, [], []);
-        next[key] = {
-          productId,
-          qty: (next[key]?.qty ?? 0) + 1,
-          removedIngredients: [],
-          selectedOptions: [],
-        };
+    if (tekrar) {
+      const ids = tekrar.split(",").map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        setCart((prev) => {
+          const next = { ...prev };
+          for (const productId of ids) {
+            const product = menu.products.find((p) => p.id === productId && !p.hidden);
+            if (!product) continue;
+            const key = buildCartKey(productId, [], []);
+            next[key] = {
+              productId,
+              qty: (next[key]?.qty ?? 0) + 1,
+              removedIngredients: [],
+              selectedOptions: [],
+            };
+          }
+          return next;
+        });
+        setCheckoutOpen(true);
+        return;
       }
-      return next;
-    });
-    setCheckoutOpen(true);
+    }
   }, [staffChrome, menu.products]);
+
+  useEffect(() => {
+    if (staffChrome || !cartHydrated || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sepet") === "1") {
+      setCheckoutOpen(true);
+    }
+  }, [staffChrome, cartHydrated]);
 
   useEffect(() => {
     if (staffChrome) {
@@ -1073,8 +1084,8 @@ export default function PublicMenuClient({
         </div>
       </div>
 
-      {cartCount > 0 ? (
-        <div className="fixed bottom-6 right-6 z-50">
+      {staffChrome ? (
+        <div className="sticky bottom-0 z-40 border-t border-surface-container-highest bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
           <button
             type="button"
             onClick={() => {
@@ -1085,19 +1096,17 @@ export default function PublicMenuClient({
               setCheckoutOpen(true);
             }}
             className={[
-              "flex items-center gap-3 rounded-2xl p-4 text-white shadow-2xl transition-transform",
-              orderingEnabled
-                ? "bg-gradient-to-b from-[#bc000c] to-[#e71418] active:scale-95"
-                : "cursor-not-allowed bg-surface-container-high text-secondary shadow-none",
+              "flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold shadow-lg transition active:scale-[0.98]",
+              orderingEnabled && cartCount > 0
+                ? "bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white"
+                : "bg-surface-container-high text-secondary",
             ].join(" ")}
             aria-label={`${t("cart")}: ${cartCount} ${t("items")}, ${formatTry(cartTotal)}`}
-            aria-disabled={!orderingEnabled}
-            title={orderingEnabled ? undefined : t("restaurantClosed")}
           >
             <span className="material-symbols-outlined">shopping_bag</span>
-            <span className="text-sm font-bold">
-              {cartCount} {t("items")} — {formatTry(cartTotal)}
-            </span>
+            {cartCount > 0
+              ? `${cartCount} ${t("items")} — ${formatTry(cartTotal)}`
+              : t("cart")}
           </button>
         </div>
       ) : null}
@@ -1119,6 +1128,7 @@ export default function PublicMenuClient({
         subdomain={slug}
         orderingEnabled={orderingEnabled}
         closedMessage={closedMessage}
+        initialStep={cartCount > 0 ? "checkout" : "cart"}
       />
       {customizeProduct ? (
         <ProductCustomizeModal
@@ -1173,6 +1183,7 @@ export default function PublicMenuClient({
       }}
       variant="overlay"
       absoluteLinks
+      onCart={() => setCheckoutOpen(true)}
     >
       {menuBody}
     </CustomerChrome>

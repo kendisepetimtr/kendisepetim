@@ -77,6 +77,8 @@ type CartCheckoutModalProps = {
   subdomain: string;
   orderingEnabled: boolean;
   closedMessage: string;
+  /** Nav’dan açılınca sepet özetini atlayıp onay adımına geç */
+  initialStep?: Step;
 };
 
 export default function CartCheckoutModal({
@@ -96,6 +98,7 @@ export default function CartCheckoutModal({
   subdomain,
   orderingEnabled,
   closedMessage,
+  initialStep = "cart",
 }: CartCheckoutModalProps) {
   const { t } = useMenuT();
   const baseId = useId();
@@ -226,13 +229,14 @@ export default function CartCheckoutModal({
 
   useEffect(() => {
     if (!open) return;
-    setStep("cart");
+    const hasItems = Object.values(cart).some((entry) => entry.qty > 0);
+    setStep(initialStep === "checkout" && hasItems ? "checkout" : "cart");
     if (cashierMode && cashierFulfillment) {
       setFulfillmentType(cashierFulfillment);
     } else if (isTableOrder) {
       setFulfillmentType("dine_in");
     }
-  }, [open, cashierMode, cashierFulfillment, isTableOrder]);
+  }, [open, cashierMode, cashierFulfillment, isTableOrder, initialStep]);
 
   useEffect(() => {
     if (!isCashierOrder || fulfillmentType !== "delivery") return;

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import CustomerAuthModal from "@/components/musteri/customer-auth-modal";
 import CustomerCartDrawer from "@/components/musteri/customer-cart-drawer";
 import { customerInitials } from "@/lib/customer-initials";
@@ -36,6 +36,8 @@ type Props = {
   children?: React.ReactNode;
   showIdentityChip?: boolean;
   className?: string;
+  /** Restoran menüsünde checkout modalını açmak için */
+  onCart?: () => void;
 };
 
 const CustomerUiContext = createContext<{
@@ -102,23 +104,28 @@ function NavLink({
     : resolveHref(tab.href, absolute);
 
   if (isCart) {
-    const inner = (
-      <>
-        <span className="relative inline-flex size-12 items-center justify-center rounded-full bg-white ring-2 ring-primary/20">
-          <Image src="/ks-logo.png" alt="" width={32} height={32} className="h-8 w-8 object-contain" />
-          {cartQty > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-primary px-1 text-center text-[10px] font-extrabold text-white">
-              {cartQty}
-            </span>
-          ) : null}
+    const cartAria = cartQty > 0 ? `${label}: ${cartQty}` : label;
+    const badge =
+      cartQty > 0 ? (
+        <span className="absolute -right-1 -top-1 z-[1] min-w-5 rounded-full bg-white px-1 text-center text-[10px] font-extrabold leading-5 text-primary shadow-sm">
+          {cartQty}
         </span>
-        <span className={layout === "bottom" ? "mt-1 text-primary" : ""}>{label}</span>
-      </>
-    );
+      ) : null;
     if (layout === "bottom") {
       return (
-        <button type="button" onClick={onCart} className="-mt-3 flex flex-col items-center gap-0.5 py-2 text-[10px] font-bold text-primary sm:text-[11px]">
-          {inner}
+        <button
+          type="button"
+          onClick={onCart}
+          aria-label={cartAria}
+          className="-mt-6 flex flex-col items-center gap-0.5 px-1 pt-0 text-[10px] font-bold text-primary sm:text-[11px]"
+        >
+          <span className="relative inline-flex size-[3.6rem] items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] p-[3px] shadow-xl shadow-primary/35 ring-4 ring-background transition-transform active:scale-95">
+            <span className="relative flex size-full items-center justify-center rounded-[0.85rem] bg-white">
+              <Image src="/ks-logo.png" alt="" width={32} height={32} className="h-8 w-8 object-contain" />
+            </span>
+            {badge}
+          </span>
+          <span>{label}</span>
         </button>
       );
     }
@@ -126,12 +133,13 @@ function NavLink({
       <button
         type="button"
         onClick={onCart}
-        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container-low hover:text-on-background"
+        aria-label={cartAria}
+        className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] px-3 py-2.5 text-sm font-bold text-white shadow-md transition active:scale-[0.98]"
       >
-        <span className="relative inline-flex size-9 items-center justify-center">
-          <Image src="/ks-logo.png" alt="" width={28} height={28} />
+        <span className="relative inline-flex size-9 items-center justify-center rounded-xl bg-white">
+          <Image src="/ks-logo.png" alt="" width={28} height={28} className="h-7 w-7 object-contain" />
           {cartQty > 0 ? (
-            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-[9px] font-extrabold text-white">
+            <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-white px-1 text-[9px] font-extrabold text-primary ring-1 ring-primary">
               {cartQty}
             </span>
           ) : null}
@@ -249,6 +257,7 @@ export default function CustomerChrome({
   children,
   showIdentityChip = false,
   className,
+  onCart,
 }: Props) {
   const pathname = usePathname() ?? "/";
   const isCustomer = session.kind === "customer";
@@ -262,6 +271,14 @@ export default function CustomerChrome({
     read();
     return subscribeMarketplaceCart(read);
   }, []);
+
+  const openCart = useCallback(() => {
+    if (onCart) {
+      onCart();
+      return;
+    }
+    setCartOpen(true);
+  }, [onCart]);
 
   const bottomNav = (
     <nav
@@ -278,7 +295,7 @@ export default function CustomerChrome({
             absolute={absolute}
             layout="bottom"
             cartQty={cartQty}
-            onCart={() => setCartOpen(true)}
+            onCart={openCart}
           />
         ))}
       </div>
@@ -298,7 +315,7 @@ export default function CustomerChrome({
             absolute={absolute}
             layout="side"
             cartQty={cartQty}
-            onCart={() => setCartOpen(true)}
+            onCart={openCart}
           />
         ))}
       </nav>
@@ -309,9 +326,9 @@ export default function CustomerChrome({
     () => ({
       openLogin: () => setAuthMode("login"),
       openRegister: () => setAuthMode("register"),
-      openCart: () => setCartOpen(true),
+      openCart,
     }),
-    [],
+    [openCart],
   );
 
   const extras = (

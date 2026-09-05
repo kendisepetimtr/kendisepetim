@@ -19,6 +19,23 @@ export function getPrimaryPublicMenuUrl(subdomain: string): string {
   return getPublicMenuSubdomainUrl(subdomain);
 }
 
+/** Marketplace sepetinden sipariş onayına (checkout) dönen menü adresi. */
+export function getPublicMenuCheckoutUrl(subdomain: string): string {
+  const slug = subdomain.toLowerCase();
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, port } = window.location;
+    const hostPort = port && port !== "80" && port !== "443" ? `:${port}` : "";
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return `${protocol}//${hostname}${hostPort}/m/${encodeURIComponent(slug)}?sepet=1`;
+    }
+    const tenantHost = `${slug}.`;
+    if (hostname === `${slug}.kendisepetim.com` || hostname.startsWith(tenantHost)) {
+      return `${protocol}//${hostname}${hostPort}/?sepet=1`;
+    }
+  }
+  return `${getPrimaryPublicMenuUrl(slug)}?sepet=1`;
+}
+
 /** Yedek path menüsü — resmi subdomain açılmazsa veya platform içi linkler için. */
 export function getPublicMenuPathUrl(
   subdomain: string,
