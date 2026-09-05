@@ -572,7 +572,6 @@ export default function KasaOrderModal({
                 showOrderNote={false}
                 showCourierNote
                 hideAddress={false}
-                showLocationButton={false}
                 phoneFieldSlot={
                   <div className="mt-2">
                     {phoneSearching ? (

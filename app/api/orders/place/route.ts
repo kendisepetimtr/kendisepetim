@@ -185,7 +185,10 @@ export async function POST(request: Request) {
       }
       if (!customerPoint) {
         return NextResponse.json(
-          { error: "Teslimat için «Konum al» ile adresinizi paylaşın." },
+          {
+            error:
+              "Teslimat konumu gerekli. «Konum al» ile paylaşın; konum alınamıyorsa «Haritadan seç» ile adresinizi işaretleyin.",
+          },
           { status: 400 },
         );
       }

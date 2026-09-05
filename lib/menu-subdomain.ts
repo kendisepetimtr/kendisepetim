@@ -14,7 +14,9 @@ export function isValidMenuSlug(slug: string): boolean {
 }
 
 /** Host başlığından (örn. `burger.localhost:3000`) menü alt alan adını çıkarır. */
-export function parseMenuSubdomainFromHost(hostHeader: string | null): string | null {
+export function parseMenuSubdomainFromHost(
+  hostHeader: string | null | undefined,
+): string | null {
   if (!hostHeader) return null;
   const host = hostHeader.split(":")[0].toLowerCase();
   const parts = host.split(".");

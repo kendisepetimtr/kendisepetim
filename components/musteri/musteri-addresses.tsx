@@ -6,7 +6,8 @@ import {
   addressHasCoordinates,
   type CustomerAddress,
 } from "@/lib/customer-address";
-import { formatCourierLocationNoteLine } from "@/lib/maps-links";
+import CustomerLocationField from "@/components/customer/customer-location-field";
+import { asGeoPoint, type GeoPoint } from "@/lib/geo";
 import {
   deleteGuestAddress,
   getGuestCustomer,
@@ -211,36 +212,20 @@ function AddressEditor({
   const [label, setLabel] = useState(initial.label);
   const [address, setAddress] = useState(initial.address);
   const [isDefault, setIsDefault] = useState(initial.isDefault);
-  const [locLoading, setLocLoading] = useState(false);
-  const [locMsg, setLocMsg] = useState<string | null>(
-    addressHasCoordinates(initial.address) ? "Bu adreste kayıtlı konum var." : null,
-  );
   const neighborhoods = useMemo(() => [...MURATPASA_NEIGHBORHOODS], []);
 
   function setField<K extends keyof CustomerAddress>(key: K, value: CustomerAddress[K]) {
     setAddress((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleRequestLocation() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocMsg("Bu cihaz konum paylaşımını desteklemiyor.");
-      return;
-    }
-    setLocLoading(true);
-    setLocMsg(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        setAddress((prev) => ({ ...prev, latitude, longitude }));
-        setLocMsg("Konum alındı. Siparişte tekrar istemeyiz.");
-        setLocLoading(false);
-      },
-      () => {
-        setLocMsg("Konum alınamadı; tarayıcı iznini kontrol edin.");
-        setLocLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 },
-    );
+  const savedPoint = asGeoPoint(address.latitude, address.longitude);
+
+  function handleLocationChange(point: GeoPoint | null) {
+    setAddress((prev) => ({
+      ...prev,
+      latitude: point?.lat ?? null,
+      longitude: point?.lng ?? null,
+    }));
   }
 
   return (
@@ -271,30 +256,19 @@ function AddressEditor({
           </option>
         ))}
       </select>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-        <input
-          value={address.street}
-          onChange={(e) => setField("street", e.target.value)}
-          placeholder="Sokak / cadde"
-          className="w-full flex-1 rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
-          required
-        />
-        <button
-          type="button"
-          onClick={handleRequestLocation}
-          disabled={locLoading}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/[0.08] px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/[0.12] disabled:opacity-60"
-        >
-          <span className="material-symbols-outlined text-[18px]">my_location</span>
-          {locLoading ? "Alınıyor…" : "Konum al"}
-        </button>
-      </div>
-      {locMsg ? <p className="text-[11px] leading-relaxed text-secondary">{locMsg}</p> : null}
-      {addressHasCoordinates(address) ? (
-        <p className="rounded-lg bg-primary/5 px-3 py-2 text-[11px] text-secondary">
-          {formatCourierLocationNoteLine(address.latitude as number, address.longitude as number)}
-        </p>
-      ) : null}
+      <input
+        value={address.street}
+        onChange={(e) => setField("street", e.target.value)}
+        placeholder="Sokak / cadde"
+        className="w-full rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
+        required
+      />
+      <CustomerLocationField
+        value={savedPoint}
+        onChange={handleLocationChange}
+        title="Adres konumu"
+        description="Bir kez işaretleyin — bu adresle verdiğiniz siparişlerde tekrar sorulmaz."
+      />
       <div className="grid grid-cols-2 gap-2">
         <input
           value={address.buildingNo}
