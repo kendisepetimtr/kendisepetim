@@ -812,8 +812,9 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
       >
         <h3 className="font-headline text-base font-bold text-on-background">Fiş ayarları</h3>
         <p className="mt-1 text-xs leading-relaxed text-secondary">
-          Her siparişte müşteri, mutfak ve (paket siparişlerde) kurye fişi basılır. Yeni sipariş geldiğinde veya ödeme
-          alındığında otomatik yazdırılabilir.
+          Her siparişte müşteri, mutfak ve (paket siparişlerde) kurye fişi basılır. Yeni sipariş veya ödemede sitede
+          fiş önizlemesi açılır; Yazdır ile yazıcıya gönderilir. Sipariş no (KS-…) ve günlük sıra (34. paket) tüm
+          fişlerde yer alır.
         </p>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -837,7 +838,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                 onChange={(e) => patchReceipt("autoPrintOnNewOrder", e.target.checked)}
                 className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
               />
-              <span className="text-sm text-on-background">Yeni sipariş geldiğinde otomatik yazdır</span>
+              <span className="text-sm text-on-background">Yeni sipariş geldiğinde fiş önizlemesini aç</span>
             </label>
 
             <label className="flex cursor-pointer items-start gap-3">
@@ -847,7 +848,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                 onChange={(e) => patchReceipt("autoPrintOnPayment", e.target.checked)}
                 className="mt-0.5 h-4 w-4 rounded border-surface-container-highest text-primary"
               />
-              <span className="text-sm text-on-background">Ödeme alındığında otomatik yazdır</span>
+              <span className="text-sm text-on-background">Ödeme alındığında fiş önizlemesini aç</span>
             </label>
 
             <div>
@@ -864,10 +865,34 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                 <option value={58}>58 mm (küçük termal)</option>
               </select>
               <p className="mt-1.5 text-[11px] leading-snug text-secondary">
-                Yazıcı kâğıdıyla aynı genişliği seçin. Soluk çıkıyorsa Windows yazıcı
-                özelliklerinde yoğunluğu (density) yükseltin; kenar boşluklarını
-                &quot;Yok / Minimum&quot; yapın.
+                Yazıcı kâğıdıyla aynı genişliği seçin. Sağ boşluğu artırınca fiyatlar kesilmez.
               </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ["marginLeftMm", "Sol mm"],
+                  ["marginRightMm", "Sağ mm"],
+                  ["marginTopMm", "Üst mm"],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-${key}`}>
+                    {label}
+                  </label>
+                  <input
+                    id={`${baseId}-${key}`}
+                    type="number"
+                    min={0}
+                    max={12}
+                    step={0.5}
+                    value={receiptSettings[key]}
+                    onChange={(e) => patchReceipt(key, Number(e.target.value))}
+                    className="mt-1 w-full rounded-xl border border-surface-container-highest bg-white px-2 py-2 text-sm"
+                  />
+                </div>
+              ))}
             </div>
 
             <fieldset className="rounded-xl border border-surface-container-highest p-3">
@@ -938,7 +963,6 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                   [
                     ["showLogo", "Logo"],
                     ["showBusinessName", "İşletme adı"],
-                    ["showOrderCode", "Sipariş no"],
                     ["showDateTime", "Tarih / saat"],
                     ["showItemUnitPrices", "Kalem tutarları"],
                     ["showPaymentMethod", "Ödeme yöntemi"],
@@ -969,7 +993,7 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                     onChange={(e) => patchReceipt("kitchenShowOrderMeta", e.target.checked)}
                     className="h-4 w-4 rounded border-surface-container-highest text-primary"
                   />
-                  Sipariş no ve saat
+                  Sipariş saati ve kanal
                 </label>
                 <label className="flex items-center gap-2 text-sm text-on-background">
                   <input
@@ -990,7 +1014,6 @@ export default function DashboardOperationsSettings({ enabled }: DashboardOperat
                   [
                     ["courierShowPrices", "Ürün fiyatları"],
                     ["courierShowPayment", "Ödeme şekli"],
-                    ["courierShowCustomer", "Müşteri adı ve telefon"],
                     ["courierShowAddress", "Adres"],
                     ["courierShowLocationQr", "Konum QR (GPS)"],
                     ["courierShowOrderNote", "Kurye notu"],

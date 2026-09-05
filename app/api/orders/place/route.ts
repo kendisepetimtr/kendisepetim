@@ -25,6 +25,8 @@ import {
   tenantPaymentFlagsFromRow,
 } from "@/lib/tenant-payment";
 import { tryCreateServerSupabaseClient } from "@/lib/supabase/server";
+import { stripCourierLocationNoteLine } from "@/lib/maps-links";
+import { allocateDailyOrderNumber } from "@/lib/order-daily-number";
 import { ensureCustomerAccount } from "@/lib/account-kind";
 import { CUSTOMER_BLOCKED_LOGIN_MESSAGE, getCustomerBlockState } from "@/lib/superadmin/customers-service";
 
@@ -78,7 +80,9 @@ export async function POST(request: Request) {
   const phone = typeof payload.phone === "string" ? payload.phone.trim() : "";
   const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
   const orderNote = typeof payload.orderNote === "string" ? payload.orderNote.trim() : "";
-  const courierNote = typeof payload.courierNote === "string" ? payload.courierNote.trim() : "";
+  const courierNote = stripCourierLocationNoteLine(
+    typeof payload.courierNote === "string" ? payload.courierNote : "",
+  );
   const paymentMethod =
     payload.paymentMethod === "cash" || payload.paymentMethod === "door_card" || payload.paymentMethod === "meal_card"
       ? payload.paymentMethod
@@ -260,9 +264,12 @@ export async function POST(request: Request) {
       customerUserId = null;
     }
 
+    const dailyNumber = await allocateDailyOrderNumber(svc, tenant.id);
+
     const orderPayload = {
       tenant_id: tenant.id,
       order_code: code,
+      daily_number: dailyNumber,
       order_source: orderSource,
       fulfillment_type: fulfillmentType,
       table_number: fulfillmentType === "dine_in" ? tableNumberRaw : null,
@@ -372,6 +379,7 @@ export async function POST(request: Request) {
       ok: true,
       orderId: insertedOrder.id,
       orderCode: insertedOrder.order_code,
+      dailyNumber,
     });
   } catch (error) {
     return NextResponse.json(

@@ -65,7 +65,7 @@ export function useKasaReceiptPrint(businessName: string, subdomain: string) {
       const data = adminOrderToReceiptData(order, businessName, subdomain, paymentAtClose);
       const ok = printThermalReceipt(data, options);
       if (!ok && !opts?.silent) {
-        window.alert("Fiş yazdırılamadı. Açılır pencere engelini kontrol edin.");
+        window.alert("Fiş önizlemesi açılamadı.");
       }
       return ok;
     },
@@ -112,7 +112,7 @@ export function useKasaReceiptPrint(businessName: string, subdomain: string) {
       );
       const ok = printThermalReceipt(data, options);
       if (!ok && !opts?.silent) {
-        window.alert("Fiş yazdırılamadı. Açılır pencere engelini kontrol edin.");
+        window.alert("Fiş önizlemesi açılamadı.");
       }
       return ok;
     },

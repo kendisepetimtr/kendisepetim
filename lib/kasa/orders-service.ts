@@ -16,6 +16,7 @@ import {
 import type { PublicOrderLineInput } from "@/lib/orders";
 import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
+import { allocateDailyOrderNumber } from "@/lib/order-daily-number";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
@@ -68,7 +69,7 @@ export type PlaceCashierOrderInput = {
 
 export async function placeCashierOrder(
   input: PlaceCashierOrderInput,
-): Promise<{ ok: true; orderId: string; orderCode: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; orderId: string; orderCode: string; dailyNumber: number | null } | { ok: false; error: string }> {
   const { tenant, fulfillmentType } = input;
 
   if (!hasFullTenantAccess(tenant)) {
@@ -111,7 +112,9 @@ export async function placeCashierOrder(
   const email = (input.email ?? "").trim();
   const address = input.address ?? emptyCustomerAddress();
   const orderNote = typeof input.orderNote === "string" ? input.orderNote.trim() : "";
-  const courierNote = typeof input.courierNote === "string" ? input.courierNote.trim() : "";
+  const courierNote = stripCourierLocationNoteLine(
+    typeof input.courierNote === "string" ? input.courierNote : "",
+  );
 
   if (fulfillmentType === "delivery" || fulfillmentType === "pickup") {
     const formLike: CustomerFormValues = {
@@ -193,6 +196,7 @@ export async function placeCashierOrder(
 
     const total = lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
     const code = orderCode();
+    const dailyNumber = await allocateDailyOrderNumber(svc, tenant.id);
 
     let tableNumber: number | null = null;
     let tableSessionId: string | null = null;
@@ -206,6 +210,7 @@ export async function placeCashierOrder(
       .insert({
         tenant_id: tenant.id,
         order_code: code,
+        daily_number: dailyNumber,
         order_source: "cashier",
         fulfillment_type: fulfillmentType,
         table_number: tableNumber,
@@ -267,6 +272,7 @@ export async function placeCashierOrder(
       ok: true,
       orderId: insertedOrder.id as string,
       orderCode: insertedOrder.order_code as string,
+      dailyNumber,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Sipariş kaydedilemedi." };

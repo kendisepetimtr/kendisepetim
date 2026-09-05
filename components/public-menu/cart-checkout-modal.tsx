@@ -14,6 +14,7 @@ import {
   validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
 import { asGeoPoint, type GeoPoint } from "@/lib/geo";
+import { stripCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
 import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
@@ -154,7 +155,10 @@ export default function CartCheckoutModal({
 
     setCustomerLatitude(point?.lat ?? null);
     setCustomerLongitude(point?.lng ?? null);
-    setFormValues((prev) => applyAddressToFormValues(prev, addr.address));
+    setFormValues((prev) => {
+      const withAddr = applyAddressToFormValues(prev, addr.address);
+      return { ...withAddr, courierNote: stripCourierLocationNoteLine(withAddr.courierNote) };
+    });
     setLocMsg(
       point
         ? "Kayıtlı adresteki konum kullanılacak."
@@ -445,7 +449,7 @@ export default function CartCheckoutModal({
             tableNumber: ft === "dine_in" ? tableNumber : undefined,
             lines,
             orderNote: formValues.orderNote.trim(),
-            courierNote: ft === "delivery" ? formValues.courierNote.trim() : "",
+            courierNote: ft === "delivery" ? stripCourierLocationNoteLine(formValues.courierNote) : "",
             firstName: formValues.firstName.trim(),
             lastName: formValues.lastName.trim(),
             phone: formValues.phone.trim(),
@@ -554,7 +558,7 @@ export default function CartCheckoutModal({
           mealCardBrandId:
             resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
           orderNote: formValues.orderNote.trim(),
-          courierNote: fulfillmentType === "delivery" ? formValues.courierNote.trim() : "",
+          courierNote: fulfillmentType === "delivery" ? stripCourierLocationNoteLine(formValues.courierNote) : "",
         }),
       });
 
@@ -584,7 +588,7 @@ export default function CartCheckoutModal({
         paymentMethod: resolvedPayMethod,
         mealCardBrandId: resolvedPayMethod === "meal_card" ? (mealBrand as MealCardBrandId) : undefined,
         orderNote: formValues.orderNote.trim(),
-        courierNote: fulfillmentType === "delivery" ? formValues.courierNote.trim() : "",
+        courierNote: fulfillmentType === "delivery" ? stripCourierLocationNoteLine(formValues.courierNote) : "",
       };
 
       appendLocalOrder(subdomain, order);

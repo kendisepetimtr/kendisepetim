@@ -51,6 +51,10 @@ export function buildAdminOrders(rows: OrderRow[], lineRows: OrderLineRow[]): Ad
     paidAt: row.paid_at ?? null,
     orderNote: row.order_note,
     courierNote: row.courier_note ?? "",
+    dailyNumber:
+      row.daily_number != null && Number.isFinite(Number(row.daily_number))
+        ? Number(row.daily_number)
+        : null,
     courierName: null,
     lines: (linesByOrderId.get(row.id) ?? [])
       .slice()

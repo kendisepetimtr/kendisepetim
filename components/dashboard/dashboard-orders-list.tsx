@@ -192,6 +192,11 @@ export default function DashboardOrdersList({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-mono text-xs font-bold text-primary">{o.orderCode}</p>
+                      {o.dailyNumber ? (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                          {o.dailyNumber}.
+                        </span>
+                      ) : null}
                       <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-semibold uppercase text-secondary">
                         {fulfillmentTypeLabel(o.fulfillmentType)}
                       </span>

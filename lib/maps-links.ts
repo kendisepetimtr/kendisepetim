@@ -2,9 +2,17 @@ export function googleMapsPlaceUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
-/*
- * Not: Buradaki "kurye notuna konum bağlantısı ekle" yardımcıları kaldırıldı.
- * Kurye fişi konumu zaten QR kod olarak basıyor; notta bir kez daha görünmesi
- * aynı adresin üçüncü kez tekrar etmesine ve kuryenin hangi hedefe gideceğini
- * şaşırmasına yol açıyordu. Teslimat noktasının tek kaynağı haritadaki pindir.
+/**
+ * Kurye fişi konumu QR olarak basılır; nota URL yazılmaz.
+ * Eski siparişlerde kalan otomatik satır kayıtta temizlenir.
  */
+export const COURIER_LOCATION_NOTE_PREFIX = "Konum (kurye):";
+
+export function stripCourierLocationNoteLine(note: string): string {
+  return note
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith(COURIER_LOCATION_NOTE_PREFIX))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}

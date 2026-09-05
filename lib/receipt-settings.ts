@@ -7,6 +7,10 @@ export type TenantReceiptSettings = {
   autoPrintOnNewOrder: boolean;
   autoPrintOnPayment: boolean;
   paperWidthMm: 58 | 80;
+  /** Yazdırılabilir alan kenarları (mm) — sağ pay fiyatların kesilmesini önler */
+  marginLeftMm: number;
+  marginRightMm: number;
+  marginTopMm: number;
 
   customerReceiptEnabled: boolean;
   customerCopies: number;
@@ -39,6 +43,9 @@ export const DEFAULT_RECEIPT_SETTINGS: TenantReceiptSettings = {
   autoPrintOnNewOrder: true,
   autoPrintOnPayment: true,
   paperWidthMm: 80,
+  marginLeftMm: 2.5,
+  marginRightMm: 7,
+  marginTopMm: 2,
 
   customerReceiptEnabled: true,
   customerCopies: 1,
@@ -70,6 +77,12 @@ function readBool(o: Record<string, unknown>, key: string, fallback: boolean): b
   return typeof o[key] === "boolean" ? (o[key] as boolean) : fallback;
 }
 
+function readMm(o: Record<string, unknown>, key: string, fallback: number): number {
+  const n = Number(o[key]);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(12, Math.max(0, Math.round(n * 10) / 10));
+}
+
 export function parseReceiptSettings(raw: unknown): TenantReceiptSettings {
   const base = DEFAULT_RECEIPT_SETTINGS;
   if (!raw || typeof raw !== "object") return base;
@@ -89,6 +102,9 @@ export function parseReceiptSettings(raw: unknown): TenantReceiptSettings {
     autoPrintOnNewOrder: o.autoPrintOnNewOrder !== false,
     autoPrintOnPayment: o.autoPrintOnPayment !== false,
     paperWidthMm: width === 58 ? 58 : 80,
+    marginLeftMm: readMm(o, "marginLeftMm", base.marginLeftMm),
+    marginRightMm: readMm(o, "marginRightMm", base.marginRightMm),
+    marginTopMm: readMm(o, "marginTopMm", base.marginTopMm),
 
     customerReceiptEnabled: o.customerReceiptEnabled !== false,
     customerCopies: copies,

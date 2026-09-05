@@ -1,5 +1,6 @@
 import { formatAddressOneLine } from "@/lib/customer-address";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { formatDailyOrderLabel } from "@/lib/order-daily-number";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
@@ -49,6 +50,8 @@ export function adminOrderToReceiptData(
     subdomain,
     menuUrl: getPrimaryPublicMenuUrl(subdomain),
     orderCode: order.orderCode,
+    dailyNumber: order.dailyNumber ?? null,
+    dailyLabel: formatDailyOrderLabel(order.dailyNumber, order.fulfillmentType, order.tableNumber),
     createdAt: order.createdAt,
     fulfillmentType: order.fulfillmentType,
     fulfillmentLabel: fulfillmentReceiptLabel(order),
@@ -88,6 +91,8 @@ export function sessionOrdersToReceiptData(
     subdomain,
     menuUrl: getPrimaryPublicMenuUrl(subdomain),
     orderCode: orderCodes || `MASA-${tableNumber}`,
+    dailyNumber: first?.dailyNumber ?? null,
+    dailyLabel: formatDailyOrderLabel(first?.dailyNumber, "dine_in", tableNumber),
     createdAt: first?.createdAt ?? new Date().toISOString(),
     fulfillmentType: "dine_in",
     fulfillmentLabel: `Masa ${tableNumber}`,

@@ -12,7 +12,7 @@ import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
-import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
+import { allocateDailyOrderNumber } from "@/lib/order-daily-number";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -36,7 +36,7 @@ export async function placeWaiterOrder(input: {
   lines: PublicOrderLineInput[];
   orderNote?: string;
   waiter?: { id: string; displayName: string };
-}): Promise<{ ok: true; orderId: string; orderCode: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; orderId: string; orderCode: string; dailyNumber: number | null } | { ok: false; error: string }> {
   const { tenant, tableNumber, waiter } = input;
   const tableCount = Number(tenant.table_count ?? 0);
   const actorLabel = waiter?.displayName?.trim() || "Garson";
@@ -82,6 +82,7 @@ export async function placeWaiterOrder(input: {
 
     const total = lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
     const code = orderCode();
+    const dailyNumber = await allocateDailyOrderNumber(svc, tenant.id);
     const tableSessionId = await ensureTableSession(
       svc,
       tenant.id,
@@ -96,6 +97,7 @@ export async function placeWaiterOrder(input: {
       .insert({
         tenant_id: tenant.id,
         order_code: code,
+        daily_number: dailyNumber,
         order_source: "waiter",
         fulfillment_type: "dine_in",
         table_number: tableNumber,
@@ -151,6 +153,7 @@ export async function placeWaiterOrder(input: {
       ok: true,
       orderId: insertedOrder.id as string,
       orderCode: insertedOrder.order_code as string,
+      dailyNumber,
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Sipariş kaydedilemedi." };

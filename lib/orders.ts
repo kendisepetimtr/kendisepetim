@@ -70,4 +70,5 @@ export type AdminOrder = {
   paidAt?: string | null;
   orderNote: string;
   courierNote: string;
+  dailyNumber?: number | null;
 };

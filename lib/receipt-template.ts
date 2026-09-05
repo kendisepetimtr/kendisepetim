@@ -32,6 +32,8 @@ export type ReceiptOrderData = {
   customerAddress?: string;
   customerLatitude?: number | null;
   customerLongitude?: number | null;
+  dailyNumber?: number | null;
+  dailyLabel?: string;
   items: ReceiptItemLine[];
   subtotal: number;
   deliveryFee?: number;
@@ -57,12 +59,15 @@ export type ReceiptSlip = {
 };
 
 /**
- * Tarayıcı + termal sürücüde kenar boşlukları yüzünden 32/48 taşabiliyor;
- * biraz dar tutmak tire/metin kaymasını önler.
+ * Tarayıcı + termal sürücüde kenar boşlukları yüzünden 32/48 taşabiliyor.
+ * Fiyat satırları HTML flex ile sağa yaslanır; bu genişlik sarmalama / ortalama içindir.
  */
 export function receiptCharWidth(paperWidthMm: ReceiptPaperWidth): number {
-  return paperWidthMm === 58 ? 30 : 42;
+  return paperWidthMm === 58 ? 28 : 38;
 }
+
+/** Sol etiket + sağ fiyat — yazdırmada tab ile flex satıra çevrilir. */
+export const RECEIPT_LR_SEP = "\t";
 
 function repeatChar(ch: string, width: number): string {
   return ch.repeat(Math.max(1, width));
@@ -78,13 +83,16 @@ function center(text: string, width: number): string {
 function alignLeftRight(left: string, right: string, width: number): string {
   const r = right.trim();
   const maxLeft = Math.max(1, width - r.length - 1);
-  const l = left.trim().length > maxLeft ? `${left.trim().slice(0, maxLeft - 1)}…` : left.trim();
-  const gap = width - l.length - r.length;
-  return l + " ".repeat(Math.max(1, gap)) + r;
+  const trimmed = left.trim();
+  const l = trimmed.length > maxLeft ? `${trimmed.slice(0, Math.max(1, maxLeft - 1))}…` : trimmed;
+  if (!r) return l;
+  return `${l}${RECEIPT_LR_SEP}${r}`;
 }
 
 function formatMoney(amount: number): string {
-  return `${amount.toFixed(2).replace(".", ",")} TL`;
+  const rounded = Math.round(amount * 100) / 100;
+  if (Number.isInteger(rounded)) return `${rounded} TL`;
+  return `${rounded.toFixed(2).replace(".", ",")} TL`;
 }
 
 function formatDateTime(isoOrDisplay: string): string {
@@ -120,7 +128,16 @@ function pushWrapped(lines: string[], text: string, width: number, indent = "") 
   }
 }
 
-function pushItems(
+function pushOrderIdentity(
+  lines: string[],
+  order: Pick<ReceiptOrderData, "orderCode" | "dailyLabel">,
+  width: number,
+) {
+  lines.push(center(order.orderCode, width));
+  if (order.dailyLabel?.trim()) {
+    lines.push(center(order.dailyLabel.trim(), width));
+  }
+}
   lines: string[],
   items: ReceiptItemLine[],
   width: number,
@@ -128,8 +145,11 @@ function pushItems(
 ) {
   for (const item of items) {
     const left = `${item.qty}x ${item.name}`;
-    const right = showPrices ? formatMoney(item.lineTotal) : "";
-    lines.push(alignLeftRight(left, right || " ", width));
+    if (showPrices) {
+      lines.push(alignLeftRight(left, formatMoney(item.lineTotal), width));
+    } else {
+      pushWrapped(lines, left, width);
+    }
     for (const mod of item.modifiers ?? []) {
       lines.push(`  · ${mod}`.slice(0, width));
     }
@@ -154,12 +174,10 @@ export function renderCustomerReceiptText(
     lines.push(center(settings.headerText.trim(), w));
   }
 
-  if (settings.showOrderCode || settings.showDateTime) {
-    lines.push(repeatChar("-", w));
-    const meta: string[] = [];
-    if (settings.showOrderCode) meta.push(order.orderCode);
-    if (settings.showDateTime) meta.push(formatDateTime(order.createdAt));
-    lines.push(center(meta.join(" · "), w));
+  lines.push(repeatChar("-", w));
+  pushOrderIdentity(lines, order, w);
+  if (settings.showDateTime) {
+    lines.push(center(formatDateTime(order.createdAt), w));
   }
 
   lines.push(repeatChar("=", w));
@@ -204,7 +222,10 @@ export function renderCustomerReceiptText(
 }
 
 export function renderKitchenReceiptText(
-  order: Pick<ReceiptOrderData, "orderCode" | "createdAt" | "fulfillmentLabel" | "items" | "orderNote">,
+  order: Pick<
+    ReceiptOrderData,
+    "orderCode" | "createdAt" | "fulfillmentLabel" | "items" | "orderNote" | "dailyLabel"
+  >,
   settings: TenantReceiptSettings,
 ): string[] {
   const w = receiptCharWidth(settings.paperWidthMm);
@@ -213,11 +234,12 @@ export function renderKitchenReceiptText(
     repeatChar("=", w),
   ];
 
+  pushOrderIdentity(lines, order, w);
   if (settings.kitchenShowOrderMeta) {
-    lines.push(center(`${order.orderCode} · ${formatTimeOnly(order.createdAt)}`, w));
+    lines.push(center(formatTimeOnly(order.createdAt), w));
     lines.push(center(order.fulfillmentLabel.toUpperCase(), w));
-    lines.push(repeatChar("-", w));
   }
+  lines.push(repeatChar("-", w));
 
   pushItems(lines, order.items, w, false);
 
@@ -238,9 +260,10 @@ export function renderCourierReceiptText(
   const w = receiptCharWidth(settings.paperWidthMm);
   const lines: string[] = [
     center("KURYE FİŞİ", w),
-    center(`${order.orderCode} · ${formatTimeOnly(order.createdAt)}`, w),
-    repeatChar("=", w),
   ];
+  pushOrderIdentity(lines, order, w);
+  lines.push(center(formatTimeOnly(order.createdAt), w));
+  lines.push(repeatChar("=", w));
 
   pushItems(lines, order.items, w, settings.courierShowPrices);
 
@@ -253,11 +276,13 @@ export function renderCourierReceiptText(
     lines.push(`Ödeme: ${order.paymentMethodLabel}`.slice(0, w));
   }
 
-  if (settings.courierShowCustomer) {
-    lines.push(repeatChar("-", w));
-    if (order.customerName) lines.push(`Müşteri: ${order.customerName}`.slice(0, w));
-    if (order.customerPhone) lines.push(`Tel: ${formatTrPhoneReceipt(order.customerPhone)}`.slice(0, w));
-  }
+  lines.push(repeatChar("-", w));
+  lines.push(`Müşteri: ${order.customerName?.trim() || "—"}`.slice(0, w));
+  const phone =
+    order.customerPhone?.trim() && order.customerPhone.trim() !== "-"
+      ? formatTrPhoneReceipt(order.customerPhone)
+      : "—";
+  lines.push(`Tel: ${phone}`.slice(0, w));
 
   if (settings.courierShowAddress && order.customerAddress?.trim()) {
     lines.push(repeatChar("-", w));
@@ -373,6 +398,8 @@ export function sampleReceiptOrder(businessName: string, subdomain = "ornek-rest
     subdomain,
     menuUrl,
     orderCode: "KS-1042",
+    dailyNumber: 34,
+    dailyLabel: "34. paket",
     createdAt: "2026-06-27T14:32:00",
     fulfillmentType: "delivery",
     fulfillmentLabel: "Paket",

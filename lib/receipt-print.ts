@@ -11,7 +11,7 @@
 import type { TenantReceiptSettings } from "@/lib/receipt-settings";
 import {
   buildReceiptSlips,
-  receiptCharWidth,
+  RECEIPT_LR_SEP,
   type ReceiptOrderData,
   type ReceiptSlip,
 } from "@/lib/receipt-template";
@@ -63,6 +63,12 @@ function renderLinesHtml(lines: string[]): string {
       if (/^=+$/.test(line)) return `<div class="rule rule-eq" aria-hidden="true"></div>`;
       if (/^-+$/.test(line)) return `<div class="rule rule-dash" aria-hidden="true"></div>`;
       if (line.length === 0) return `<div class="line">&nbsp;</div>`;
+      const tab = line.indexOf(RECEIPT_LR_SEP);
+      if (tab >= 0) {
+        const left = line.slice(0, tab);
+        const right = line.slice(tab + 1);
+        return `<div class="row"><span class="left">${escapeHtml(left)}</span><span class="right">${escapeHtml(right)}</span></div>`;
+      }
       return `<div class="line">${escapeHtml(line)}</div>`;
     })
     .join("\n");
@@ -89,8 +95,7 @@ ${renderQrBlocks(slip.qrBlocks)}
 
 function buildPrintHtml(slips: ReceiptSlip[], options: ReceiptPrintOptions): string {
   const { settings } = options;
-  const cols = receiptCharWidth(settings.paperWidthMm);
-  const fontPx = settings.paperWidthMm === 58 ? 12 : 13;
+  const fontPx = settings.paperWidthMm === 58 ? 11 : 12;
   const sections = slips
     .map((slip, index) => renderSlipHtml(slip, options, index === 0))
     .join("\n");
@@ -113,14 +118,14 @@ function buildPrintHtml(slips: ReceiptSlip[], options: ReceiptPrintOptions): str
     print-color-adjust: exact !important;
   }
   body {
-    width: ${cols}ch;
+    width: ${settings.paperWidthMm}mm;
     max-width: 100%;
     margin: 0 auto;
-    padding: 1.5mm 1mm 3mm;
+    padding: ${settings.marginTopMm}mm ${settings.marginRightMm}mm 4mm ${settings.marginLeftMm}mm;
     font-family: "Courier New", Courier, "Lucida Console", monospace;
     font-size: ${fontPx}px;
     font-weight: 700;
-    line-height: 1.28;
+    line-height: 1.22;
     letter-spacing: 0;
     font-variant-ligatures: none;
     -webkit-font-smoothing: none;
@@ -129,14 +134,35 @@ function buildPrintHtml(slips: ReceiptSlip[], options: ReceiptPrintOptions): str
   .line {
     margin: 0;
     padding: 0;
-    white-space: pre;
-    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     font-family: inherit;
     font-size: inherit;
     font-weight: inherit;
     line-height: inherit;
-    /* Termal kâğıtta daha koyu / net stroke */
-    text-shadow: 0.35px 0 0 #000, -0.35px 0 0 #000;
+    text-shadow: 0.2px 0 0 #000;
+  }
+  .row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    text-shadow: 0.2px 0 0 #000;
+  }
+  .row .left {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .row .right {
+    flex: 0 0 auto;
+    text-align: right;
+    white-space: nowrap;
   }
   .rule {
     display: block;
@@ -219,6 +245,52 @@ function waitForImages(doc: Document, timeoutMs = 2500): Promise<void> {
   });
 }
 
+export const RECEIPT_PREVIEW_EVENT = "ks-receipt-preview";
+
+export type ReceiptPreviewDetail = {
+  html: string;
+  heading: string;
+};
+
+export function openReceiptPreview(html: string, heading: string): boolean {
+  if (typeof window === "undefined") return false;
+  window.dispatchEvent(
+    new CustomEvent<ReceiptPreviewDetail>(RECEIPT_PREVIEW_EVENT, { detail: { html, heading } }),
+  );
+  return true;
+}
+
+export async function printReceiptHtml(html: string): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument;
+  if (!doc) {
+    iframe.remove();
+    return false;
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+  await waitForImages(doc);
+  try {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    window.setTimeout(() => iframe.remove(), 60_000);
+  }
+}
+
 export function printThermalReceipt(
   order: ReceiptOrderData,
   options: ReceiptPrintOptions,
@@ -231,25 +303,8 @@ export function printThermalReceipt(
   if (slips.length === 0) return false;
 
   const html = buildPrintHtml(slips, options);
-  const popup = window.open("", "_blank", "width=420,height=900");
-  if (!popup) {
-    window.alert("Yazdırma penceresi açılamadı. Tarayıcı açılır pencereyi engelliyor olabilir.");
-    return false;
-  }
-
-  popup.document.write(html);
-  popup.document.close();
-
-  void waitForImages(popup.document).then(() => {
-    try {
-      popup.focus();
-      popup.print();
-    } catch {
-      /* ignore */
-    }
-  });
-
-  return true;
+  const heading = [order.dailyLabel, order.orderCode].filter(Boolean).join(" · ");
+  return openReceiptPreview(html, heading || "Fiş");
 }
 
 export async function fetchKasaReceiptPrintOptions(): Promise<ReceiptPrintOptions | null> {

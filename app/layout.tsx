@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import OAuthErrorRecovery from "@/components/oauth-error-recovery";
 import MarketplacePwaRuntime from "@/components/musteri/marketplace-pwa-runtime";
+import ReceiptPrintHost from "@/components/receipts/receipt-print-host";
 import { isMarketplacePwaHost } from "@/lib/pwa-host";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -61,6 +62,7 @@ export default function RootLayout({
       <body className="min-h-full bg-background font-body text-on-background antialiased selection:bg-primary/20 selection:text-primary">
         <OAuthErrorRecovery />
         <MarketplacePwaRuntime />
+        <ReceiptPrintHost />
         {children}
       </body>
     </html>

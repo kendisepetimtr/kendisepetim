@@ -11,6 +11,7 @@ import {
 } from "@/lib/customer-address";
 import type { FulfillmentType } from "@/lib/fulfillment";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
+import { formatDailyOrderLabel } from "@/lib/order-daily-number";
 import { formatCashierPhonePreview, type CashierCustomerMatch } from "@/lib/kasa/customer-search";
 import { receiptSettingsForKasaChannel } from "@/lib/kasa/receipt-channel";
 import {
@@ -424,6 +425,7 @@ export default function KasaOrderModal({
         ok?: boolean;
         orderId?: string;
         orderCode?: string;
+        dailyNumber?: number | null;
         error?: string;
       };
       if (!response.ok || !result.ok || !result.orderCode) {
@@ -442,6 +444,8 @@ export default function KasaOrderModal({
           subdomain,
           menuUrl: getPrimaryPublicMenuUrl(subdomain),
           orderCode: result.orderCode,
+          dailyNumber: result.dailyNumber ?? null,
+          dailyLabel: formatDailyOrderLabel(result.dailyNumber, channel, tableNumber),
           createdAt: new Date().toISOString(),
           fulfillmentType: channel,
           fulfillmentLabel,
