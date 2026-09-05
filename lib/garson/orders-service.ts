@@ -13,6 +13,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { allocateDailyOrderNumber } from "@/lib/order-daily-number";
+import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();

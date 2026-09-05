@@ -138,6 +138,8 @@ function pushOrderIdentity(
     lines.push(center(order.dailyLabel.trim(), width));
   }
 }
+
+function pushItems(
   lines: string[],
   items: ReceiptItemLine[],
   width: number,

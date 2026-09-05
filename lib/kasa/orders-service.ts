@@ -17,6 +17,7 @@ import type { PublicOrderLineInput } from "@/lib/orders";
 import { ensureTableSession } from "@/lib/table-sessions";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import { allocateDailyOrderNumber } from "@/lib/order-daily-number";
+import { stripCourierLocationNoteLine } from "@/lib/maps-links";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { FREE_PLAN_UPGRADE_MESSAGE, hasFullTenantAccess } from "@/lib/tenant-entitlements";
