@@ -55,6 +55,7 @@ type CustomerAddressMapProps = {
   /** Adres çevirisi tamamlandı. `null` = metin alınamadı, pin yine geçerli. */
   onAddressResolved: (address: ResolvedAddress | null) => void;
   restaurant?: GeoPoint | null;
+  restaurantLogoUrl?: string | null;
   radiusKm?: number | null;
   /** Dışarıdan gelen bilgi notu (ör. kayıtlı adresteki konum kullanılacak). */
   note?: string | null;
@@ -67,6 +68,7 @@ export default function CustomerAddressMap({
   onPointChange,
   onAddressResolved,
   restaurant = null,
+  restaurantLogoUrl = null,
   radiusKm = null,
   note = null,
   title = "Teslimat konumu",
@@ -185,6 +187,7 @@ export default function CustomerAddressMap({
           value={point}
           onChange={applyPoint}
           restaurant={restaurant}
+          restaurantLogoUrl={restaurantLogoUrl}
           radiusKm={radiusKm}
         />
       </div>

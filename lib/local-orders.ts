@@ -54,6 +54,7 @@ function parseAddress(r: Record<string, unknown>): CustomerAddress {
     livesInSite: r.livesInSite === true,
     siteName: typeof r.siteName === "string" ? r.siteName : "",
     block: typeof r.block === "string" ? r.block : "",
+    courierNote: typeof r.courierNote === "string" ? r.courierNote : "",
   };
 }
 

@@ -20,6 +20,7 @@ import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/
 import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
 import type { MusteriCheckoutContextResponse } from "@/app/api/musteri/checkout-context/route";
 import { customerOrderPath, MUSTERI_ADDRESSES_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
+import { getLastSavedAddressId, setLastSavedAddressId } from "@/lib/musteri/last-address";
 import { getOAuthSiteBase } from "@/lib/site-url";
 import type { LocalMenuProduct } from "@/lib/local-menu";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
@@ -77,6 +78,8 @@ type CartCheckoutModalProps = {
   onCashierOrderPlaced?: (result: { orderId: string; orderCode: string }) => void;
   /** Menü subdomain (işletme kimliği) */
   subdomain: string;
+  /** Haritada restoran işareti */
+  restaurantLogoUrl?: string;
   orderingEnabled: boolean;
   closedMessage: string;
   /** Nav’dan açılınca sepet özetini atlayıp onay adımına geç */
@@ -98,6 +101,7 @@ export default function CartCheckoutModal({
   cashierFulfillment,
   onCashierOrderPlaced,
   subdomain,
+  restaurantLogoUrl = "",
   orderingEnabled,
   closedMessage,
   initialStep = "cart",
@@ -130,6 +134,7 @@ export default function CartCheckoutModal({
   const [loggedInCustomer, setLoggedInCustomer] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<CustomerSavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [lastUsedAddressId, setLastUsedAddressId] = useState<string>("");
   const [guestSuccess, setGuestSuccess] = useState<{ orderCode: string; table: boolean } | null>(null);
 
   const customerPoint = useMemo(
@@ -188,7 +193,7 @@ export default function CartCheckoutModal({
       siteName: session.siteName || guestAddr?.address.siteName || "",
       block: session.block || guestAddr?.address.block || "",
       orderNote: "",
-      courierNote: "",
+      courierNote: guestAddr?.address.courierNote ?? "",
     };
 
     setLoggedInCustomer(false);
@@ -214,6 +219,7 @@ export default function CartCheckoutModal({
 
       setLoggedInCustomer(true);
       setSavedAddresses(data.addresses);
+      setLastUsedAddressId(getLastSavedAddressId());
       setFormValues((prev) => ({
         ...prev,
         firstName: data.firstName || prev.firstName,
@@ -573,6 +579,10 @@ export default function CartCheckoutModal({
       if (!response.ok || !result.ok || !result.orderCode) {
         window.alert(result.error ?? "Sipariş kaydedilemedi.");
         return;
+      }
+
+      if (loggedInCustomer && selectedAddressId) {
+        setLastSavedAddressId(selectedAddressId);
       }
 
       const order: LocalOrder = {
@@ -979,50 +989,56 @@ export default function CartCheckoutModal({
                         ’den ekleyin.
                       </p>
                     ) : (
-                      <ul className="mt-3 space-y-2">
+                      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                         {savedAddresses.map((addr) => {
                           const active = selectedAddressId === addr.id;
+                          const lastUsed = lastUsedAddressId === addr.id;
                           return (
-                            <li key={addr.id}>
+                            <li key={addr.id} className="sm:col-span-1">
                               <button
                                 type="button"
                                 onClick={() => applySavedAddress(addr)}
                                 className={[
-                                  "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
+                                  "flex h-full w-full items-start gap-3 rounded-2xl border px-4 py-4 text-left transition",
                                   active
-                                    ? "border-primary bg-primary/10"
+                                    ? "border-primary bg-primary/10 shadow-sm"
                                     : "border-surface-container-highest bg-white hover:border-primary/35",
                                 ].join(" ")}
                               >
                                 <span
                                   className={[
-                                    "mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border",
+                                    "mt-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full border",
                                     active ? "border-primary bg-primary text-white" : "border-surface-container-highest",
                                   ].join(" ")}
                                 >
                                   {active ? (
-                                    <span className="material-symbols-outlined text-[14px]">check</span>
+                                    <span className="material-symbols-outlined text-[16px]">check</span>
                                   ) : null}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="block text-sm font-bold text-on-background">
-                                    {addr.label}
+                                  <span className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-base font-extrabold text-on-background">{addr.label}</span>
                                     {addr.isDefault ? (
-                                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">
+                                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
                                         Varsayılan
                                       </span>
                                     ) : null}
+                                    {lastUsed ? (
+                                      <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-secondary">
+                                        Son kullanılan
+                                      </span>
+                                    ) : null}
                                   </span>
-                                  <span className="mt-0.5 block text-xs text-secondary">
+                                  <span className="mt-1 block text-xs leading-relaxed text-secondary">
                                     {formatAddressOneLine(addr.address)}
                                   </span>
                                   {addressHasCoordinates(addr.address) ? (
-                                    <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
+                                    <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
                                       <span className="material-symbols-outlined text-[12px]">my_location</span>
                                       Konum hazır
                                     </span>
                                   ) : (
-                                    <span className="mt-1 block text-[10px] text-secondary">
+                                    <span className="mt-1.5 block text-[10px] text-secondary">
                                       Konum yok — aşağıdan alın
                                     </span>
                                   )}
@@ -1074,6 +1090,7 @@ export default function CartCheckoutModal({
                         onPointChange={handleLocationChange}
                         onAddressResolved={handleAddressResolved}
                         restaurant={restaurantPoint}
+                        restaurantLogoUrl={restaurantLogoUrl}
                         radiusKm={fulfillmentFlags.deliveryRadiusKm}
                         note={locMsg}
                       />
@@ -1085,6 +1102,7 @@ export default function CartCheckoutModal({
                         value={customerPoint}
                         onChange={handleLocationChange}
                         restaurant={restaurantPoint}
+                        restaurantLogoUrl={restaurantLogoUrl}
                         radiusKm={fulfillmentFlags.deliveryRadiusKm}
                         note={locMsg}
                       />

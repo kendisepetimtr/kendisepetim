@@ -16,7 +16,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef } from "react";
 import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { normalizeGeoPoint, type GeoPoint } from "@/lib/geo";
-import { customerPinIcon, restaurantPinIcon } from "@/lib/leaflet-icons";
+import { customerPinIcon, restaurantMarkerIcon } from "@/lib/leaflet-icons";
 import { DEFAULT_MAP_CENTER } from "@/lib/turkey-geography";
 
 type CustomerLocationPickerProps = {
@@ -24,6 +24,8 @@ type CustomerLocationPickerProps = {
   onChange: (point: GeoPoint) => void;
   /** İşletme konumu — teslimat dairesiyle birlikte gösterilir. */
   restaurant?: GeoPoint | null;
+  /** Haritada restoran pini yerine logo. */
+  restaurantLogoUrl?: string | null;
   radiusKm?: number | null;
   /** Yükseklik sınıfı; dar modallarda kısaltmak için. */
   heightClass?: string;
@@ -132,6 +134,7 @@ export default function CustomerLocationPicker({
   value,
   onChange,
   restaurant = null,
+  restaurantLogoUrl = null,
   radiusKm = null,
   heightClass = "h-72",
 }: CustomerLocationPickerProps) {
@@ -167,7 +170,11 @@ export default function CustomerLocationPicker({
 
         {restaurant ? (
           <>
-            <Marker position={[restaurant.lat, restaurant.lng]} icon={restaurantPinIcon()} />
+            <Marker
+              position={[restaurant.lat, restaurant.lng]}
+              icon={restaurantMarkerIcon(restaurantLogoUrl)}
+              zIndexOffset={-200}
+            />
             {radiusMeters != null ? (
               <Circle
                 center={[restaurant.lat, restaurant.lng]}
@@ -202,7 +209,7 @@ export default function CustomerLocationPicker({
         {value
           ? "Noktayı düzeltmek için haritada doğru yere dokunun; pini sürükleyerek de taşıyabilirsiniz."
           : "Teslimat adresinizi haritada bulup dokunun; kırmızı pin oraya yerleşir."}
-        {restaurant ? " Mavi daire işletmenin teslimat alanıdır." : ""}
+        {restaurant ? " Daire teslimat alanı, logo restoranın yeridir." : ""}
       </p>
     </div>
   );

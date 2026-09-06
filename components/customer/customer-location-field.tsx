@@ -42,6 +42,7 @@ type CustomerLocationFieldProps = {
   onChange: (point: GeoPoint | null) => void;
   /** İşletme konumu — teslimat dairesi ve mesafe uyarısı için. */
   restaurant?: GeoPoint | null;
+  restaurantLogoUrl?: string | null;
   radiusKm?: number | null;
   /** Dışarıdan gelen bilgi notu (ör. kayıtlı adresteki konum kullanılacak). */
   note?: string | null;
@@ -59,6 +60,7 @@ export default function CustomerLocationField({
   value,
   onChange,
   restaurant = null,
+  restaurantLogoUrl = null,
   radiusKm = null,
   note = null,
   title = "Teslimat konumu",
@@ -155,6 +157,7 @@ export default function CustomerLocationField({
             value={value}
             onChange={handleMapPick}
             restaurant={restaurant}
+            restaurantLogoUrl={restaurantLogoUrl}
             radiusKm={radiusKm}
           />
         </div>

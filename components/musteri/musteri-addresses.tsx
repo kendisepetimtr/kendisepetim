@@ -157,6 +157,11 @@ export default function MusteriAddresses({ isCustomer, initialAddresses }: Props
                   ) : (
                     <p className="mt-1.5 text-[11px] text-secondary">Konum yok — siparişte istenebilir</p>
                   )}
+                  {row.address.courierNote?.trim() ? (
+                    <p className="mt-1.5 text-[11px] text-secondary">
+                      Kapı / zil: {row.address.courierNote.trim()}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button
@@ -340,9 +345,25 @@ function AddressEditor({
           />
         </div>
       ) : null}
-      <label className="flex items-center gap-2 text-sm">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-secondary" htmlFor="addr-courier-note">
+          Kapı / zil notu
+        </label>
+        <textarea
+          id="addr-courier-note"
+          value={address.courierNote ?? ""}
+          onChange={(e) => setField("courierNote", e.target.value)}
+          rows={2}
+          placeholder="Örn. zil çalışmıyor, kapıcıya bırakın…"
+          className="w-full resize-y rounded-xl border border-surface-container-highest px-3 py-2.5 text-sm"
+        />
+        <p className="mt-1 text-[11px] text-secondary">
+          Paket siparişinde kurye notuna otomatik dolar. Restoran mutfağını ilgilendirmez.
+        </p>
+      </div>
+      <label className="flex items-center gap-2 rounded-xl border border-surface-container-highest bg-surface-container-low/40 px-3 py-2.5 text-sm font-medium">
         <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
-        Varsayılan adres
+        Bu konumu varsayılan yap
       </label>
       {error ? (
         <p className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-sm text-error">{error}</p>

@@ -41,6 +41,7 @@ function makePin(color: string, coreColor: string): L.DivIcon {
 
 let customerPin: L.DivIcon | null = null;
 let restaurantPin: L.DivIcon | null = null;
+const restaurantLogoPins = new Map<string, L.DivIcon>();
 
 export function customerPinIcon(): L.DivIcon {
   customerPin ??= makePin(CUSTOMER_PIN_COLOR, "#7f1710");
@@ -50,4 +51,43 @@ export function customerPinIcon(): L.DivIcon {
 export function restaurantPinIcon(): L.DivIcon {
   restaurantPin ??= makePin(RESTAURANT_PIN_COLOR, "#15306e");
   return restaurantPin;
+}
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+const LOGO_MARKER_SIZE = 44;
+const LOGO_MARKER_HEIGHT = 52;
+
+/** Müşteri haritasında işletme: logo yuvarlak; yoksa mavi pin. */
+export function restaurantMarkerIcon(logoUrl?: string | null): L.DivIcon {
+  const src = typeof logoUrl === "string" ? logoUrl.trim() : "";
+  if (!src) return restaurantPinIcon();
+
+  const cached = restaurantLogoPins.get(src);
+  if (cached) return cached;
+
+  const html = [
+    `<div style="display:flex;flex-direction:column;align-items:center;width:${LOGO_MARKER_SIZE}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));">`,
+    `<div style="width:${LOGO_MARKER_SIZE}px;height:${LOGO_MARKER_SIZE}px;border-radius:999px;overflow:hidden;border:2.5px solid #fff;background:#fff;">`,
+    `<img src="${escapeHtmlAttr(src)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" />`,
+    `</div>`,
+    `<div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:10px solid #fff;margin-top:-2px;"></div>`,
+    `</div>`,
+  ].join("");
+
+  const icon = L.divIcon({
+    html,
+    className: "",
+    iconSize: [LOGO_MARKER_SIZE, LOGO_MARKER_HEIGHT],
+    iconAnchor: [LOGO_MARKER_SIZE / 2, LOGO_MARKER_HEIGHT],
+    popupAnchor: [0, -LOGO_MARKER_HEIGHT + 8],
+  });
+  restaurantLogoPins.set(src, icon);
+  return icon;
 }

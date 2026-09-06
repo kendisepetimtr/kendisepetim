@@ -114,6 +114,33 @@ export async function loadCustomerOrders(userId: string): Promise<MusteriOrderVi
   }
 }
 
+function isActiveCustomerOrder(order: MusteriOrderView): boolean {
+  if (order.status === "cancelled" || order.status === "completed") return false;
+  if (order.deliveryStatus === "delivered" || order.deliveryStatus === "cancelled") return false;
+  return true;
+}
+
+export async function loadCustomerActiveOrder(userId: string): Promise<MusteriOrderView | null> {
+  try {
+    const svc = createServiceSupabaseClient();
+    const { data, error } = await svc
+      .from("orders")
+      .select(CUSTOMER_ORDER_SELECT)
+      .eq("customer_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error || !data) return null;
+    for (const row of data) {
+      const order = mapCustomerOrderRow(row as Record<string, unknown>);
+      if (isActiveCustomerOrder(order)) return order;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loadCustomerOrderById(
   userId: string,
   orderId: string,

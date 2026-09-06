@@ -1,11 +1,37 @@
 "use client";
 
 import RestaurantCard from "@/components/marketplace/restaurant-card";
+import ActiveOrderBanner from "@/components/musteri/active-order-banner";
 import { CUISINE_TAG_OPTIONS, type MarketplaceListing } from "@/lib/marketplace";
 import { getSavedCustomerGeo, requestCustomerGeo, type CustomerGeo } from "@/lib/customer-geo";
 import { asGeoPoint, distanceKm, isWithinDeliveryRadius } from "@/lib/geo";
 import { LAUNCH_CITY, LAUNCH_DISTRICT, MURATPASA_NEIGHBORHOODS } from "@/lib/turkey-geography";
 import { useEffect, useMemo, useState } from "react";
+
+function FilterChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition",
+        selected
+          ? "border-primary bg-primary text-white"
+          : "border-surface-container-highest bg-white text-on-background",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  );
+}
 
 const PICKUP_NEAR_KM = 8;
 
@@ -37,6 +63,8 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
   const [neighborhood, setNeighborhood] = useState("");
   const [cuisineTag, setCuisineTag] = useState("");
   const [openOnly, setOpenOnly] = useState(false);
+  const [pickupOnly, setPickupOnly] = useState(false);
+  const [deliveryOnly, setDeliveryOnly] = useState(false);
   const [geo, setGeo] = useState<CustomerGeo | null>(null);
   const [geoStatus, setGeoStatus] = useState<"idle" | "asking" | "ok" | "denied">("idle");
 
@@ -61,6 +89,13 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
     if (neighborhood) items = items.filter((l) => l.neighborhood === neighborhood);
     if (cuisineTag) items = items.filter((l) => l.cuisineTags.includes(cuisineTag));
     if (openOnly) items = items.filter((l) => l.isOpen);
+    if (pickupOnly || deliveryOnly) {
+      items = items.filter(
+        (l) =>
+          (pickupOnly && l.fulfillmentPickupEnabled) ||
+          (deliveryOnly && l.fulfillmentDeliveryEnabled),
+      );
+    }
     if (search.trim()) {
       const q = search.trim().toLocaleLowerCase("tr");
       items = items.filter(
@@ -71,7 +106,7 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
       );
     }
     return items;
-  }, [initialListings, neighborhood, cuisineTag, openOnly, search]);
+  }, [initialListings, neighborhood, cuisineTag, openOnly, pickupOnly, deliveryOnly, search]);
 
   const nearby = useMemo(() => {
     if (!geo) return [];
@@ -90,6 +125,7 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
 
   return (
     <div>
+      <ActiveOrderBanner enabled={isCustomer} />
       <div className="mb-6">
         <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">
           Yakınınızdaki mutfak, kendi sepetiniz.
@@ -119,47 +155,41 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
         ) : null}
       </div>
 
-      <div className="mb-6 grid gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Restoran ara…"
-          className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm sm:col-span-2 lg:col-span-1"
-        />
-        <select
-          value={neighborhood}
-          onChange={(e) => setNeighborhood(e.target.value)}
-          className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
-        >
-          <option value="">Tüm mahalleler</option>
-          {MURATPASA_NEIGHBORHOODS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <select
-          value={cuisineTag}
-          onChange={(e) => setCuisineTag(e.target.value)}
-          className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
-        >
-          <option value="">Tüm mutfaklar</option>
-          {CUISINE_TAG_OPTIONS.map((tag) => (
-            <option key={tag} value={tag}>
-              {tag}
-            </option>
-          ))}
-        </select>
-        <label className="flex items-center gap-2 rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm">
+      <div className="mb-6 space-y-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
           <input
-            type="checkbox"
-            checked={openOnly}
-            onChange={(e) => setOpenOnly(e.target.checked)}
-            className="h-4 w-4 rounded text-primary"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Restoran ara…"
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
           />
-          Yalnızca açık
-        </label>
+          <select
+            value={neighborhood}
+            onChange={(e) => setNeighborhood(e.target.value)}
+            className="rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm"
+          >
+            <option value="">Tüm mahalleler</option>
+            {MURATPASA_NEIGHBORHOODS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
+          <FilterChip label="Açık" selected={openOnly} onClick={() => setOpenOnly((v) => !v)} />
+          <FilterChip label="Gel-al" selected={pickupOnly} onClick={() => setPickupOnly((v) => !v)} />
+          <FilterChip label="Paket" selected={deliveryOnly} onClick={() => setDeliveryOnly((v) => !v)} />
+          {CUISINE_TAG_OPTIONS.map((tag) => (
+            <FilterChip
+              key={tag}
+              label={tag}
+              selected={cuisineTag === tag}
+              onClick={() => setCuisineTag((prev) => (prev === tag ? "" : tag))}
+            />
+          ))}
+        </div>
       </div>
 
       {emptyAll ? (

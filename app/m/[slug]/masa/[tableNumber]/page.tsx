@@ -9,6 +9,7 @@ import { buildLocalMenuState } from "@/lib/menu-map";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
 import { clampDeliveryRadiusKm, type TenantFulfillmentFlags } from "@/lib/fulfillment";
 import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
+import { listingEtaMinutesFromTenant } from "@/lib/musteri/order-tracking";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 import { getTableMenuUrl } from "@/lib/public-menu-urls";
 
@@ -139,6 +140,7 @@ export default async function TableMenuPage({ params }: Props) {
       initialClosedMessage={initialClosedMessage}
       paymentFlags={paymentFlags}
       fulfillmentFlags={fulfillmentFlags}
+      etaMinutes={listingEtaMinutesFromTenant(row as Record<string, unknown>)}
       tableNumber={tableNumber}
       initialMenu={buildLocalMenuState({
         categories,

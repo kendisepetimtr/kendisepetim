@@ -7,7 +7,6 @@ import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { DELIVERY_STATUS_LABELS } from "@/lib/delivery-status";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
 import { customerOrderPath, MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
-import { formatDailyOrderLabel } from "@/lib/order-daily-number";
 import { formatCancelReasonForCustomer, isOrderCancelReason } from "@/lib/order-cancel";
 
 type Props = {
@@ -68,10 +67,6 @@ export default function MusteriOrders({ accountOrders }: Props) {
         <ul className="space-y-4">
           {accountOrders.map((o) => {
             const cancelled = o.status === "cancelled" || o.deliveryStatus === "cancelled";
-            const dailyLabel =
-              o.dailyNumber != null && o.fulfillmentType
-                ? formatDailyOrderLabel(o.dailyNumber, o.fulfillmentType)
-                : undefined;
             return (
             <li
               key={o.id}
@@ -82,8 +77,7 @@ export default function MusteriOrders({ accountOrders }: Props) {
                 <div>
                   <p className="font-headline text-base font-bold text-on-background">{o.restaurantName}</p>
                   <p className="mt-0.5 text-xs text-secondary">
-                    {o.orderCode}
-                    {dailyLabel ? ` · ${dailyLabel}` : ""} · {formatWhen(o.createdAt)}
+                    {o.orderCode} · {formatWhen(o.createdAt)}
                   </p>
                 </div>
                 <p className="text-sm font-bold text-on-background">{money(o.total)}</p>

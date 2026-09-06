@@ -7,7 +7,6 @@ import {
   formatCancelReasonForCustomer,
   isOrderCancelReason,
 } from "@/lib/order-cancel";
-import { formatDailyOrderLabel } from "@/lib/order-daily-number";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { DELIVERY_STATUS_LABELS } from "@/lib/delivery-status";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
@@ -53,10 +52,6 @@ export default function MusteriOrderTrack({ initialOrder }: Props) {
 
   const cancelled = order.status === "cancelled" || order.deliveryStatus === "cancelled";
   const fulfillmentIsDelivery = order.fulfillmentType === "delivery";
-  const dailyLabel =
-    order.dailyNumber != null && order.fulfillmentType
-      ? formatDailyOrderLabel(order.dailyNumber, order.fulfillmentType)
-      : undefined;
   const currentStage =
     stageFromDeliveryStatus(order.deliveryStatus) ?? stageFromOrderStatus(order.status) ?? "received";
   const cancelText = cancelled
@@ -77,7 +72,6 @@ export default function MusteriOrderTrack({ initialOrder }: Props) {
         <h1 className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-on-background">
           {order.orderCode}
         </h1>
-        {dailyLabel ? <p className="mt-1 text-sm font-bold text-primary">{dailyLabel}</p> : null}
         <p className="mt-1 text-sm text-secondary">
           {order.fulfillmentType ? fulfillmentTypeLabel(order.fulfillmentType) : ""}
           {order.etaMinutes ? ` · ~${order.etaMinutes} dk` : ""}

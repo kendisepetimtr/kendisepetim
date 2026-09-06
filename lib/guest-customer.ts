@@ -50,6 +50,7 @@ function parseAddress(raw: unknown): CustomerAddress {
     block: typeof raw.block === "string" ? raw.block : "",
     latitude: typeof lat === "number" && Number.isFinite(lat) ? lat : null,
     longitude: typeof lng === "number" && Number.isFinite(lng) ? lng : null,
+    courierNote: typeof raw.courierNote === "string" ? raw.courierNote : "",
   };
 }
 

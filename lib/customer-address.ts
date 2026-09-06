@@ -13,6 +13,8 @@ export type CustomerAddress = {
   /** Teslimat noktası — adres kaydında opsiyonel; yoksa checkout’ta istenir */
   latitude?: number | null;
   longitude?: number | null;
+  /** Kapı / zil / kurye notu — adres kaydında saklanır, checkout’ta kurye notuna dolar */
+  courierNote?: string;
 };
 
 export function emptyCustomerAddress(): CustomerAddress {
@@ -28,6 +30,7 @@ export function emptyCustomerAddress(): CustomerAddress {
     block: "",
     latitude: null,
     longitude: null,
+    courierNote: "",
   };
 }
 
@@ -82,6 +85,7 @@ export function formValuesToAddress(v: CustomerFormValues): CustomerAddress {
     block: v.block.trim(),
     latitude: null,
     longitude: null,
+    courierNote: v.courierNote.trim(),
   };
 }
 
@@ -109,6 +113,7 @@ export function applyAddressToFormValues(
     livesInSite: address.livesInSite,
     siteName: address.siteName,
     block: address.block,
+    courierNote: (address.courierNote ?? "").trim(),
   };
 }
 

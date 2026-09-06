@@ -38,6 +38,7 @@ import QrMenuHeaderActions from "@/components/public-menu/qr-menu-header-actions
 import { isRestaurantMenuPwaHost } from "@/lib/pwa-host";
 import SiteLogo from "@/components/site-logo";
 import CustomerChrome, { CustomerIdentityChip } from "@/components/musteri/customer-chrome";
+import ActiveOrderBanner from "@/components/musteri/active-order-banner";
 import CustomerNotificationsPanel from "@/components/musteri/customer-notifications-panel";
 import {
   isProductFavorited,
@@ -116,6 +117,8 @@ type PublicMenuClientProps = {
   initialClosedMessage: string;
   paymentFlags: TenantPaymentFlags;
   fulfillmentFlags: TenantFulfillmentFlags;
+  /** Restoran tahmini hazırlık / teslimat süresi (dakika) */
+  etaMinutes?: number | null;
   orderSource?: "qr_menu" | "marketplace";
   /** Masa menusu — dine_in siparis akisi */
   tableNumber?: number;
@@ -163,6 +166,7 @@ export default function PublicMenuClient({
   initialClosedMessage,
   paymentFlags,
   fulfillmentFlags,
+  etaMinutes = null,
   orderSource = "qr_menu",
   tableNumber,
   waiterMode = false,
@@ -708,6 +712,12 @@ export default function PublicMenuClient({
         </div>
       ) : null}
 
+      {!staffChrome ? (
+        <div className="px-4 pt-3">
+          <ActiveOrderBanner enabled={customerKind === "customer"} />
+        </div>
+      ) : null}
+
       <div
         className={
           desktopSplit
@@ -801,6 +811,28 @@ export default function PublicMenuClient({
                   {hoursRangeLabel ? (
                     <span className="rounded-full bg-surface-container-low px-2 py-1 text-[11px] font-semibold text-secondary">
                       {hoursRangeLabel}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {etaMinutes != null && etaMinutes > 0 ? (
+                    <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-bold text-on-background">
+                      ~{etaMinutes} dk
+                    </span>
+                  ) : null}
+                  {fulfillmentFlags.minOrderAmount != null && fulfillmentFlags.minOrderAmount > 0 ? (
+                    <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-bold text-on-background">
+                      Min. {formatTry(fulfillmentFlags.minOrderAmount)}
+                    </span>
+                  ) : null}
+                  {fulfillmentFlags.fulfillmentPickupEnabled ? (
+                    <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-bold text-on-background">
+                      Gel-al
+                    </span>
+                  ) : null}
+                  {fulfillmentFlags.fulfillmentDeliveryEnabled ? (
+                    <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-bold text-on-background">
+                      Paket
                     </span>
                   ) : null}
                 </div>
@@ -1126,6 +1158,7 @@ export default function PublicMenuClient({
         cashierFulfillment={cashierFulfillment}
         onCashierOrderPlaced={onCashierOrderPlaced}
         subdomain={slug}
+        restaurantLogoUrl={businessLogoUrl}
         orderingEnabled={orderingEnabled}
         closedMessage={closedMessage}
         initialStep={cartCount > 0 ? "checkout" : "cart"}
