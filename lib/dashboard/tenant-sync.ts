@@ -31,6 +31,7 @@ const TENANT_SYNC_COLUMNS = [
   "payment_meal_card",
   "payment_meal_card_brands",
   "marketplace_enabled",
+  "marketplace_vitrin_approved",
   "plan",
   "trial_ends_at",
   "city",

@@ -71,4 +71,7 @@ export type AdminOrder = {
   orderNote: string;
   courierNote: string;
   dailyNumber?: number | null;
+  seenAt?: string | null;
+  cancelReason?: string | null;
+  cancelNote?: string | null;
 };

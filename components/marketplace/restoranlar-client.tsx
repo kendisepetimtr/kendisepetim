@@ -109,10 +109,17 @@ export default function RestoranlarClient({ initialListings }: RestoranlarClient
 
         {filtered.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-surface-container-highest bg-surface-container-low/40 px-6 py-16 text-center">
-            <p className="font-headline text-lg font-bold text-on-background">Sonuç bulunamadı</p>
-            <p className="mt-2 text-sm text-secondary">
-              Filtreleri değiştirin veya yakında yeni restoranlar eklenecek.
+            <p className="font-headline text-lg font-bold text-on-background">
+              {neighborhood ? "Bu mahallede henüz restoran yok" : "Sonuç bulunamadı"}
             </p>
+            <p className="mt-2 text-sm text-secondary">
+              {neighborhood
+                ? "Filtreyi değiştirin veya mutfağınızı Kendi Sepetim’e ekleyin."
+                : "Filtreleri değiştirin veya yakında yeni restoranlar eklenecek."}
+            </p>
+            <Link href="/kayit" className="mt-4 inline-flex font-bold text-primary">
+              Restoranını kaydet
+            </Link>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

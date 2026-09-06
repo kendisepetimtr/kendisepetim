@@ -3,6 +3,7 @@ import {
   clearAllOrdersData,
   loadDashboardOrderById,
   loadDashboardOrders,
+  markDashboardOrderSeen,
   updateDashboardOrderStatus,
   type OrderChannelFilter,
 } from "@/lib/dashboard/orders-service";
@@ -38,18 +39,40 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  let body: { orderId?: string; status?: OrderStatus };
+  let body: {
+    orderId?: string;
+    status?: OrderStatus;
+    action?: string;
+    cancelReason?: unknown;
+    cancelNote?: unknown;
+  };
   try {
-    body = (await request.json()) as { orderId?: string; status?: OrderStatus };
+    body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ ok: false, error: "Geçersiz istek gövdesi." }, { status: 400 });
   }
 
-  if (!body.orderId || !body.status) {
+  if (!body.orderId) {
+    return NextResponse.json({ ok: false, error: "Sipariş gerekli." }, { status: 400 });
+  }
+
+  if (body.action === "seen") {
+    const result = await markDashboardOrderSeen(body.orderId);
+    if (!result.ok) {
+      const status = result.error === "Oturum bulunamadı." ? 401 : 400;
+      return NextResponse.json(result, { status });
+    }
+    return NextResponse.json(result);
+  }
+
+  if (!body.status) {
     return NextResponse.json({ ok: false, error: "Sipariş ve durum gerekli." }, { status: 400 });
   }
 
-  const result = await updateDashboardOrderStatus(body.orderId, body.status);
+  const result = await updateDashboardOrderStatus(body.orderId, body.status, {
+    reason: body.cancelReason,
+    note: body.cancelNote,
+  });
   if (!result.ok) {
     const status = result.error === "Oturum bulunamadı." ? 401 : 400;
     return NextResponse.json(result, { status });

@@ -13,6 +13,7 @@ import {
 } from "@/lib/marketplace-profile-checklist";
 import {
   CUISINE_TAG_OPTIONS,
+  getMarketplaceDiscoverBlockers,
   getMarketplaceQualityIssues,
   type MarketplaceProfileInput,
 } from "@/lib/marketplace";
@@ -113,6 +114,8 @@ export default function MarketplaceSettingsPanel({
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       productCount,
+      openTime: tenant.openTime,
+      closeTime: tenant.closeTime,
     }),
     [
       marketplaceEnabled,
@@ -129,6 +132,8 @@ export default function MarketplaceSettingsPanel({
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       productCount,
+      tenant.openTime,
+      tenant.closeTime,
     ],
   );
 
@@ -136,6 +141,12 @@ export default function MarketplaceSettingsPanel({
   const qualityIssues = useMemo(() => getMarketplaceQualityIssues(profilePreview), [profilePreview]);
   const canPublish = qualityIssues.length === 0;
   const incompleteItems = checklistStatus.items.filter((i) => !i.complete);
+  const discoverBlockers = getMarketplaceDiscoverBlockers({
+    qualityIssues,
+    marketplaceEnabled,
+    vitrinApproved: tenant.marketplaceVitrinApproved,
+    applicationApproved: true,
+  });
 
   useEffect(() => {
     setMarketplaceEnabled(tenant.marketplaceEnabled);
@@ -643,13 +654,21 @@ export default function MarketplaceSettingsPanel({
           <span>
             <span className="block text-sm font-semibold text-on-background">Marketplace&apos;te yayınla</span>
             <span className="mt-0.5 block text-xs text-secondary">
-              Açıkken restoranınız Restoranlar listesinde ve ana sayfada görünür. Kapatmak için işareti kaldırın.
+              Açıkken keşif için aday olursunuz. Listede görünmek için superadmin vitrin onayı da gerekir. QR menü
+              bundan bağımsız çalışır.
             </span>
             {marketplaceEnabled && !canPublish ? (
               <span className="mt-2 block text-xs font-medium text-amber-800">
                 Kaydetmeden önce profil adımlarını tamamlayın.
               </span>
             ) : null}
+            {discoverBlockers.length > 0 ? (
+              <span className="mt-2 block text-xs font-medium text-amber-900">
+                Keşifte değilsiniz çünkü: {discoverBlockers.map((b) => b.label).join(", ")}.
+              </span>
+            ) : (
+              <span className="mt-2 block text-xs font-medium text-emerald-800">Keşif vitrininde görünüyorsunuz.</span>
+            )}
           </span>
         </label>
       </section>

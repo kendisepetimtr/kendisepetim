@@ -149,6 +149,8 @@ export async function updateMarketplaceSettings(
       fulfillmentPickupEnabled,
       fulfillmentDeliveryEnabled,
       productCount,
+      openTime: current.open_time ?? "",
+      closeTime: current.close_time ?? "",
     };
 
     if (patch.marketplaceEnabled && !hasFullTenantAccess(current)) {
@@ -192,7 +194,7 @@ export async function updateMarketplaceSettings(
       })
       .eq("id", current.id)
       .select(
-        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, plan, trial_ends_at, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount, order_eta_auto_enabled, order_eta_mode, order_eta_total_minutes, order_eta_prep_minutes, order_eta_ready_minutes, order_eta_dispatch_minutes, order_eta_deliver_minutes",
+        "business_name, subdomain, owner_name, email, phone, created_at, logo_url, cover_image_url, public_description, google_maps_url, seo_index_enabled, public_menu_enabled, hours_day_mode, open_time, close_time, payment_cash, payment_door_card, payment_meal_card, payment_meal_card_brands, marketplace_enabled, marketplace_vitrin_approved, plan, trial_ends_at, city, district, neighborhood, cuisine_tags, latitude, longitude, delivery_radius_km, fulfillment_pickup_enabled, fulfillment_delivery_enabled, min_order_amount, order_eta_auto_enabled, order_eta_mode, order_eta_total_minutes, order_eta_prep_minutes, order_eta_ready_minutes, order_eta_dispatch_minutes, order_eta_deliver_minutes",
       )
       .single();
 

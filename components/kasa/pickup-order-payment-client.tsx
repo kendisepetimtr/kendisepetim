@@ -14,6 +14,8 @@ import {
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
 import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
+import type { OrderCancelReason } from "@/lib/order-cancel";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -41,6 +43,7 @@ export default function PickupOrderPaymentClient({
     order.paymentMethod === "meal_card" && order.mealCardBrandId ? order.mealCardBrandId : "",
   );
   const [submitting, setSubmitting] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const { printOrder, printOrderIfAuto } = useKasaReceiptPrint(businessName, subdomain);
 
   async function handleClosePayment() {
@@ -89,6 +92,32 @@ export default function PickupOrderPaymentClient({
         mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
       });
       window.location.href = "/kasa";
+    } catch {
+      window.alert("Bağlantı hatası.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCancel(reason: OrderCancelReason, note: string) {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/kasa/pickup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "cancel",
+          orderId: order.id,
+          cancelReason: reason,
+          cancelNote: note,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "İptal edilemedi.");
+        return;
+      }
+      window.location.href = "/kasa/gel-al";
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -254,8 +283,22 @@ export default function PickupOrderPaymentClient({
             <span className="material-symbols-outlined text-[22px]">payments</span>
             {submitting ? "Kaydediliyor…" : `Ödemeyi al · Kapat (${formatTry(order.total)})`}
           </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => setCancelOpen(true)}
+            className="mt-2 w-full rounded-xl border border-error/30 py-2.5 text-sm font-semibold text-error"
+          >
+            Siparişi iptal et
+          </button>
         </div>
       </div>
+      <CancelOrderDialog
+        open={cancelOpen}
+        pending={submitting}
+        onClose={() => setCancelOpen(false)}
+        onConfirm={(reason, note) => void handleCancel(reason, note)}
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { parseTimeToMinutes } from "@/lib/business-hours";
 import { isValidCoordinate } from "@/lib/geo";
 import { MARKETPLACE_MIN_PRODUCT_COUNT } from "@/lib/fulfillment";
 import type { MarketplaceProfileInput } from "@/lib/marketplace";
@@ -11,7 +12,8 @@ export type MarketplaceChecklistKey =
   | "location"
   | "fulfillment"
   | "products"
-  | "public_menu";
+  | "public_menu"
+  | "hours";
 
 export type MarketplaceChecklistItem = {
   key: MarketplaceChecklistKey;
@@ -57,6 +59,7 @@ export const MARKETPLACE_CHECKLIST_ITEMS: MarketplaceChecklistItem[] = [
     navTab: "menu",
   },
   { key: "public_menu", label: "QR menü açık", shortLabel: "QR menü", target: "qr", navTab: "qr" },
+  { key: "hours", label: "Çalışma saati", shortLabel: "Saatler", target: "settings", navTab: "settings" },
 ];
 
 export function isMarketplaceChecklistItemComplete(
@@ -82,6 +85,8 @@ export function isMarketplaceChecklistItemComplete(
       return input.productCount >= MARKETPLACE_MIN_PRODUCT_COUNT;
     case "public_menu":
       return input.publicMenuEnabled !== false;
+    case "hours":
+      return parseTimeToMinutes(input.openTime) != null && parseTimeToMinutes(input.closeTime) != null;
     default:
       return false;
   }

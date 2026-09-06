@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  cancelKasaPickupOrder,
   closePickupOrderWithPayment,
   loadKasaPickupOrderDetail,
   loadKasaPickupOrders,
@@ -51,9 +52,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   let body: {
+    action?: string;
     orderId?: string;
     paymentMethod?: CheckoutPaymentMethod;
     mealCardBrandId?: MealCardBrandId;
+    cancelReason?: unknown;
+    cancelNote?: unknown;
   };
 
   try {
@@ -66,11 +70,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Sipariş gerekli." }, { status: 400 });
   }
 
-  const paymentMethod = body.paymentMethod;
-  if (!isCheckoutPaymentMethod(paymentMethod)) {
-    return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
-  }
-
   const auth = await getAuthenticatedCashierTenantByCookie();
   if (!auth.ok) {
     const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
@@ -80,6 +79,22 @@ export async function POST(request: Request) {
   const features = getKasaFeatures(auth.tenant);
   if (!features.pickup) {
     return NextResponse.json({ ok: false, error: "Gel-al siparişi kapalı." }, { status: 409 });
+  }
+
+  if (body.action === "cancel") {
+    const result = await cancelKasaPickupOrder({
+      tenantId: auth.tenant.id,
+      orderId: body.orderId,
+      reason: body.cancelReason,
+      note: body.cancelNote,
+    });
+    if (!result.ok) return NextResponse.json(result, { status: 400 });
+    return NextResponse.json(result);
+  }
+
+  const paymentMethod = body.paymentMethod;
+  if (!isCheckoutPaymentMethod(paymentMethod)) {
+    return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
   }
 
   const result = await closePickupOrderWithPayment({

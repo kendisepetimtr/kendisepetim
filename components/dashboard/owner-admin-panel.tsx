@@ -24,6 +24,8 @@ import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
 import { changeOwnerAdminPinAction, cancelAdminOrderAction } from "@/app/dashboard/admin/actions";
 import type { OwnerAdminPinActionState } from "@/app/dashboard/admin/actions";
+import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
+import type { OrderCancelReason } from "@/lib/order-cancel";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import {
@@ -536,6 +538,7 @@ export default function OwnerAdminPanel({
   const [ordersDayOffset, setOrdersDayOffset] = useState(0);
   const [openId, setOpenId] = useState<string | null>(initialOrders[0]?.id ?? null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const publicMenuHref = getPrimaryPublicMenuUrl(subdomain);
   const ownerBadge = ownerInitials(ownerName);
@@ -630,14 +633,20 @@ export default function OwnerAdminPanel({
   }, [sidebarOpen]);
 
   function cancelOrder(orderId: string) {
-    if (!window.confirm("Bu siparişi iptal etmek istediğinize emin misiniz?")) return;
+    setCancelOrderId(orderId);
+  }
+
+  function confirmCancelOrder(reason: OrderCancelReason, note: string) {
+    if (!cancelOrderId) return;
+    const orderId = cancelOrderId;
     startTransition(async () => {
       setStatusError(null);
-      const result = await cancelAdminOrderAction(orderId);
+      const result = await cancelAdminOrderAction(orderId, reason, note);
       if (result.error) {
         setStatusError(result.error);
         return;
       }
+      setCancelOrderId(null);
       router.refresh();
     });
   }
@@ -1285,6 +1294,12 @@ export default function OwnerAdminPanel({
           </div>
         </main>
       </div>
+      <CancelOrderDialog
+        open={cancelOrderId != null}
+        pending={pending}
+        onClose={() => setCancelOrderId(null)}
+        onConfirm={confirmCancelOrder}
+      />
     </div>
   );
 }

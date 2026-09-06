@@ -10,6 +10,10 @@ import { paymentMethodLabel } from "@/lib/tenant-payment";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useDashboardReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
+import { useUnseenOrderSlaAlert } from "@/lib/hooks/use-unseen-order-sla-alert";
+import { isOrderUnseenOverdue } from "@/lib/order-sla";
+import type { OrderCancelReason } from "@/lib/order-cancel";
 
 
 const CHANNEL_TABS: { id: OrderChannelFilter; label: string }[] = [
@@ -69,6 +73,15 @@ export default function DashboardOrdersList({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useUnseenOrderSlaAlert(orders, remoteAuthEnabled);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     if (!remoteAuthEnabled) {
@@ -105,6 +118,10 @@ export default function DashboardOrdersList({
   }, [load, refreshKey]);
 
   function handleStatusChange(orderId: string, status: OrderStatus) {
+    if (status === "cancelled") {
+      setCancelOrderId(orderId);
+      return;
+    }
     startTransition(async () => {
       const res = await fetch("/api/dashboard/orders", {
         method: "PATCH",
@@ -119,6 +136,39 @@ export default function DashboardOrdersList({
       }
       await load();
     });
+  }
+
+  function handleCancelConfirm(reason: OrderCancelReason, note: string) {
+    if (!cancelOrderId) return;
+    const orderId = cancelOrderId;
+    startTransition(async () => {
+      const res = await fetch("/api/dashboard/orders", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, status: "cancelled", cancelReason: reason, cancelNote: note }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        window.alert(data.error ?? "Güncellenemedi.");
+        return;
+      }
+      setCancelOrderId(null);
+      await load();
+    });
+  }
+
+  async function handleToggleOpen(orderId: string, expanded: boolean) {
+    const next = expanded ? null : orderId;
+    setOpenId(next);
+    if (!expanded) {
+      void fetch("/api/dashboard/orders", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, action: "seen" }),
+      }).then(() => void load());
+    }
   }
 
   if (!remoteAuthEnabled) {
@@ -179,14 +229,23 @@ export default function DashboardOrdersList({
           {orders.map((o) => {
             const expanded = openId === o.id;
             const canUpdate = o.status !== "completed" && o.status !== "cancelled";
+            const overdue = isOrderUnseenOverdue({
+              status: o.status,
+              createdAt: o.createdAt,
+              seenAt: o.seenAt,
+              now: nowTick,
+            });
             return (
               <li
                 key={o.id}
-                className="overflow-hidden rounded-2xl border border-surface-container-highest bg-surface-container-lowest shadow-sm"
+                className={[
+                  "overflow-hidden rounded-2xl border bg-surface-container-lowest shadow-sm",
+                  overdue ? "border-error/50" : "border-surface-container-highest",
+                ].join(" ")}
               >
                 <button
                   type="button"
-                  onClick={() => setOpenId(expanded ? null : o.id)}
+                  onClick={() => void handleToggleOpen(o.id, expanded)}
                   className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left hover:bg-surface-container-low/80"
                 >
                   <div className="min-w-0">
@@ -195,6 +254,11 @@ export default function DashboardOrdersList({
                       {o.dailyNumber ? (
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                           {o.dailyNumber}.
+                        </span>
+                      ) : null}
+                      {overdue ? (
+                        <span className="rounded-full bg-error px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                          Cevap yok
                         </span>
                       ) : null}
                       <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-semibold uppercase text-secondary">
@@ -317,6 +381,12 @@ export default function DashboardOrdersList({
           })}
         </ul>
       )}
+      <CancelOrderDialog
+        open={cancelOrderId != null}
+        pending={pending}
+        onClose={() => setCancelOrderId(null)}
+        onConfirm={handleCancelConfirm}
+      />
     </div>
   );
 }

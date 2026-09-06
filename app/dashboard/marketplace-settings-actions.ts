@@ -74,6 +74,8 @@ export async function getMarketplaceQualityForOwnerAction(): Promise<
       fulfillmentPickupEnabled: row.fulfillment_pickup_enabled !== false,
       fulfillmentDeliveryEnabled: row.fulfillment_delivery_enabled === true,
       productCount,
+      openTime: row.open_time ?? "",
+      closeTime: row.close_time ?? "",
     };
 
     return {

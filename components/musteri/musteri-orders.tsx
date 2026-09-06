@@ -6,7 +6,9 @@ import type { MusteriOrderView } from "@/lib/musteri/orders-service";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { DELIVERY_STATUS_LABELS } from "@/lib/delivery-status";
 import { fulfillmentTypeLabel } from "@/lib/fulfillment";
-import { MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
+import { customerOrderPath, MUSTERI_HOME_PATH } from "@/lib/musteri/paths";
+import { formatDailyOrderLabel } from "@/lib/order-daily-number";
+import { formatCancelReasonForCustomer, isOrderCancelReason } from "@/lib/order-cancel";
 
 type Props = {
   accountOrders: MusteriOrderView[];
@@ -64,35 +66,51 @@ export default function MusteriOrders({ accountOrders }: Props) {
         </div>
       ) : (
         <ul className="space-y-4">
-          {accountOrders.map((o) => (
+          {accountOrders.map((o) => {
+            const cancelled = o.status === "cancelled" || o.deliveryStatus === "cancelled";
+            const dailyLabel =
+              o.dailyNumber != null && o.fulfillmentType
+                ? formatDailyOrderLabel(o.dailyNumber, o.fulfillmentType)
+                : undefined;
+            return (
             <li
               key={o.id}
               className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4"
             >
+              <Link href={customerOrderPath(o.id)} className="block">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-headline text-base font-bold text-on-background">{o.restaurantName}</p>
                   <p className="mt-0.5 text-xs text-secondary">
-                    {o.orderCode} · {formatWhen(o.createdAt)}
+                    {o.orderCode}
+                    {dailyLabel ? ` · ${dailyLabel}` : ""} · {formatWhen(o.createdAt)}
                   </p>
                 </div>
                 <p className="text-sm font-bold text-on-background">{money(o.total)}</p>
               </div>
               <p className="mt-2 text-xs font-semibold text-primary">
-                {o.deliveryStatus
-                  ? DELIVERY_STATUS_LABELS[o.deliveryStatus]
-                  : ORDER_STATUS_LABELS[o.status]}
+                {cancelled
+                  ? "İptal edildi"
+                  : o.deliveryStatus
+                    ? DELIVERY_STATUS_LABELS[o.deliveryStatus]
+                    : ORDER_STATUS_LABELS[o.status]}
                 {o.fulfillmentType ? ` · ${fulfillmentTypeLabel(o.fulfillmentType)}` : ""}
               </p>
-              {o.addressLine !== "—" ? (
-                <p className="mt-1 text-xs text-secondary">{o.addressLine}</p>
-              ) : null}
-
-              <OrderTrackTimeline
-                status={o.status}
-                deliveryStatus={o.deliveryStatus}
-                fulfillmentIsDelivery={o.fulfillmentType === "delivery"}
-              />
+              {cancelled ? (
+                <p className="mt-1 text-xs text-error">
+                  {formatCancelReasonForCustomer(
+                    isOrderCancelReason(o.cancelReason) ? o.cancelReason : undefined,
+                    o.cancelNote,
+                  )}
+                </p>
+              ) : (
+                <OrderTrackTimeline
+                  status={o.status}
+                  deliveryStatus={o.deliveryStatus}
+                  fulfillmentIsDelivery={o.fulfillmentType === "delivery"}
+                />
+              )}
+              </Link>
 
               {o.lines.length > 0 ? (
                 <ul className="mt-3 space-y-1 border-t border-surface-container-highest pt-3">
@@ -117,7 +135,8 @@ export default function MusteriOrders({ accountOrders }: Props) {
                 </a>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

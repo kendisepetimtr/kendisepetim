@@ -146,6 +146,23 @@ export async function superadminSetPublicMenu(tenantId: string, enabled: boolean
   return {};
 }
 
+export async function superadminSetVitrin(tenantId: string, approved: boolean): Promise<{ error?: string }> {
+  if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
+  const svc = await guardAndService();
+  const { error } = await svc
+    .from("tenants")
+    .update({ marketplace_vitrin_approved: approved })
+    .eq("id", tenantId);
+  if (error) return { error: error.message };
+  revalidateSuperadminPaths();
+  revalidatePath("/restoranlar");
+  revalidatePath("/kesfet");
+  revalidatePath("/musteri");
+  revalidatePath("/isletme");
+  revalidatePath("/");
+  return {};
+}
+
 export async function superadminSetMarketplace(tenantId: string, enabled: boolean): Promise<{ error?: string }> {
   if (!isUuid(tenantId)) return { error: "Geçersiz kayıt." };
   const svc = await guardAndService();
@@ -199,6 +216,7 @@ export async function superadminRejectApplication(
       dashboard_enabled: false,
       public_menu_enabled: false,
       marketplace_enabled: false,
+      marketplace_vitrin_approved: false,
       rejected_reason: reason.trim().slice(0, 500),
     })
     .eq("id", tenantId);

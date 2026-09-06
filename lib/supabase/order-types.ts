@@ -33,6 +33,9 @@ export type OrderRow = {
   delivery_status: DeliveryStatus | null;
   customer_user_id?: string | null;
   daily_number?: number | null;
+  seen_at?: string | null;
+  cancel_reason?: string | null;
+  cancel_note?: string | null;
 };
 
 export type OrderLineRow = {

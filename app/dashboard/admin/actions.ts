@@ -1,6 +1,5 @@
 "use server";
 
-import { writeActivityLog } from "@/lib/activity-log";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
@@ -13,6 +12,7 @@ import {
 } from "@/lib/owner-admin/session";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import { revalidatePath } from "next/cache";
+import { cancelKitchenOrder } from "@/lib/kitchen-orders";
 
 export type OwnerAdminPinActionState =
   | {
@@ -124,7 +124,11 @@ export async function changeOwnerAdminPinAction(
   return { success: "PIN başarıyla güncellendi." };
 }
 
-export async function cancelAdminOrderAction(orderId: string): Promise<{ error?: string }> {
+export async function cancelAdminOrderAction(
+  orderId: string,
+  reason?: unknown,
+  note?: unknown,
+): Promise<{ error?: string }> {
   if (!orderId) {
     return { error: "Geçersiz sipariş." };
   }
@@ -138,47 +142,16 @@ export async function cancelAdminOrderAction(orderId: string): Promise<{ error?:
   }
 
   const svc = createServiceSupabaseClient();
-  const { data: existing, error: findErr } = await svc
-    .from("orders")
-    .select("id, order_code, status, fulfillment_type")
-    .eq("id", orderId)
-    .eq("tenant_id", tenant.id)
-    .maybeSingle();
-
-  if (findErr || !existing) {
-    return { error: "Sipariş bulunamadı." };
-  }
-  if (existing.status === "cancelled") {
-    return { error: "Sipariş zaten iptal edilmiş." };
-  }
-  if (existing.status === "completed") {
-    return { error: "Tamamlanmış sipariş iptal edilemez." };
-  }
-
-  const { error } = await svc
-    .from("orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId)
-    .eq("tenant_id", tenant.id);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  await writeActivityLog({
-    tenant_id: tenant.id,
-    actor_type: "admin",
-    actor_label: tenant.owner_name || "Admin",
-    action: "order_cancelled",
-    entity_type: "order",
-    entity_id: orderId,
-    order_code: existing.order_code as string,
-    metadata: {
-      from: existing.status,
-      fulfillment_type: existing.fulfillment_type,
-      panel: "admin",
-    },
+  const result = await cancelKitchenOrder(svc, {
+    tenantId: tenant.id,
+    orderId,
+    reason,
+    note,
+    actorType: "admin",
+    actorLabel: tenant.owner_name || "Admin",
+    panel: "admin",
   });
+  if (!result.ok) return { error: result.error };
 
   revalidatePath("/admin");
   return {};

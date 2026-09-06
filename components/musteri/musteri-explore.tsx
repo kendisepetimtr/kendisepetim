@@ -166,15 +166,25 @@ export default function MusteriExplore({ initialListings, isCustomer = false }: 
         <div className="rounded-2xl border border-dashed border-surface-container-highest bg-surface-container-low/40 px-6 py-16 text-center">
           <p className="font-headline text-lg font-bold text-on-background">Yakında restoran eklenecek</p>
           <p className="mt-2 text-sm text-secondary">Muratpaşa’daki mutfaklar burada listelenecek.</p>
+          <a href="/kayit" className="mt-4 inline-flex font-bold text-primary">
+            Restoranını kaydet
+          </a>
         </div>
       ) : emptyFiltered ? (
         <div className="rounded-2xl border border-dashed border-surface-container-highest bg-surface-container-low/40 px-6 py-16 text-center">
-          <p className="font-headline text-lg font-bold text-on-background">Yakında restoran eklenecek</p>
-          <p className="mt-2 text-sm text-secondary">
-            {geoStatus === "ok"
-              ? "Konumunuza göre teslimat alanında restoran yok. Filtreleri değiştirin veya biraz sonra tekrar bakın."
-              : "Filtreleri değiştirin veya yakında yeni restoranlar eklenecek."}
+          <p className="font-headline text-lg font-bold text-on-background">
+            {neighborhood ? "Bu mahallede henüz restoran yok" : "Yakında restoran eklenecek"}
           </p>
+          <p className="mt-2 text-sm text-secondary">
+            {neighborhood
+              ? "Filtreyi değiştirin veya mutfağınızı Kendi Sepetim’e ekleyin."
+              : geoStatus === "ok"
+                ? "Konumunuza göre teslimat alanında restoran yok. Filtreleri değiştirin veya biraz sonra tekrar bakın."
+                : "Filtreleri değiştirin veya yakında yeni restoranlar eklenecek."}
+          </p>
+          <a href="/kayit" className="mt-4 inline-flex font-bold text-primary">
+            Restoranını kaydet
+          </a>
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

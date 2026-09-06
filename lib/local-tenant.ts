@@ -54,6 +54,8 @@ export type LocalTenantProfile = {
   paymentMealCardBrands: MealCardBrandId[];
   /** Marketplace vitrininde listelenir (opt-in) */
   marketplaceEnabled: boolean;
+  /** Superadmin keşif onayı */
+  marketplaceVitrinApproved: boolean;
   /** free | premium | lifetime — superadmin / ödeme */
   plan: "free" | "premium" | "lifetime";
   /** Ücretsiz deneme bitiş ISO; null = yok */
@@ -107,6 +109,7 @@ export function saveLocalTenant(
     paymentMealCard: data.paymentMealCard === true,
     paymentMealCardBrands: parseMealCardBrandIds(data.paymentMealCardBrands),
     marketplaceEnabled: data.marketplaceEnabled === true,
+    marketplaceVitrinApproved: data.marketplaceVitrinApproved === true,
     plan: normalizeTenantPlan(data.plan),
     trialEndsAt:
       typeof data.trialEndsAt === "string" && data.trialEndsAt.trim()
@@ -187,6 +190,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
     const paymentMealCardBrands = parseMealCardBrandIds(p.paymentMealCardBrands);
 
     const marketplaceEnabled = p.marketplaceEnabled === true;
+    const marketplaceVitrinApproved = p.marketplaceVitrinApproved === true;
     const plan = normalizeTenantPlan(p.plan);
     const trialEndsAt =
       typeof p.trialEndsAt === "string" && p.trialEndsAt.trim() ? p.trialEndsAt : null;
@@ -229,6 +233,7 @@ export function getLocalTenant(): LocalTenantProfile | null {
       paymentMealCard,
       paymentMealCardBrands,
       marketplaceEnabled,
+      marketplaceVitrinApproved,
       plan,
       trialEndsAt,
       city,

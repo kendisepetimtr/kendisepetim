@@ -2,10 +2,10 @@
 
 import {
   ORDER_TRACK_STAGES,
-  ORDER_TRACK_STAGE_LABELS,
   stageFromDeliveryStatus,
   stageFromOrderStatus,
   stageIndex,
+  trackStageLabel,
   type OrderTrackStage,
 } from "@/lib/musteri/order-tracking";
 import type { DeliveryStatus } from "@/lib/fulfillment";
@@ -60,7 +60,7 @@ export default function OrderTrackTimeline({ status, deliveryStatus, fulfillment
                 active ? "text-primary" : idx <= currentIdx ? "text-on-background" : "text-secondary",
               ].join(" ")}
             >
-              {ORDER_TRACK_STAGE_LABELS[stage]}
+              {trackStageLabel(stage, fulfillmentIsDelivery)}
             </span>
           </li>
         );

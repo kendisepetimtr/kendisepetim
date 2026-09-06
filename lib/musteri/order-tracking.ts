@@ -18,12 +18,22 @@ export const ORDER_TRACK_STAGE_LABELS: Record<OrderTrackStage, string> = {
   delivered: "Teslim",
 };
 
+export const ORDER_TRACK_PICKUP_STAGE_LABELS: Record<OrderTrackStage, string> = {
+  ...ORDER_TRACK_STAGE_LABELS,
+  ready: "Gel alabilirsiniz",
+};
+
 export const ORDER_TRACK_STAGE_MESSAGES: Record<OrderTrackStage, string> = {
   received: "Siparişiniz restorana ulaştı.",
   preparing: "Siparişiniz hazırlanıyor.",
   ready: "Siparişiniz hazır.",
   on_the_way: "Siparişiniz yola çıktı.",
   delivered: "Siparişiniz teslim edildi. Afiyet olsun!",
+};
+
+export const ORDER_TRACK_PICKUP_STAGE_MESSAGES: Record<OrderTrackStage, string> = {
+  ...ORDER_TRACK_STAGE_MESSAGES,
+  ready: "Siparişiniz gel almaya hazır.",
 };
 
 export type OrderEtaMode = "total" | "stages";
@@ -130,4 +140,24 @@ export function stageFromOrderStatus(status: string | null | undefined): OrderTr
 
 export function stageIndex(stage: OrderTrackStage): number {
   return ORDER_TRACK_STAGES.indexOf(stage);
+}
+
+export function trackStageLabel(
+  stage: OrderTrackStage,
+  fulfillmentIsDelivery: boolean,
+): string {
+  return fulfillmentIsDelivery ? ORDER_TRACK_STAGE_LABELS[stage] : ORDER_TRACK_PICKUP_STAGE_LABELS[stage];
+}
+
+export function trackStageMessage(
+  stage: OrderTrackStage,
+  fulfillmentIsDelivery: boolean,
+): string {
+  return fulfillmentIsDelivery
+    ? ORDER_TRACK_STAGE_MESSAGES[stage]
+    : ORDER_TRACK_PICKUP_STAGE_MESSAGES[stage];
+}
+
+export function listingEtaMinutesFromTenant(row: Record<string, unknown> | null | undefined): number {
+  return parseOrderEtaFromTenant(row).totalMinutes;
 }

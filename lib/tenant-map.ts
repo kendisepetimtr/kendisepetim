@@ -39,6 +39,7 @@ export function tenantRowToLocalProfile(row: TenantRow): LocalTenantProfile {
       row.payment_meal_card_brands,
     ),
     marketplaceEnabled: row.marketplace_enabled === true,
+    marketplaceVitrinApproved: row.marketplace_vitrin_approved === true,
     plan: normalizeTenantPlan(row.plan),
     trialEndsAt: row.trial_ends_at?.trim() ? row.trial_ends_at : null,
     city: row.city ?? "",

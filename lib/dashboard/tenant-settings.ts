@@ -37,6 +37,7 @@ const TENANT_SETTINGS_COLUMNS = [
   "payment_meal_card",
   "payment_meal_card_brands",
   "marketplace_enabled",
+  "marketplace_vitrin_approved",
   "city",
   "district",
   "neighborhood",

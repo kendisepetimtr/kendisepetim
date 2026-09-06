@@ -100,10 +100,7 @@ export default function RestaurantCard({ listing, distanceKm = null, isCustomer 
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-headline text-base font-bold text-on-background">{listing.businessName}</h3>
-            <p className="mt-0.5 text-xs text-secondary">
-              {listing.neighborhood}
-              {distanceKm != null ? ` · ${formatDistanceKm(distanceKm)}` : ""}
-            </p>
+            <p className="mt-0.5 text-xs text-secondary">{listing.neighborhood}</p>
           </div>
         </div>
 
@@ -120,21 +117,37 @@ export default function RestaurantCard({ listing, distanceKm = null, isCustomer 
           </div>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-secondary">
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-secondary">
+          {listing.etaMinutes != null && listing.etaMinutes > 0 ? (
+            <span className="rounded-full bg-surface-container-low px-2 py-0.5">~{listing.etaMinutes} dk</span>
+          ) : null}
           {listing.minOrderAmount != null && listing.minOrderAmount > 0 ? (
-            <span>Min. {formatTry(listing.minOrderAmount)}</span>
+            <span className="rounded-full bg-surface-container-low px-2 py-0.5">
+              Min. {formatTry(listing.minOrderAmount)}
+            </span>
           ) : null}
           {listing.fulfillmentDeliveryEnabled ? (
-            <span>Teslimat {listing.deliveryRadiusKm} km</span>
+            <span className="rounded-full bg-surface-container-low px-2 py-0.5">Paket</span>
           ) : null}
-          {listing.fulfillmentPickupEnabled ? <span>Gel-al</span> : null}
+          {listing.fulfillmentPickupEnabled ? (
+            <span className="rounded-full bg-surface-container-low px-2 py-0.5">Gel-al</span>
+          ) : null}
+          {distanceKm != null ? (
+            <span className="rounded-full bg-surface-container-low px-2 py-0.5">{formatDistanceKm(distanceKm)}</span>
+          ) : null}
         </div>
+
+        {listing.signatureDishName && listing.signatureDishPrice != null ? (
+          <p className="mt-2 text-[11px] text-secondary">
+            {listing.signatureDishName} · {formatTry(listing.signatureDishPrice)}
+          </p>
+        ) : null}
 
         <Link
           href={menuUrl}
           className="mt-4 inline-flex w-full items-center justify-center gap-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-container"
         >
-          {listing.isOpen ? "Menüye git" : "Şu an kapalı, menüye bak"}
+          {listing.isOpen ? "Menüye git" : "Şu an sipariş yok, menüye bak"}
           <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
         </Link>
       </div>

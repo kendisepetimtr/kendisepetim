@@ -5,6 +5,7 @@ import {
   superadminRejectApplication,
   superadminResetTenantPassword,
   superadminSetMarketplace,
+  superadminSetVitrin,
   superadminSetDashboard,
   superadminSetOwnerAdminPin,
   superadminSetPlan,
@@ -12,7 +13,12 @@ import {
   superadminSetTrialEndsAt,
   superadminUpdateSubdomain,
 } from "@/app/superadmin/actions";
-import { APPLICATION_STATUS_LABELS, parseApplicationStatus } from "@/lib/partner/status";
+import { APPLICATION_STATUS_LABELS, parseApplicationStatus, isApplicationApproved } from "@/lib/partner/status";
+import {
+  getMarketplaceDiscoverBlockers,
+  getMarketplaceQualityIssues,
+  type MarketplaceProfileInput,
+} from "@/lib/marketplace";
 import type { TenantPlan, TenantRow } from "@/lib/supabase/tenant-types";
 import {
   getTenantAccessTier,
@@ -194,6 +200,7 @@ export default function SuperadminTenantCards({
                           <TrialBadge tenant={t} />
                           <Badge active={t.public_menu_enabled} label="QR" />
                           <Badge active={t.marketplace_enabled} label="Market" />
+                          <Badge active={t.marketplace_vitrin_approved === true} label="Vitrin" />
                           <Badge active={t.dashboard_enabled} label="Panel" />
                           <Badge
                             active={parseApplicationStatus(t.application_status) === "approved"}
@@ -412,11 +419,19 @@ function TenantAccordionBody({
           />
           <ToggleRow
             id={`${baseId}-market`}
-            label="Marketplace"
-            description="Keşfet / restoranlar listesinde görünürlük"
+            label="Marketplace isteği"
+            description="İşletme pazaryerinde yayınlanmak istiyor (QR menüden bağımsız)"
             checked={t.marketplace_enabled}
             disabled={pending}
             onChange={() => run(superadminSetMarketplace(t.id, !t.marketplace_enabled))}
+          />
+          <ToggleRow
+            id={`${baseId}-vitrin`}
+            label="Keşif vitrin onayı"
+            description="Açıkken Keşfet / Restoranlar listesinde görünür"
+            checked={t.marketplace_vitrin_approved === true}
+            disabled={pending}
+            onChange={() => run(superadminSetVitrin(t.id, t.marketplace_vitrin_approved !== true))}
           />
           <ToggleRow
             id={`${baseId}-panel`}
@@ -427,6 +442,24 @@ function TenantAccordionBody({
             onChange={() => run(superadminSetDashboard(t.id, !t.dashboard_enabled))}
           />
         </div>
+        {(() => {
+          const blockers = superadminVitrinBlockers(t);
+          if (blockers.length === 0) {
+            return (
+              <p className="mt-2 text-xs font-medium text-emerald-800">Keşif vitrininde yayında.</p>
+            );
+          }
+          return (
+            <div className="mt-2 rounded-xl border border-amber-500/30 bg-amber-50 px-3 py-2">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-950">Keşifte değil</p>
+              <ul className="mt-1 list-disc pl-4 text-xs text-amber-950">
+                {blockers.map((b) => (
+                  <li key={b.key}>{b.label}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
       </Section>
 
       <Section title="Kimlik / plan" hint="Subdomain, paket, deneme süresi ve patron PIN">
@@ -622,6 +655,33 @@ function ToggleSwitch({
       />
     </button>
   );
+}
+
+function superadminVitrinBlockers(t: TenantRow) {
+  const profile: MarketplaceProfileInput = {
+    marketplaceEnabled: t.marketplace_enabled === true,
+    city: t.city ?? "",
+    district: t.district ?? "",
+    neighborhood: t.neighborhood ?? "",
+    cuisineTags: t.cuisine_tags ?? [],
+    latitude: t.latitude ?? null,
+    longitude: t.longitude ?? null,
+    coverImageUrl: t.cover_image_url ?? "",
+    logoUrl: t.logo_url ?? "",
+    publicDescription: t.public_description ?? "",
+    publicMenuEnabled: t.public_menu_enabled !== false,
+    fulfillmentPickupEnabled: t.fulfillment_pickup_enabled !== false,
+    fulfillmentDeliveryEnabled: t.fulfillment_delivery_enabled === true,
+    productCount: 99,
+    openTime: t.open_time ?? "",
+    closeTime: t.close_time ?? "",
+  };
+  return getMarketplaceDiscoverBlockers({
+    qualityIssues: getMarketplaceQualityIssues(profile).filter((i) => i.key !== "products"),
+    marketplaceEnabled: t.marketplace_enabled === true,
+    vitrinApproved: t.marketplace_vitrin_approved === true,
+    applicationApproved: isApplicationApproved(t.application_status),
+  });
 }
 
 function Badge({ label, active }: { label: string; active: boolean }) {

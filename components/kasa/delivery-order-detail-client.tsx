@@ -22,6 +22,8 @@ import {
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
 import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
+import type { OrderCancelReason } from "@/lib/order-cancel";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -55,6 +57,7 @@ export default function DeliveryOrderDetailClient({
     order.paymentMethod === "meal_card" && order.mealCardBrandId ? order.mealCardBrandId : "",
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const { printOrder, printOrderIfAuto } = useKasaReceiptPrint(businessName, subdomain);
 
   const currentDeliveryStatus = order.deliveryStatus ?? "pending";
@@ -219,7 +222,10 @@ export default function DeliveryOrderDetailClient({
     }
   }
 
-  async function handleStatusUpdate(status: DeliveryStatus) {
+  async function handleStatusUpdate(
+    status: DeliveryStatus,
+    cancel?: { reason: OrderCancelReason; note: string },
+  ) {
     setBusy(`status-${status}`);
     try {
       const res = await fetch("/api/kasa/delivery", {
@@ -229,6 +235,8 @@ export default function DeliveryOrderDetailClient({
           action: "update-status",
           orderId: order.id,
           deliveryStatus: status,
+          cancelReason: cancel?.reason,
+          cancelNote: cancel?.note,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
@@ -427,6 +435,14 @@ export default function DeliveryOrderDetailClient({
                 {DELIVERY_STATUS_LABELS[status]}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={busy != null}
+              onClick={() => setCancelOpen(true)}
+              className="min-h-11 rounded-xl border border-error/30 px-3 py-2 text-xs font-semibold text-error"
+            >
+              İptal
+            </button>
           </div>
         </section>
 
@@ -463,6 +479,12 @@ export default function DeliveryOrderDetailClient({
           </button>
         </div>
       </div>
+      <CancelOrderDialog
+        open={cancelOpen}
+        pending={busy != null}
+        onClose={() => setCancelOpen(false)}
+        onConfirm={(reason, note) => void handleStatusUpdate("cancelled", { reason, note })}
+      />
     </div>
   );
 }

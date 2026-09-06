@@ -19,7 +19,7 @@ import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/lo
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
 import type { CustomerSavedAddress } from "@/lib/musteri/customer-profile";
 import type { MusteriCheckoutContextResponse } from "@/app/api/musteri/checkout-context/route";
-import { MUSTERI_ADDRESSES_PATH } from "@/lib/musteri/paths";
+import { customerOrderPath, MUSTERI_ADDRESSES_PATH, MUSTERI_LOGIN_PATH } from "@/lib/musteri/paths";
 import { getOAuthSiteBase } from "@/lib/site-url";
 import type { LocalMenuProduct } from "@/lib/local-menu";
 import { formatSelectedVariationLabels } from "@/lib/menu-variations";
@@ -130,6 +130,7 @@ export default function CartCheckoutModal({
   const [loggedInCustomer, setLoggedInCustomer] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<CustomerSavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [guestSuccess, setGuestSuccess] = useState<{ orderCode: string; table: boolean } | null>(null);
 
   const customerPoint = useMemo(
     () => asGeoPoint(customerLatitude, customerLongitude),
@@ -565,6 +566,7 @@ export default function CartCheckoutModal({
       const result = (await response.json()) as {
         ok?: boolean;
         orderCode?: string;
+        orderId?: string;
         error?: string;
       };
 
@@ -619,12 +621,11 @@ export default function CartCheckoutModal({
       );
 
       setCart({});
-      onClose();
-      window.alert(
-        isTableOrder
-          ? `Siparişiniz masaya iletildi.\nNo: ${result.orderCode}\nÖdeme restoranda alınacaktır.`
-          : `Siparişiniz alındı.\nNo: ${result.orderCode}\nÖdeme: ${paymentMethodLabel(resolvedPayMethod, mealBrand || undefined)}`,
-      );
+      if (loggedInCustomer && result.orderId && !isWaiterOrder && !isCashierOrder) {
+        window.location.href = customerOrderPath(result.orderId);
+        return;
+      }
+      setGuestSuccess({ orderCode: result.orderCode, table: isTableOrder });
     } catch {
       window.alert("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
     } finally {
@@ -635,6 +636,47 @@ export default function CartCheckoutModal({
   if (!open) return null;
 
   const title = step === "cart" ? t("cartTitle") : t("checkoutTitle");
+
+  if (guestSuccess) {
+    return (
+      <div className="fixed inset-0 z-[190] flex items-end justify-center p-0 sm:items-center sm:p-6">
+        <button type="button" className="absolute inset-0 bg-on-background/50" aria-label="Kapat" onClick={() => {
+          setGuestSuccess(null);
+          onClose();
+        }} />
+        <div className="relative z-10 w-full max-w-md rounded-t-3xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-2xl sm:rounded-2xl">
+          <p className="text-sm font-bold text-primary">Sipariş alındı</p>
+          <p className="mt-2 font-headline text-2xl font-extrabold">{guestSuccess.orderCode}</p>
+          <p className="mt-2 text-sm text-secondary">
+            {guestSuccess.table
+              ? "Sipariş masaya iletildi. Ödeme restoranda alınacaktır."
+              : "Restoran siparişinizi hazırlamaya başlayacak."}
+          </p>
+          <p className="mt-3 text-xs text-secondary">
+            Canlı takip için hesapla giriş yapın. Misafir siparişinde yalnızca bu özet görünür.
+          </p>
+          <div className="mt-5 flex flex-col gap-2">
+            <a
+              href={MUSTERI_LOGIN_PATH}
+              className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white"
+            >
+              Giriş yap
+            </a>
+            <button
+              type="button"
+              className="rounded-xl border border-surface-container-highest px-4 py-2.5 text-sm font-semibold"
+              onClick={() => {
+                setGuestSuccess(null);
+                onClose();
+              }}
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

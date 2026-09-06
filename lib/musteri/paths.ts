@@ -2,6 +2,9 @@
 
 export const MUSTERI_HOME_PATH = "/musteri";
 export const MUSTERI_ORDERS_PATH = "/musteri/siparisler";
+export function customerOrderPath(orderId: string): string {
+  return `${MUSTERI_ORDERS_PATH}/${orderId}`;
+}
 export const MUSTERI_FAVORITES_PATH = "/musteri/favoriler";
 export const MUSTERI_ADDRESSES_PATH = "/musteri/adresler";
 export const MUSTERI_ACCOUNT_PATH = "/musteri/hesap";

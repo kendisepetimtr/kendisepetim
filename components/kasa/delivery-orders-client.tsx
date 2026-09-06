@@ -16,6 +16,8 @@ import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
 import type { CourierRow } from "@/lib/supabase/courier-types";
 import { paymentMethodLabel, type TenantPaymentFlags } from "@/lib/tenant-payment";
+import { useUnseenOrderSlaAlert } from "@/lib/hooks/use-unseen-order-sla-alert";
+import { isOrderUnseenOverdue } from "@/lib/order-sla";
 
 const REFRESH_ON_ACTIONS = ["order_created", "payment_closed", "delivery_status_updated", "courier_assigned"];
 
@@ -54,6 +56,8 @@ export default function DeliveryOrdersClient({
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderOpen, setOrderOpen] = useState(false);
+
+  useUnseenOrderSlaAlert(tab === "active" ? orders : []);
 
   const refreshActive = useCallback(async () => {
     setError(null);
@@ -187,6 +191,13 @@ export default function DeliveryOrdersClient({
                 tab === "history" && order.paymentMethodAtClose
                   ? paymentMethodLabel(order.paymentMethodAtClose, order.mealCardBrandId)
                   : paymentMethodLabel(order.paymentMethod, order.mealCardBrandId);
+              const overdue =
+                tab === "active" &&
+                isOrderUnseenOverdue({
+                  status: order.status,
+                  createdAt: order.createdAt,
+                  seenAt: order.seenAt,
+                });
               return (
                 <li key={order.id}>
                   <Link
@@ -195,13 +206,21 @@ export default function DeliveryOrdersClient({
                         ? `/kasa/paket/${order.id}?view=history`
                         : `/kasa/paket/${order.id}`
                     }
-                    className="flex flex-col gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between"
+                    className={[
+                      "flex flex-col gap-3 rounded-2xl border bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between",
+                      overdue ? "border-error/50" : "border-surface-container-highest",
+                    ].join(" ")}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-lg font-black text-on-background">
                           {order.orderCode}
                         </span>
+                        {overdue ? (
+                          <span className="rounded-full bg-error px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                            Cevap yok
+                          </span>
+                        ) : null}
                         <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-900">
                           {deliveryLabel}
                         </span>

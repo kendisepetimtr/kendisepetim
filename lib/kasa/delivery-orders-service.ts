@@ -1,4 +1,6 @@
 import { writeActivityLog } from "@/lib/activity-log";
+import { cancelKitchenOrder, markOrderSeenIfNeeded } from "@/lib/kitchen-orders";
+import { compareKitchenUrgency } from "@/lib/order-sla";
 import { buildAdminOrders } from "@/lib/order-map";
 import type { DeliveryStatus } from "@/lib/fulfillment";
 import type { AdminOrder } from "@/lib/orders";
@@ -99,13 +101,12 @@ export async function loadKasaDeliveryOrders(
       return { ok: false, error: lineErr.message };
     }
 
-    return {
-      ok: true,
-      orders: await enrichDeliveryOrdersWithCouriers(
-        tenantId,
-        buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]),
-      ),
-    };
+    const orders = await enrichDeliveryOrdersWithCouriers(
+      tenantId,
+      buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]),
+    );
+    orders.sort(compareKitchenUrgency);
+    return { ok: true, orders };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Paket siparişleri yüklenemedi." };
   }
@@ -217,15 +218,19 @@ export async function loadKasaDeliveryOrderDetail(
       return { ok: false, error: "Sipariş zaten kapatılmış." };
     }
 
+    const svc = createServiceSupabaseClient();
+    await markOrderSeenIfNeeded(svc, tenantId, orderId);
+    const refreshed = (await loadOrderWithLines(tenantId, orderId)) ?? order;
+
     const couriersResult = await loadActiveCouriers(tenantId);
     if (!couriersResult.ok) {
       return couriersResult;
     }
 
-    const [enriched] = await enrichDeliveryOrdersWithCouriers(tenantId, [order]);
+    const [enriched] = await enrichDeliveryOrdersWithCouriers(tenantId, [refreshed]);
     return {
       ok: true,
-      order: enriched ?? order,
+      order: enriched ?? refreshed,
       couriers: couriersResult.couriers,
       open: true,
       courierName: enriched?.courierName ?? null,
@@ -333,6 +338,8 @@ export async function updateDeliveryOrderStatus(input: {
   tenantId: string;
   orderId: string;
   deliveryStatus: DeliveryStatus;
+  cancelReason?: unknown;
+  cancelNote?: unknown;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const allowed: DeliveryStatus[] = [
     "pending",
@@ -345,6 +352,19 @@ export async function updateDeliveryOrderStatus(input: {
     return { ok: false, error: "Geçersiz teslimat durumu." };
   }
 
+  if (input.deliveryStatus === "cancelled") {
+    const svc = createServiceSupabaseClient();
+    return cancelKitchenOrder(svc, {
+      tenantId: input.tenantId,
+      orderId: input.orderId,
+      reason: input.cancelReason,
+      note: input.cancelNote,
+      actorType: "cashier",
+      actorLabel: "Kasa",
+      panel: "kasa-delivery",
+    });
+  }
+
   const detail = await loadKasaDeliveryOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -355,8 +375,8 @@ export async function updateDeliveryOrderStatus(input: {
     const orderUpdate: Record<string, unknown> = {
       delivery_status: input.deliveryStatus,
     };
-    if (input.deliveryStatus === "cancelled") {
-      orderUpdate.status = "cancelled";
+    if (!detail.order.seenAt) {
+      orderUpdate.seen_at = new Date().toISOString();
     }
 
     const { error } = await svc
@@ -374,7 +394,7 @@ export async function updateDeliveryOrderStatus(input: {
       tenant_id: input.tenantId,
       actor_type: "cashier",
       actor_label: "Kasa",
-      action: input.deliveryStatus === "cancelled" ? "order_cancelled" : "delivery_status_updated",
+      action: "delivery_status_updated",
       entity_type: "order",
       entity_id: input.orderId,
       order_code: detail.order.orderCode,

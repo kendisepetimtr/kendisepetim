@@ -8,6 +8,7 @@ import {
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
+import { parseOrderEtaFromTenant } from "@/lib/musteri/order-tracking";
 import { isApplicationApproved } from "@/lib/partner/status";
 import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
@@ -30,6 +31,8 @@ function tenantToProfileInput(
     fulfillmentPickupEnabled: tenant.fulfillment_pickup_enabled !== false,
     fulfillmentDeliveryEnabled: tenant.fulfillment_delivery_enabled === true,
     productCount,
+    openTime: tenant.open_time ?? "",
+    closeTime: tenant.close_time ?? "",
   };
 }
 
@@ -47,8 +50,11 @@ function rowToListing(tenant: TenantRow, productCount: number, products: MenuPro
   if (!isApplicationApproved(tenant.application_status)) return null;
   const profile = tenantToProfileInput(tenant, productCount);
   if (!canEnableMarketplace(profile) || tenant.marketplace_enabled !== true) return null;
+  if (tenant.marketplace_vitrin_approved === false) return null;
+  if (!(tenant.cover_image_url ?? "").trim()) return null;
 
   const signature = pickSignatureDish(products);
+  const eta = parseOrderEtaFromTenant(tenant as unknown as Record<string, unknown>);
   return {
     id: tenant.id,
     subdomain: tenant.subdomain,
@@ -67,6 +73,7 @@ function rowToListing(tenant: TenantRow, productCount: number, products: MenuPro
     latitude: tenant.latitude ?? null,
     longitude: tenant.longitude ?? null,
     minOrderAmount: tenant.min_order_amount != null ? Number(tenant.min_order_amount) : null,
+    etaMinutes: eta.totalMinutes,
   };
 }
 

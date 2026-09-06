@@ -1,4 +1,6 @@
 import { writeActivityLog } from "@/lib/activity-log";
+import { cancelKitchenOrder, markOrderSeenIfNeeded } from "@/lib/kitchen-orders";
+import { compareKitchenUrgency } from "@/lib/order-sla";
 import { buildAdminOrders } from "@/lib/order-map";
 import type { AdminOrder } from "@/lib/orders";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
@@ -61,7 +63,10 @@ export async function loadKasaPickupOrders(
       return { ok: false, error: lineErr.message };
     }
 
-    return { ok: true, orders: buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]) };
+    return {
+      ok: true,
+      orders: buildAdminOrders(orderRows, (lineRows ?? []) as OrderLineRow[]).sort(compareKitchenUrgency),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Gel-al siparişleri yüklenemedi." };
   }
@@ -163,7 +168,11 @@ export async function loadKasaPickupOrderDetail(
       return { ok: false, error: "Sipariş zaten kapatılmış." };
     }
 
-    return { ok: true, order };
+    const svc = createServiceSupabaseClient();
+    await markOrderSeenIfNeeded(svc, tenantId, orderId);
+    const refreshed = await loadOrderWithLines(tenantId, orderId);
+
+    return { ok: true, order: refreshed ?? order };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Sipariş yüklenemedi." };
   }
@@ -239,4 +248,22 @@ export async function closePickupOrderWithPayment(input: {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Ödeme kaydedilemedi." };
   }
+}
+
+export async function cancelKasaPickupOrder(input: {
+  tenantId: string;
+  orderId: string;
+  reason: unknown;
+  note?: unknown;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const svc = createServiceSupabaseClient();
+  return cancelKitchenOrder(svc, {
+    tenantId: input.tenantId,
+    orderId: input.orderId,
+    reason: input.reason,
+    note: input.note,
+    actorType: "cashier",
+    actorLabel: "Kasa",
+    panel: "kasa-pickup",
+  });
 }

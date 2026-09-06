@@ -1,6 +1,7 @@
 import { LAUNCH_CITY, LAUNCH_DISTRICT, isValidNeighborhood } from "@/lib/turkey-geography";
 import { isValidCoordinate } from "@/lib/geo";
 import { MARKETPLACE_MIN_PRODUCT_COUNT } from "@/lib/fulfillment";
+import { parseTimeToMinutes } from "@/lib/business-hours";
 
 export const CUISINE_TAG_OPTIONS = [
   "Burger",
@@ -34,6 +35,8 @@ export type MarketplaceProfileInput = {
   fulfillmentPickupEnabled: boolean;
   fulfillmentDeliveryEnabled: boolean;
   productCount: number;
+  openTime: string;
+  closeTime: string;
 };
 
 export type MarketplaceQualityIssue = {
@@ -62,6 +65,9 @@ export function getMarketplaceQualityIssues(input: MarketplaceProfileInput): Mar
   if (input.publicMenuEnabled === false) {
     issues.push({ key: "public_menu", label: "QR menü açık olmalı" });
   }
+  if (parseTimeToMinutes(input.openTime) === null || parseTimeToMinutes(input.closeTime) === null) {
+    issues.push({ key: "hours", label: "Çalışma saati" });
+  }
   if (input.city !== LAUNCH_CITY || input.district !== LAUNCH_DISTRICT) {
     issues.push({ key: "region", label: `${LAUNCH_CITY} / ${LAUNCH_DISTRICT} bölgesi` });
   }
@@ -82,6 +88,30 @@ export function isMarketplaceListable(input: MarketplaceProfileInput): boolean {
   return input.marketplaceEnabled && canEnableMarketplace(input);
 }
 
+export type MarketplaceDiscoverBlocker = { key: string; label: string };
+
+export function getMarketplaceDiscoverBlockers(input: {
+  qualityIssues: MarketplaceQualityIssue[];
+  marketplaceEnabled: boolean;
+  vitrinApproved: boolean;
+  applicationApproved: boolean;
+}): MarketplaceDiscoverBlocker[] {
+  const blockers: MarketplaceDiscoverBlocker[] = [];
+  if (!input.applicationApproved) {
+    blockers.push({ key: "application", label: "Partner başvurusu onaylanmalı" });
+  }
+  for (const issue of input.qualityIssues) {
+    blockers.push(issue);
+  }
+  if (!input.marketplaceEnabled) {
+    blockers.push({ key: "opt_in", label: "Marketplace yayını kapalı" });
+  }
+  if (!input.vitrinApproved) {
+    blockers.push({ key: "vitrin", label: "Superadmin vitrin onayı bekleniyor" });
+  }
+  return blockers;
+}
+
 export type MarketplaceListing = {
   id: string;
   subdomain: string;
@@ -100,4 +130,5 @@ export type MarketplaceListing = {
   latitude: number | null;
   longitude: number | null;
   minOrderAmount: number | null;
+  etaMinutes: number | null;
 };

@@ -47,6 +47,8 @@ export type TenantRow = {
   public_menu_enabled: boolean;
   dashboard_enabled: boolean;
   marketplace_enabled: boolean;
+  /** Superadmin keşif vitrin onayı; QR menüden bağımsız. */
+  marketplace_vitrin_approved?: boolean;
   city: string;
   district: string;
   neighborhood: string;

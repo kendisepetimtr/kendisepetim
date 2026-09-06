@@ -10,6 +10,8 @@ import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 import type { AdminOrder } from "@/lib/orders";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
+import { useUnseenOrderSlaAlert } from "@/lib/hooks/use-unseen-order-sla-alert";
+import { isOrderUnseenOverdue } from "@/lib/order-sla";
 
 const REFRESH_ON_ACTIONS = ["order_created", "payment_closed"];
 
@@ -40,6 +42,8 @@ export default function PickupOrdersClient({
 }: PickupOrdersClientProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [error, setError] = useState<string | null>(null);
+
+  useUnseenOrderSlaAlert(orders);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -95,15 +99,29 @@ export default function PickupOrdersClient({
           </div>
         ) : (
           <ul className="space-y-3">
-            {orders.map((order) => (
+            {orders.map((order) => {
+              const overdue = isOrderUnseenOverdue({
+                status: order.status,
+                createdAt: order.createdAt,
+                seenAt: order.seenAt,
+              });
+              return (
               <li key={order.id}>
                 <Link
                   href={`/kasa/gel-al/${order.id}`}
-                  className="flex flex-col gap-3 rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between"
+                  className={[
+                    "flex flex-col gap-3 rounded-2xl border bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between",
+                    overdue ? "border-error/50" : "border-surface-container-highest",
+                  ].join(" ")}
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-lg font-black text-on-background">{order.orderCode}</span>
+                      {overdue ? (
+                        <span className="rounded-full bg-error px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+                          Cevap yok
+                        </span>
+                      ) : null}
                       <span
                         className={[
                           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
@@ -128,7 +146,8 @@ export default function PickupOrdersClient({
                   </p>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </main>

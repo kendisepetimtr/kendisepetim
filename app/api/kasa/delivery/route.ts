@@ -68,6 +68,8 @@ export async function POST(request: Request) {
     deliveryStatus?: DeliveryStatus;
     paymentMethod?: CheckoutPaymentMethod;
     mealCardBrandId?: MealCardBrandId;
+    cancelReason?: unknown;
+    cancelNote?: unknown;
   };
 
   try {
@@ -116,6 +118,8 @@ export async function POST(request: Request) {
       tenantId: auth.tenant.id,
       orderId: body.orderId,
       deliveryStatus: body.deliveryStatus,
+      cancelReason: body.cancelReason,
+      cancelNote: body.cancelNote,
     });
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 });

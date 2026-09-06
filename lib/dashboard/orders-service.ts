@@ -5,6 +5,8 @@ import type { AdminOrder } from "@/lib/orders";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { OrderStatus } from "@/lib/supabase/order-types";
 import type { FulfillmentType } from "@/lib/fulfillment";
+import { cancelKitchenOrder, markOrderSeenIfNeeded } from "@/lib/kitchen-orders";
+import { compareKitchenUrgency } from "@/lib/order-sla";
 
 export type OrderChannelFilter = "all" | FulfillmentType;
 
@@ -13,7 +15,7 @@ export type DashboardOrdersResult =
   | { ok: false; error: string };
 
 const ORDER_COLUMNS =
-  "id, created_at, updated_at, tenant_id, order_code, daily_number, order_source, status, total, customer_first_name, customer_last_name, customer_phone, customer_email, address_json, payment_method, payment_method_at_close, meal_card_brand_id, paid_at, order_note, courier_note, fulfillment_type, customer_latitude, customer_longitude, table_number, table_session_id, courier_id, delivery_status";
+  "id, created_at, updated_at, tenant_id, order_code, daily_number, order_source, status, total, customer_first_name, customer_last_name, customer_phone, customer_email, address_json, payment_method, payment_method_at_close, meal_card_brand_id, paid_at, order_note, courier_note, fulfillment_type, customer_latitude, customer_longitude, table_number, table_session_id, courier_id, delivery_status, seen_at, cancel_reason, cancel_note";
 
 export async function loadDashboardOrderById(orderId: string): Promise<DashboardOrdersResult> {
   if (!orderId) return { ok: false, error: "Geçersiz sipariş." };
@@ -83,6 +85,7 @@ export async function loadDashboardOrders(channel: OrderChannelFilter): Promise<
     if (lineErr) return { ok: false, error: lineErr.message };
 
     const orders = await enrichOrdersWithCourierNames(tenant.id, buildAdminOrders(rows ?? [], lineRows ?? []));
+    orders.sort((a, b) => compareKitchenUrgency(a, b) || Date.parse(b.createdAt) - Date.parse(a.createdAt));
     return { ok: true, orders };
   } catch (error) {
     return {
@@ -118,9 +121,25 @@ async function enrichOrdersWithCourierNames(
   }
 }
 
+export async function markDashboardOrderSeen(
+  orderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!orderId) return { ok: false, error: "Geçersiz sipariş." };
+  const tenant = await getAuthenticatedOwnerTenant();
+  if (!tenant) return { ok: false, error: "Oturum bulunamadı." };
+  try {
+    const svc = createServiceSupabaseClient();
+    await markOrderSeenIfNeeded(svc, tenant.id, orderId);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Güncellenemedi." };
+  }
+}
+
 export async function updateDashboardOrderStatus(
   orderId: string,
   status: OrderStatus,
+  cancel?: { reason?: unknown; note?: unknown },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!orderId) return { ok: false, error: "Geçersiz sipariş." };
   if (!["new", "confirmed", "preparing", "completed", "cancelled"].includes(status)) {
@@ -132,9 +151,21 @@ export async function updateDashboardOrderStatus(
 
   try {
     const svc = createServiceSupabaseClient();
+    if (status === "cancelled") {
+      return cancelKitchenOrder(svc, {
+        tenantId: tenant.id,
+        orderId,
+        reason: cancel?.reason,
+        note: cancel?.note,
+        actorType: "owner",
+        actorLabel: tenant.owner_name || "Dashboard",
+        panel: "dashboard",
+      });
+    }
+
     const { data: existing, error: findErr } = await svc
       .from("orders")
-      .select("id, order_code, status, fulfillment_type")
+      .select("id, order_code, status, fulfillment_type, seen_at")
       .eq("id", orderId)
       .eq("tenant_id", tenant.id)
       .maybeSingle();
@@ -143,14 +174,19 @@ export async function updateDashboardOrderStatus(
       return { ok: false, error: "Sipariş bulunamadı." };
     }
 
-    const { error } = await svc.from("orders").update({ status }).eq("id", orderId).eq("tenant_id", tenant.id);
+    const patch: Record<string, unknown> = { status };
+    if (!existing.seen_at) {
+      patch.seen_at = new Date().toISOString();
+    }
+
+    const { error } = await svc.from("orders").update(patch).eq("id", orderId).eq("tenant_id", tenant.id);
     if (error) return { ok: false, error: error.message };
 
     await writeActivityLog({
       tenant_id: tenant.id,
       actor_type: "owner",
       actor_label: tenant.owner_name || "Dashboard",
-      action: status === "cancelled" ? "order_cancelled" : "order_status_updated",
+      action: "order_status_updated",
       entity_type: "order",
       entity_id: orderId,
       order_code: existing.order_code as string,
