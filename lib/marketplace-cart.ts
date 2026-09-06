@@ -1,3 +1,5 @@
+import { readSharedJson, writeSharedJson } from "@/lib/shared-browser-storage";
+
 const KEY = "kendisepetim_marketplace_cart_v1";
 
 export type MarketplaceCartLine = {
@@ -34,34 +36,34 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+function parseCart(raw: unknown): MarketplaceCart | null {
+  if (!isRecord(raw) || typeof raw.subdomain !== "string" || !Array.isArray(raw.lines)) return null;
+  const lines: MarketplaceCartLine[] = [];
+  for (const row of raw.lines) {
+    if (!isRecord(row)) continue;
+    const qty = Number(row.qty);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    lines.push({
+      productId: String(row.productId ?? ""),
+      name: String(row.name ?? "Ürün"),
+      qty,
+      unitPrice: Number(row.unitPrice) || 0,
+    });
+  }
+  if (lines.length === 0) return null;
+  const detail = isRecord(raw.detail) ? (raw.detail as MarketplaceCartDetail) : undefined;
+  return {
+    subdomain: raw.subdomain.toLowerCase(),
+    restaurantName: typeof raw.restaurantName === "string" ? raw.restaurantName : raw.subdomain,
+    lines,
+    detail,
+  };
+}
+
 export function getMarketplaceCart(): MarketplaceCart | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw) as unknown;
-    if (!isRecord(p) || typeof p.subdomain !== "string" || !Array.isArray(p.lines)) return null;
-    const lines: MarketplaceCartLine[] = [];
-    for (const row of p.lines) {
-      if (!isRecord(row)) continue;
-      const qty = Number(row.qty);
-      if (!Number.isFinite(qty) || qty <= 0) continue;
-      lines.push({
-        productId: String(row.productId ?? ""),
-        name: String(row.name ?? "Ürün"),
-        qty,
-        unitPrice: Number(row.unitPrice) || 0,
-      });
-    }
-    if (lines.length === 0) return null;
-    const detail =
-      isRecord(p.detail) ? (p.detail as MarketplaceCartDetail) : undefined;
-    return {
-      subdomain: p.subdomain.toLowerCase(),
-      restaurantName: typeof p.restaurantName === "string" ? p.restaurantName : p.subdomain,
-      lines,
-      detail,
-    };
+    return parseCart(readSharedJson(KEY));
   } catch {
     return null;
   }
@@ -70,11 +72,11 @@ export function getMarketplaceCart(): MarketplaceCart | null {
 export function saveMarketplaceCart(cart: MarketplaceCart | null): void {
   if (typeof window === "undefined") return;
   if (!cart || cart.lines.length === 0) {
-    window.localStorage.removeItem(KEY);
+    writeSharedJson(KEY, null);
     window.dispatchEvent(new Event("ks-cart-change"));
     return;
   }
-  window.localStorage.setItem(KEY, JSON.stringify(cart));
+  writeSharedJson(KEY, cart);
   window.dispatchEvent(new Event("ks-cart-change"));
 }
 

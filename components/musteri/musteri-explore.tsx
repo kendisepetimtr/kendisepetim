@@ -49,13 +49,12 @@ function matchDistance(listing: MarketplaceListing, geo: CustomerGeo): number | 
 function isNearby(listing: MarketplaceListing, geo: CustomerGeo): boolean {
   const pin = asGeoPoint(listing.latitude, listing.longitude);
   if (!pin) return false;
-  if (listing.fulfillmentDeliveryEnabled) {
-    return isWithinDeliveryRadius(pin, geo, listing.deliveryRadiusKm);
-  }
-  if (listing.fulfillmentPickupEnabled) {
-    return distanceKm(pin, geo) <= PICKUP_NEAR_KM;
-  }
-  return false;
+  const inDelivery =
+    listing.fulfillmentDeliveryEnabled &&
+    isWithinDeliveryRadius(pin, geo, listing.deliveryRadiusKm);
+  const inPickup =
+    listing.fulfillmentPickupEnabled && distanceKm(pin, geo) <= PICKUP_NEAR_KM;
+  return inDelivery || inPickup;
 }
 
 export default function MusteriExplore({ initialListings, isCustomer = false }: Props) {

@@ -228,7 +228,10 @@ export async function POST(request: Request) {
 
     const total = lines.reduce((sum, line) => sum + line.qty * line.unit_price, 0);
 
-    if (fulfillmentType === "delivery" && tenant.min_order_amount != null) {
+    if (
+      (fulfillmentType === "delivery" || fulfillmentType === "pickup") &&
+      tenant.min_order_amount != null
+    ) {
       const minAmount = Number(tenant.min_order_amount);
       if (Number.isFinite(minAmount) && minAmount > 0 && total < minAmount) {
         return NextResponse.json(

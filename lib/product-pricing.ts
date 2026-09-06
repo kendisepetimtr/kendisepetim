@@ -31,6 +31,20 @@ export function getPrimaryMenuDisplayPrice(
   return getPickupProductPrice(p);
 }
 
+/** Gel-al ve paket fiyatı farklıysa ikincil fiyat (gösterim için). */
+export function getSecondaryMenuDisplayPrice(
+  p: LocalMenuProduct,
+  flags: { fulfillmentPickupEnabled: boolean; fulfillmentDeliveryEnabled: boolean },
+): number | null {
+  if (!flags.fulfillmentPickupEnabled || !flags.fulfillmentDeliveryEnabled) return null;
+  if (!p.usePackagePrice) return null;
+  const pickup = getPickupProductPrice(p);
+  const delivery = getDeliveryProductPrice(p);
+  if (pickup === delivery) return null;
+  // Birincil paket fiyatıysa gel-al’ı ikincil göster
+  return pickup;
+}
+
 /** Birincil fiyat + seçilen varyasyon farkları. */
 export function getPrimaryMenuDisplayPriceWithVariations(
   p: LocalMenuProduct,

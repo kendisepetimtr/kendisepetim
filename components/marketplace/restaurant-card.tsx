@@ -18,7 +18,7 @@ type RestaurantCardProps = {
 };
 
 export default function RestaurantCard({ listing, distanceKm = null, isCustomer = false }: RestaurantCardProps) {
-  const menuUrl = getPrimaryPublicMenuUrl(listing.subdomain);
+  const menuUrl = `${getPrimaryPublicMenuUrl(listing.subdomain)}?kaynak=kesfet`;
   const [fav, setFav] = useState(false);
 
   useEffect(() => {

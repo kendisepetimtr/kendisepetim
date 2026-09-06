@@ -13,7 +13,10 @@ import { tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 import { listingEtaMinutesFromTenant } from "@/lib/musteri/order-tracking";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ kaynak?: string; sepet?: string; tekrar?: string }>;
+};
 
 function getServiceClientSafe() {
   try {
@@ -76,8 +79,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function PublicMenuPage({ params }: Props) {
+export default async function PublicMenuPage({ params, searchParams }: Props) {
   const { slug: raw } = await params;
+  const q = searchParams ? await searchParams : {};
+  const orderSource = q.kaynak === "kesfet" ? "marketplace" : "qr_menu";
   const slug = raw.toLowerCase();
   if (!isValidMenuSlug(slug)) notFound();
 
@@ -148,6 +153,7 @@ export default async function PublicMenuPage({ params }: Props) {
       paymentFlags={paymentFlags}
       fulfillmentFlags={fulfillmentFlags}
       etaMinutes={listingEtaMinutesFromTenant(row as Record<string, unknown>)}
+      orderSource={orderSource}
       initialMenu={buildLocalMenuState({
         categories,
         products: (productRows ?? []) as MenuProductRow[],

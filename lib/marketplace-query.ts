@@ -8,7 +8,7 @@ import {
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { MenuProductRow } from "@/lib/supabase/menu-types";
 import type { TenantRow } from "@/lib/supabase/tenant-types";
-import { parseOrderEtaFromTenant } from "@/lib/musteri/order-tracking";
+import { listingEtaMinutesFromTenant } from "@/lib/musteri/order-tracking";
 import { isApplicationApproved } from "@/lib/partner/status";
 import { hasFullTenantAccess } from "@/lib/tenant-entitlements";
 
@@ -54,7 +54,6 @@ function rowToListing(tenant: TenantRow, productCount: number, products: MenuPro
   if (!(tenant.cover_image_url ?? "").trim()) return null;
 
   const signature = pickSignatureDish(products);
-  const eta = parseOrderEtaFromTenant(tenant as unknown as Record<string, unknown>);
   return {
     id: tenant.id,
     subdomain: tenant.subdomain,
@@ -73,7 +72,7 @@ function rowToListing(tenant: TenantRow, productCount: number, products: MenuPro
     latitude: tenant.latitude ?? null,
     longitude: tenant.longitude ?? null,
     minOrderAmount: tenant.min_order_amount != null ? Number(tenant.min_order_amount) : null,
-    etaMinutes: eta.totalMinutes,
+    etaMinutes: listingEtaMinutesFromTenant(tenant as unknown as Record<string, unknown>),
   };
 }
 

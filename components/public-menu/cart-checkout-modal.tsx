@@ -13,7 +13,7 @@ import {
   type CustomerFormValues,
   validateCustomerFormForFulfillment,
 } from "@/lib/customer-address";
-import { asGeoPoint, type GeoPoint } from "@/lib/geo";
+import { asGeoPoint, isWithinDeliveryRadius, type GeoPoint } from "@/lib/geo";
 import { stripCourierLocationNoteLine } from "@/lib/maps-links";
 import { appendLocalOrder, type LocalOrder, type LocalOrderLine } from "@/lib/local-orders";
 import { getGuestCustomer, guestDefaultAddress, saveGuestFromCheckout } from "@/lib/guest-customer";
@@ -228,8 +228,12 @@ export default function CartCheckoutModal({
         email: data.email || prev.email,
       }));
 
+      const lastId = getLastSavedAddressId();
       const preferred =
-        data.addresses.find((a) => a.isDefault) ?? data.addresses[0] ?? null;
+        (lastId ? data.addresses.find((a) => a.id === lastId) : null) ??
+        data.addresses.find((a) => a.isDefault) ??
+        data.addresses[0] ??
+        null;
       if (preferred) {
         applySavedAddress(preferred);
       }
@@ -308,6 +312,41 @@ export default function CartCheckoutModal({
     (s, l) => s + getProductPriceForFulfillmentWithVariations(l.product, fulfillmentType, l.selectedOptions) * l.qty,
     0,
   );
+
+  const minOrderAmount =
+    fulfillmentFlags.minOrderAmount != null &&
+    Number.isFinite(fulfillmentFlags.minOrderAmount) &&
+    fulfillmentFlags.minOrderAmount > 0
+      ? fulfillmentFlags.minOrderAmount
+      : null;
+  const belowMinOrder =
+    !isCashierOrder &&
+    !isTableOrder &&
+    (fulfillmentType === "delivery" || fulfillmentType === "pickup") &&
+    minOrderAmount != null &&
+    cartTotal < minOrderAmount;
+
+  const outsideDeliveryRadius = useMemo(() => {
+    if (!isDeliveryOrder || isCashierOrder || isTableOrder) return false;
+    if (!restaurantPoint || customerPoint == null) return false;
+    return !isWithinDeliveryRadius(restaurantPoint, customerPoint, fulfillmentFlags.deliveryRadiusKm);
+  }, [
+    isDeliveryOrder,
+    isCashierOrder,
+    isTableOrder,
+    restaurantPoint,
+    customerPoint,
+    fulfillmentFlags.deliveryRadiusKm,
+  ]);
+
+  const pickupPriceDiffers = useMemo(() => {
+    if (fulfillmentType !== "pickup") return false;
+    return cartLines.some((l) => {
+      const pickup = getProductPriceForFulfillmentWithVariations(l.product, "pickup", l.selectedOptions);
+      const delivery = getProductPriceForFulfillmentWithVariations(l.product, "delivery", l.selectedOptions);
+      return pickup !== delivery;
+    });
+  }, [fulfillmentType, cartLines]);
 
   const showFulfillmentChoice =
     !isCashierOrder &&
@@ -498,6 +537,16 @@ export default function CartCheckoutModal({
       );
       return;
     }
+    if (outsideDeliveryRadius) {
+      window.alert(
+        `Seçilen konum teslimat alanı dışında (yarıçap ${fulfillmentFlags.deliveryRadiusKm} km). Pin’i yaklaştırın veya gel-al seçin.`,
+      );
+      return;
+    }
+    if (belowMinOrder && minOrderAmount != null) {
+      window.alert(`Minimum sipariş tutarı ${formatTry(minOrderAmount)}. Sepete ürün ekleyin.`);
+      return;
+    }
     if (
       loggedInCustomer &&
       fulfillmentType === "delivery" &&
@@ -632,7 +681,7 @@ export default function CartCheckoutModal({
 
       setCart({});
       if (loggedInCustomer && result.orderId && !isWaiterOrder && !isCashierOrder) {
-        window.location.href = customerOrderPath(result.orderId);
+        window.location.href = `${getOAuthSiteBase()}${customerOrderPath(result.orderId)}`;
         return;
       }
       setGuestSuccess({ orderCode: result.orderCode, table: isTableOrder });
@@ -913,6 +962,22 @@ export default function CartCheckoutModal({
                 <span className="font-semibold text-on-background">{t("subtotal")}:</span>{" "}
                 <span className="font-headline font-black text-primary">{formatTry(cartTotal)}</span>
               </div>
+              {belowMinOrder && minOrderAmount != null ? (
+                <p className="mt-2 text-xs font-semibold text-error">
+                  Minimum sipariş: {formatTry(minOrderAmount)} (şu an {formatTry(cartTotal)})
+                </p>
+              ) : null}
+              {outsideDeliveryRadius ? (
+                <p className="mt-2 text-xs font-semibold text-error">
+                  Konum teslimat yarıçapı dışında ({fulfillmentFlags.deliveryRadiusKm} km). Pin’i taşıyın veya gel-al
+                  seçin.
+                </p>
+              ) : null}
+              {pickupPriceDiffers ? (
+                <p className="mt-2 text-[11px] text-secondary">
+                  Gel-al seçildi — menüdeki paket fiyatından farklı satırlar gel-al tutarına güncellendi.
+                </p>
+              ) : null}
 
               <div className="mt-6">
                 {!isCashierOrder &&
@@ -1179,10 +1244,18 @@ export default function CartCheckoutModal({
               <button
                 type="button"
                 onClick={handleConfirmOrder}
-                disabled={submitting || !orderingEnabled}
+                disabled={submitting || !orderingEnabled || belowMinOrder || outsideDeliveryRadius}
                 className="w-full rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-3.5 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
               >
-                {submitting ? t("savingOrder") : orderingEnabled ? t("confirmOrder") : t("restaurantClosed")}
+                {submitting
+                  ? t("savingOrder")
+                  : !orderingEnabled
+                    ? t("restaurantClosed")
+                    : belowMinOrder
+                      ? "Minimum tutarın altında"
+                      : outsideDeliveryRadius
+                        ? "Teslimat alanı dışında"
+                        : t("confirmOrder")}
               </button>
               <button
                 type="button"

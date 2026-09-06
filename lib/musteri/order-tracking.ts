@@ -158,6 +158,10 @@ export function trackStageMessage(
     : ORDER_TRACK_PICKUP_STAGE_MESSAGES[stage];
 }
 
-export function listingEtaMinutesFromTenant(row: Record<string, unknown> | null | undefined): number {
-  return parseOrderEtaFromTenant(row).totalMinutes;
+export function listingEtaMinutesFromTenant(
+  row: Record<string, unknown> | null | undefined,
+): number | null {
+  const eta = parseOrderEtaFromTenant(row);
+  if (!eta.autoEnabled) return null;
+  return eta.totalMinutes;
 }

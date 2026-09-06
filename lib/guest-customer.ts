@@ -4,6 +4,7 @@ import {
   type CustomerAddress,
   type CustomerFormValues,
 } from "@/lib/customer-address";
+import { readSharedJson, writeSharedJson } from "@/lib/shared-browser-storage";
 
 const STORAGE_KEY = "kendisepetim_guest_customer_v1";
 
@@ -63,10 +64,8 @@ function newId(): string {
 export function getGuestCustomer(): GuestCustomerState {
   if (typeof window === "undefined") return emptyState();
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyState();
-    const p = JSON.parse(raw) as unknown;
-    if (!isRecord(p)) return emptyState();
+    const p = readSharedJson<Record<string, unknown>>(STORAGE_KEY);
+    if (!p || !isRecord(p)) return emptyState();
     const addresses: GuestSavedAddress[] = [];
     if (Array.isArray(p.addresses)) {
       for (const row of p.addresses) {
@@ -93,7 +92,7 @@ export function getGuestCustomer(): GuestCustomerState {
 
 export function saveGuestCustomer(state: GuestCustomerState): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  writeSharedJson(STORAGE_KEY, state);
 }
 
 export function saveGuestProfile(input: {

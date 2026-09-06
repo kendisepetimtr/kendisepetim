@@ -91,7 +91,7 @@ function mapCustomerOrderRow(row: Record<string, unknown>): MusteriOrderView {
       row.daily_number != null && Number.isFinite(Number(row.daily_number))
         ? Number(row.daily_number)
         : null,
-    etaMinutes: eta.totalMinutes,
+    etaMinutes: eta.autoEnabled ? eta.totalMinutes : null,
     cancelReason: typeof row.cancel_reason === "string" ? row.cancel_reason : null,
     cancelNote: typeof row.cancel_note === "string" ? row.cancel_note : null,
   };

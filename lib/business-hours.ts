@@ -59,7 +59,8 @@ export function isBusinessOpenNow(
 ): boolean {
   const o = parseTimeToMinutes(openTime);
   const c = parseTimeToMinutes(closeTime);
-  if (o === null || c === null) return true;
+  // Saat tanımsız / bozuksa siparişe kapalı say — yanlışlıkla açık bırakma.
+  if (o === null || c === null) return false;
   const cur = minutesInTimeZone(now, timeZone);
   if (c === o) return true;
   if (c > o) return cur >= o && cur < c;

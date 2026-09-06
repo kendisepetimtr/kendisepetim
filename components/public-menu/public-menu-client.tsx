@@ -11,6 +11,7 @@ import {
 import {
   getPrimaryMenuDisplayPrice,
   getPrimaryMenuDisplayPriceWithVariations,
+  getSecondaryMenuDisplayPrice,
 } from "@/lib/product-pricing";
 import {
   hasVariations,
@@ -210,6 +211,19 @@ export default function PublicMenuClient({
   const isOnline = useSyncExternalStore(subscribeOnlineStatus, getClientOnlineStatus, () => true);
   const pwaInstall = usePublicMenuPwaInstall();
   const [restaurantPwaHost, setRestaurantPwaHost] = useState(false);
+  const [resolvedOrderSource, setResolvedOrderSource] = useState<"qr_menu" | "marketplace">(orderSource);
+  useEffect(() => {
+    if (orderSource === "marketplace") {
+      setResolvedOrderSource("marketplace");
+      return;
+    }
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("kaynak") === "kesfet") setResolvedOrderSource("marketplace");
+    } catch {
+      /* ignore */
+    }
+  }, [orderSource]);
   useEffect(() => {
     setRestaurantPwaHost(isRestaurantMenuPwaHost(window.location.host));
   }, []);
@@ -920,8 +934,13 @@ export default function PublicMenuClient({
                         {heroProduct.description ||
                           parseIngredientLines(heroProduct.ingredients).slice(0, 2).join(" · ")}
                       </p>
-                      <span className="shrink-0 text-xl font-black text-white">
+                      <span className="shrink-0 text-right text-xl font-black text-white">
                         {formatTry(getPrimaryMenuDisplayPrice(heroProduct, fulfillmentFlags))}
+                        {getSecondaryMenuDisplayPrice(heroProduct, fulfillmentFlags) != null ? (
+                          <span className="mt-0.5 block text-[11px] font-semibold text-white/75">
+                            Gel-al {formatTry(getSecondaryMenuDisplayPrice(heroProduct, fulfillmentFlags)!)}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -1020,6 +1039,11 @@ export default function PublicMenuClient({
                       <div className="flex items-center justify-between">
                         <span className="font-black text-primary">
                           {formatTry(getPrimaryMenuDisplayPrice(p, fulfillmentFlags))}
+                          {getSecondaryMenuDisplayPrice(p, fulfillmentFlags) != null ? (
+                            <span className="mt-0.5 block text-[11px] font-semibold text-secondary">
+                              Gel-al {formatTry(getSecondaryMenuDisplayPrice(p, fulfillmentFlags)!)}
+                            </span>
+                          ) : null}
                         </span>
                         <button
                           type="button"
@@ -1151,7 +1175,7 @@ export default function PublicMenuClient({
         visibleProducts={visibleProducts}
         paymentFlags={paymentFlags}
         fulfillmentFlags={fulfillmentFlags}
-        orderSource={isTableMenu ? "table_qr" : orderSource}
+        orderSource={isTableMenu ? "table_qr" : resolvedOrderSource}
         tableNumber={tableNumber}
         waiterMode={waiterMode}
         cashierMode={cashierMode}
@@ -1270,7 +1294,14 @@ function ProductPreviewModal({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="font-headline text-2xl font-extrabold text-on-background">{product.name}</h2>
-              <p className="mt-2 text-lg font-black text-primary">{formatTry(getPrimaryMenuDisplayPrice(product, fulfillmentFlags))}</p>
+              <p className="mt-2 text-lg font-black text-primary">
+                {formatTry(getPrimaryMenuDisplayPrice(product, fulfillmentFlags))}
+                {getSecondaryMenuDisplayPrice(product, fulfillmentFlags) != null ? (
+                  <span className="mt-1 block text-sm font-semibold text-secondary">
+                    Gel-al {formatTry(getSecondaryMenuDisplayPrice(product, fulfillmentFlags)!)}
+                  </span>
+                ) : null}
+              </p>
             </div>
           </div>
           {product.warningBadges.length > 0 ? (
