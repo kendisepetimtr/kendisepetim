@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { signOutCashierAction } from "@/app/kasa/actions";
 import type { KasaFeatures } from "@/lib/kasa/kasa-access";
+import {
+  KASA_OPS_SURFACE,
+  opsPaketPath,
+  opsSiparislerPath,
+  type OpsSurface,
+} from "@/lib/ops/surface";
 
 type TabId = "masalar" | "paket";
 
@@ -15,6 +21,7 @@ type KasaShellHeaderProps = {
   newOrderHref?: string;
   onBasketClick?: () => void;
   children?: ReactNode;
+  surface?: OpsSurface;
 };
 
 export default function KasaShellHeader({
@@ -24,6 +31,7 @@ export default function KasaShellHeader({
   newOrderHref,
   onBasketClick,
   children,
+  surface = KASA_OPS_SURFACE,
 }: KasaShellHeaderProps) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -32,8 +40,8 @@ export default function KasaShellHeader({
   const showBoard = features.dineIn || features.pickup;
   const tabs = (
     [
-      { id: "masalar" as const, href: "/kasa", label: "Masalar", enabled: showBoard },
-      { id: "paket" as const, href: "/kasa/paket", label: "Paket", enabled: features.delivery },
+      { id: "masalar" as const, href: opsSiparislerPath(surface), label: "Masalar", enabled: showBoard },
+      { id: "paket" as const, href: opsPaketPath(surface), label: "Paket", enabled: features.delivery },
     ] as const
   ).filter((t) => t.enabled);
 
@@ -41,10 +49,10 @@ export default function KasaShellHeader({
   const basketHref =
     newOrderHref ??
     (active === "paket" && features.delivery
-      ? "/kasa/paket"
+      ? opsPaketPath(surface)
       : features.dineIn || features.pickup
-        ? "/kasa"
-        : "/kasa/paket");
+        ? opsSiparislerPath(surface)
+        : opsPaketPath(surface));
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -66,7 +74,7 @@ export default function KasaShellHeader({
     <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Kasa</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{surface.brandLabel}</p>
           <h1 className="truncate font-headline text-xl font-extrabold text-on-background sm:text-2xl">
             {businessName}
           </h1>
@@ -112,17 +120,28 @@ export default function KasaShellHeader({
             {menuOpen ? (
               <div
                 id={menuId}
-                className="absolute right-0 z-30 mt-2 min-w-[10rem] overflow-hidden rounded-xl border border-surface-container-highest bg-white py-1 shadow-lg"
+                className="absolute right-0 z-30 mt-2 min-w-[12rem] overflow-hidden rounded-xl border border-surface-container-highest bg-white py-1 shadow-lg"
               >
-                <form action={signOutCashierAction}>
-                  <button
-                    type="submit"
+                {surface.shell === "admin" ? (
+                  <Link
+                    href="/admin"
                     className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                    onClick={() => setMenuOpen(false)}
                   >
-                    <span className="material-symbols-outlined text-[18px]">logout</span>
-                    Çıkış
-                  </button>
-                </form>
+                    <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                    Yönetim paneline dön
+                  </Link>
+                ) : (
+                  <form action={signOutCashierAction}>
+                    <button
+                      type="submit"
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">logout</span>
+                      Çıkış
+                    </button>
+                  </form>
+                )}
               </div>
             ) : null}
           </div>

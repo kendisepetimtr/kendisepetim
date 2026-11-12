@@ -18,6 +18,11 @@ import type { CourierRow } from "@/lib/supabase/courier-types";
 import { paymentMethodLabel, type TenantPaymentFlags } from "@/lib/tenant-payment";
 import { useUnseenOrderSlaAlert } from "@/lib/hooks/use-unseen-order-sla-alert";
 import { isOrderUnseenOverdue } from "@/lib/order-sla";
+import {
+  KASA_OPS_SURFACE,
+  opsPaketOrderPath,
+  type OpsSurface,
+} from "@/lib/ops/surface";
 
 const REFRESH_ON_ACTIONS = ["order_created", "payment_closed", "delivery_status_updated", "courier_assigned"];
 
@@ -37,6 +42,7 @@ type DeliveryOrdersClientProps = {
   menu: LocalMenuState;
   paymentFlags: TenantPaymentFlags;
   initialTab?: ListTab;
+  surface?: OpsSurface;
 };
 
 export default function DeliveryOrdersClient({
@@ -49,6 +55,7 @@ export default function DeliveryOrdersClient({
   menu,
   paymentFlags,
   initialTab = "active",
+  surface = KASA_OPS_SURFACE,
 }: DeliveryOrdersClientProps) {
   const [tab, setTab] = useState<ListTab>(initialTab);
   const [orders, setOrders] = useState(initialOrders);
@@ -62,7 +69,7 @@ export default function DeliveryOrdersClient({
   const refreshActive = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/kasa/delivery", { cache: "no-store" });
+      const res = await fetch(`${surface.apiBase}/delivery`, { cache: "no-store" });
       const data = (await res.json()) as { ok?: boolean; orders?: AdminOrder[]; error?: string };
       if (!res.ok || !data.ok || !data.orders) {
         setError(data.error ?? "Siparişler yüklenemedi.");
@@ -72,12 +79,12 @@ export default function DeliveryOrdersClient({
     } catch {
       setError("Bağlantı hatası.");
     }
-  }, []);
+  }, [surface.apiBase]);
 
   const refreshHistory = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/kasa/delivery?scope=closed", { cache: "no-store" });
+      const res = await fetch(`${surface.apiBase}/delivery?scope=closed`, { cache: "no-store" });
       const data = (await res.json()) as { ok?: boolean; orders?: AdminOrder[]; error?: string };
       if (!res.ok || !data.ok || !data.orders) {
         setError(data.error ?? "Geçmiş yüklenemedi.");
@@ -88,7 +95,7 @@ export default function DeliveryOrdersClient({
     } catch {
       setError("Bağlantı hatası.");
     }
-  }, []);
+  }, [surface.apiBase]);
 
   useEffect(() => {
     if (tab !== "history") return;
@@ -96,13 +103,13 @@ export default function DeliveryOrdersClient({
   }, [tab, refreshHistory]);
 
   const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
-    streamUrl: "/api/kasa/notifications/stream",
+    streamUrl: surface.streamUrl,
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: () => {
       void refreshActive();
       if (tab === "history") void refreshHistory();
     },
-    crossClientPresence: { role: "kasa", scope: subdomain },
+    crossClientPresence: { role: surface.shell === "admin" ? "panel" : "kasa", scope: subdomain },
   });
 
   useTenantOpsRealtime({
@@ -123,6 +130,7 @@ export default function DeliveryOrdersClient({
         features={features}
         active="paket"
         onBasketClick={tab === "active" ? () => setOrderOpen(true) : undefined}
+        surface={surface}
       />
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
@@ -201,11 +209,7 @@ export default function DeliveryOrdersClient({
               return (
                 <li key={order.id}>
                   <Link
-                    href={
-                      tab === "history"
-                        ? `/kasa/paket/${order.id}?view=history`
-                        : `/kasa/paket/${order.id}`
-                    }
+                    href={opsPaketOrderPath(surface, order.id, tab === "history")}
                     className={[
                       "flex flex-col gap-3 rounded-2xl border bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between",
                       overdue ? "border-error/50" : "border-surface-container-highest",
@@ -270,6 +274,8 @@ export default function DeliveryOrdersClient({
           paymentFlags={paymentFlags}
           onClose={() => setOrderOpen(false)}
           onOrderPlaced={() => void refreshActive()}
+          ordersEndpoint={`${surface.apiBase}/orders`}
+          customersSearchBase={surface.apiBase}
         />
       ) : null}
 

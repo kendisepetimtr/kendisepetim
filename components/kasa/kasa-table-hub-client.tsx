@@ -6,6 +6,7 @@ import SessionPaymentClient from "@/components/kasa/session-payment-client";
 import type { KasaSessionDetail } from "@/lib/kasa/sessions-service";
 import type { LocalMenuState } from "@/lib/local-menu";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
+import { KASA_OPS_SURFACE, type OpsSurface } from "@/lib/ops/surface";
 
 type KasaTableHubClientProps = {
   tableNumber: number;
@@ -14,6 +15,7 @@ type KasaTableHubClientProps = {
   initialSession: KasaSessionDetail;
   paymentFlags: TenantPaymentFlags;
   menu: LocalMenuState;
+  surface?: OpsSurface;
 };
 
 /** Dolu masa: ödeme ekranı + ürün ekleme modalı. */
@@ -24,6 +26,7 @@ export default function KasaTableHubClient({
   initialSession,
   paymentFlags,
   menu,
+  surface = KASA_OPS_SURFACE,
 }: KasaTableHubClientProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
@@ -38,6 +41,7 @@ export default function KasaTableHubClient({
         initialSession={initialSession}
         paymentFlags={paymentFlags}
         onAddItems={() => setAddOpen(true)}
+        surface={surface}
       />
       {addOpen ? (
         <KasaOrderModal
@@ -54,6 +58,8 @@ export default function KasaTableHubClient({
             setSessionKey((k) => k + 1);
             window.location.reload();
           }}
+          ordersEndpoint={`${surface.apiBase}/orders`}
+          customersSearchBase={surface.apiBase}
         />
       ) : null}
     </>

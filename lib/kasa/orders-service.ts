@@ -27,6 +27,7 @@ import {
   type CheckoutPaymentMethod,
   type MealCardBrandId,
 } from "@/lib/tenant-payment";
+import { CASHIER_OPS_ACTOR, type OpsActor } from "@/lib/ops/actor";
 
 function orderCode(): string {
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -66,12 +67,14 @@ export type PlaceCashierOrderInput = {
   customerLongitude?: number | null;
   paymentMethod?: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
+  actor?: OpsActor;
 };
 
 export async function placeCashierOrder(
   input: PlaceCashierOrderInput,
 ): Promise<{ ok: true; orderId: string; orderCode: string; dailyNumber: number | null } | { ok: false; error: string }> {
   const { tenant, fulfillmentType } = input;
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
 
   if (!hasFullTenantAccess(tenant)) {
     return { ok: false, error: FREE_PLAN_UPGRADE_MESSAGE };
@@ -255,14 +258,14 @@ export async function placeCashierOrder(
 
     await writeActivityLog({
       tenant_id: tenant.id,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "order_created",
       entity_type: "order",
       entity_id: insertedOrder.id as string,
       order_code: insertedOrder.order_code as string,
       metadata: {
-        source: "cashier",
+        source: actor.type === "owner" ? "owner_admin" : "cashier",
         fulfillment_type: fulfillmentType,
         table: tableNumber,
         item_count: lines.length,

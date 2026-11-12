@@ -14,6 +14,7 @@ export default async function ProtectedTenantAdminLayout({ children, params }: L
   const { slug } = await params;
   await redirectUnapprovedTenantPanel(slug);
   await requireOwnerTenantSlugMatch(slug);
+  // Ops alt yolları PIN sonrası aynı sayfaya dönsün
   await requireOwnerAdminOrRedirect("/admin");
   return <>{children}</>;
 }

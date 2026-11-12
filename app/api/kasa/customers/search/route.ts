@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import { searchCashierCustomers } from "@/lib/kasa/customer-search";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
+    const status =
+      auth.error === "Oturum gerekli." || auth.error === "Admin PIN oturumu gerekli." ? 401 : 400;
     return NextResponse.json(auth, { status });
   }
 

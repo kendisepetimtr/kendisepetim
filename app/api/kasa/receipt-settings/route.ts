@@ -1,11 +1,11 @@
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 import { parseReceiptSettings } from "@/lib/receipt-settings";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, error: auth.error }, { status: 401 });
   }

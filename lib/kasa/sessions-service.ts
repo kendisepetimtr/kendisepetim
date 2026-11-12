@@ -1,11 +1,12 @@
 import { writeActivityLog } from "@/lib/activity-log";
 import { buildAdminOrders } from "@/lib/order-map";
 import type { AdminOrder } from "@/lib/orders";
+import { CASHIER_OPS_ACTOR, type OpsActor } from "@/lib/ops/actor";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 import type { TableSessionStatus } from "@/lib/supabase/table-session-types";
 import type { CheckoutPaymentMethod, MealCardBrandId, TenantPaymentFlags } from "@/lib/tenant-payment";
-import { isMealCardBrandAllowed } from "@/lib/tenant-payment";
+import { isMealCardBrandAllowed, isPaymentMethodEnabled } from "@/lib/tenant-payment";
 
 export type KasaSessionDetail = {
   tableNumber: number;
@@ -90,21 +91,16 @@ export async function loadKasaSessionDetail(
   }
 }
 
-function isPaymentMethodEnabled(flags: TenantPaymentFlags, method: CheckoutPaymentMethod): boolean {
-  if (method === "cash") return flags.paymentCash;
-  if (method === "door_card") return flags.paymentDoorCard;
-  if (method === "havale") return flags.paymentHavale;
-  return flags.paymentMealCard;
-}
-
 export async function closeSessionWithPayment(input: {
   tenantId: string;
   tableNumber: number;
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
+  actor?: OpsActor;
 }): Promise<{ ok: true; sessionTotal: number; orderCount: number; paidAt: string } | { ok: false; error: string }> {
   const { tenantId, tableNumber, paymentMethod, paymentFlags } = input;
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
 
   if (!isPaymentMethodEnabled(paymentFlags, paymentMethod)) {
     return { ok: false, error: "Bu ödeme yöntemi aktif değil." };
@@ -162,8 +158,8 @@ export async function closeSessionWithPayment(input: {
 
     await writeActivityLog({
       tenant_id: tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "payment_closed",
       entity_type: "table_session",
       entity_id: detail.session.sessionId,

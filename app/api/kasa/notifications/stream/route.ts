@@ -1,11 +1,11 @@
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
 import { createActivityLogSseStream } from "@/lib/notification-stream-service";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
     return new Response(JSON.stringify({ ok: false, error: auth.error }), {
       status: 401,

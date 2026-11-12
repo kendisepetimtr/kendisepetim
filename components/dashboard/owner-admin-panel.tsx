@@ -1,18 +1,13 @@
 "use client";
 
 import TenantTrialBanner from "@/components/dashboard/tenant-trial-banner";
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatAddressOneLine } from "@/lib/customer-address";
-import { formatSelectedVariationLabels } from "@/lib/menu-variations";
 import type { AdminOrder } from "@/lib/orders";
 import { getPrimaryPublicMenuUrl } from "@/lib/public-menu-urls";
 import {
   buildChannelRevenueSummary,
   buildOrdersReportSummary,
-  buildReportDayStrip,
-  effectivePaymentMethod,
-  filterOrdersByPaidReportDay,
   filterOrdersByPeriod,
   formatTry,
   getOrdersForRelativeReportDay,
@@ -22,18 +17,15 @@ import {
 } from "@/lib/orders-report";
 import type { BusinessHoursDayMode } from "@/lib/business-hours";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
-import { changeOwnerAdminPinAction, cancelAdminOrderAction } from "@/app/dashboard/admin/actions";
+import { changeOwnerAdminPinAction } from "@/app/dashboard/admin/actions";
 import type { OwnerAdminPinActionState } from "@/app/dashboard/admin/actions";
-import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
-import type { OrderCancelReason } from "@/lib/order-cancel";
-import type { OrderStatus } from "@/lib/supabase/order-types";
 import type { ActivityLogRow } from "@/lib/supabase/activity-log-types";
 import {
   ACTIVITY_ACTION_LABELS,
   ACTIVITY_ACTOR_LABELS,
   formatActivityLogSummary,
 } from "@/lib/dashboard/activity-log-labels";
-import { fulfillmentTypeLabel, type FulfillmentType } from "@/lib/fulfillment";
+import { fulfillmentTypeLabel } from "@/lib/fulfillment";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { useTenantOpsRealtime } from "@/lib/hooks/use-tenant-ops-realtime";
 
@@ -41,22 +33,6 @@ const PERIODS: { id: ReportPeriod; label: string }[] = [
   { id: "7d", label: "Son 7 gün" },
   { id: "30d", label: "Son 30 gün" },
   { id: "all", label: "Tümü" },
-];
-
-const STATUS_FILTERS: { id: "all" | OrderStatus; label: string }[] = [
-  { id: "all", label: "Tümü" },
-  { id: "new", label: "Yeni" },
-  { id: "confirmed", label: "Onaylandı" },
-  { id: "preparing", label: "Hazırlanıyor" },
-  { id: "completed", label: "Tamamlandı" },
-  { id: "cancelled", label: "İptal" },
-];
-
-const CHANNEL_FILTERS: { id: "all" | FulfillmentType; label: string }[] = [
-  { id: "all", label: "Tümü" },
-  { id: "pickup", label: "Gel-al" },
-  { id: "dine_in", label: "Masa" },
-  { id: "delivery", label: "Paket" },
 ];
 
 const STATUS_LABELS = ORDER_STATUS_LABELS;
@@ -73,35 +49,16 @@ const NAV_SETTINGS = { id: "settings", label: "Ayarlar", icon: "settings" } as c
 type SidebarNavItem = { readonly id: string; readonly label: string; readonly icon: string };
 type AdminNavId = (typeof NAV_MAIN)[number]["id"] | typeof NAV_SETTINGS.id;
 
-function NoteWithMapLinks({ text }: { text: string }) {
-  if (!text.trim()) return <span className="text-secondary/70">—</span>;
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return (
-    <div className="space-y-2 text-xs leading-relaxed text-secondary">
-      {text.split(/\n+/).filter(Boolean).map((para, i) => {
-        const parts = para.split(urlRegex);
-        return (
-          <p key={i}>
-            {parts.map((part, j) =>
-              /^https?:\/\//.test(part) ? (
-                <a
-                  key={j}
-                  href={part}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-primary underline decoration-primary/40 underline-offset-2 hover:text-primary-container"
-                >
-                  Haritada aç
-                </a>
-              ) : (
-                <span key={j}>{part}</span>
-              ),
-            )}
-          </p>
-        );
-      })}
-    </div>
-  );
+function ownerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "?";
+  const b = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (a + b).toUpperCase();
+}
+
+function getNavLabel(navId: AdminNavId): string {
+  if (navId === NAV_SETTINGS.id) return NAV_SETTINGS.label;
+  return NAV_MAIN.find((item) => item.id === navId)?.label ?? "Admin";
 }
 
 function SidebarNavButton({
@@ -120,7 +77,9 @@ function SidebarNavButton({
       aria-current={active ? "page" : undefined}
       className={[
         "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-[transform,color,background-color] duration-200",
-        active ? "bg-primary/10 text-primary" : "text-secondary hover:translate-x-1 hover:bg-surface-container-low hover:text-on-background",
+        active
+          ? "bg-primary/10 text-primary"
+          : "text-secondary hover:translate-x-1 hover:bg-surface-container-low hover:text-on-background",
       ].join(" ")}
     >
       <span className={`material-symbols-outlined text-[22px] ${active ? "text-primary" : "text-secondary"}`} aria-hidden>
@@ -129,18 +88,6 @@ function SidebarNavButton({
       <span>{item.label}</span>
     </button>
   );
-}
-
-function ownerInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const a = parts[0]?.[0] ?? "?";
-  const b = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (a + b).toUpperCase();
-}
-
-function getNavLabel(navId: AdminNavId): string {
-  if (navId === NAV_SETTINGS.id) return NAV_SETTINGS.label;
-  return NAV_MAIN.find((item) => item.id === navId)?.label ?? "Admin";
 }
 
 function AdminSidebarBrand({
@@ -533,13 +480,6 @@ export default function OwnerAdminPanel({
   const [activeNav, setActiveNav] = useState<AdminNavId>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>("7d");
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
-  const [channelFilter, setChannelFilter] = useState<"all" | FulfillmentType>("all");
-  const [ordersDayOffset, setOrdersDayOffset] = useState(0);
-  const [openId, setOpenId] = useState<string | null>(initialOrders[0]?.id ?? null);
-  const [statusError, setStatusError] = useState<string | null>(null);
-  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
   const publicMenuHref = getPrimaryPublicMenuUrl(subdomain);
   const ownerBadge = ownerInitials(ownerName);
   const reportDayConfig = useMemo(
@@ -568,52 +508,6 @@ export default function OwnerAdminPanel({
     [initialOrders, period, reportDayConfig],
   );
 
-  const dayStrip = useMemo(() => buildReportDayStrip(7, reportDayConfig), [reportDayConfig]);
-  const dayModeHint = reportDayModeLabel(reportDayConfig);
-
-  const openOrdersLive = useMemo(
-    () => initialOrders.filter((order) => ["new", "confirmed", "preparing"].includes(order.status)),
-    [initialOrders],
-  );
-  const closedOrdersForDay = useMemo(
-    () =>
-      filterOrdersByPaidReportDay(
-        initialOrders.filter((order) => order.status === "completed"),
-        ordersDayOffset,
-        reportDayConfig,
-      ),
-    [initialOrders, ordersDayOffset, reportDayConfig],
-  );
-
-  const ordersTabPool = useMemo(() => {
-    const closedIds = new Set(closedOrdersForDay.map((o) => o.id));
-    const openPart = openOrdersLive;
-    const closedPart = closedOrdersForDay;
-    const cancelledSameDay = filterOrdersByPaidReportDay(
-      initialOrders.filter((o) => o.status === "cancelled"),
-      ordersDayOffset,
-      reportDayConfig,
-    ).filter((o) => !closedIds.has(o.id));
-    return [...openPart, ...closedPart, ...cancelledSameDay];
-  }, [openOrdersLive, closedOrdersForDay, initialOrders, ordersDayOffset, reportDayConfig]);
-
-  const filteredOrders = useMemo(() => {
-    let list = ordersTabPool;
-    if (channelFilter !== "all") list = list.filter((order) => order.fulfillmentType === channelFilter);
-    if (statusFilter !== "all") list = list.filter((order) => order.status === statusFilter);
-    return list;
-  }, [ordersTabPool, channelFilter, statusFilter]);
-
-  const ordersDaySummary = useMemo(() => {
-    const completed = closedOrdersForDay;
-    return {
-      channel: buildChannelRevenueSummary(completed),
-      payment: buildOrdersReportSummary(completed, reportDayConfig).byPayment,
-      openCount: openOrdersLive.length,
-      closedCount: completed.length,
-    };
-  }, [closedOrdersForDay, openOrdersLive.length, reportDayConfig]);
-
   const summary = useMemo(
     () => buildOrdersReportSummary(filteredByPeriod, reportDayConfig),
     [filteredByPeriod, reportDayConfig],
@@ -632,34 +526,13 @@ export default function OwnerAdminPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
-  function cancelOrder(orderId: string) {
-    setCancelOrderId(orderId);
-  }
-
-  function confirmCancelOrder(reason: OrderCancelReason, note: string) {
-    if (!cancelOrderId) return;
-    const orderId = cancelOrderId;
-    startTransition(async () => {
-      setStatusError(null);
-      const result = await cancelAdminOrderAction(orderId, reason, note);
-      if (result.error) {
-        setStatusError(result.error);
-        return;
-      }
-      setCancelOrderId(null);
-      router.refresh();
-    });
-  }
-
   const channelSummary = useMemo(() => buildChannelRevenueSummary(filteredByPeriod), [filteredByPeriod]);
 
   const headerTitle = getNavLabel(activeNav);
   const headerSubtitle =
     activeNav === "overview"
       ? "İşletmenin genel görünümü ve birikimli özet"
-      : activeNav === "orders"
-        ? "Aktif ve geçmiş sipariş akışı"
-        : activeNav === "reports"
+      : activeNav === "reports"
           ? "Dönemsel analiz, ciro ve ürün performansı"
           : activeNav === "logs"
             ? "Operasyon geçmişi ve denetim kayıtları"
@@ -701,6 +574,10 @@ export default function OwnerAdminPanel({
                 item={item}
                 active={activeNav === item.id}
                 onSelect={() => {
+                  if (item.id === "orders") {
+                    window.location.href = "/admin/siparisler";
+                    return;
+                  }
                   setActiveNav(item.id);
                   setSidebarOpen(false);
                 }}
@@ -723,6 +600,12 @@ export default function OwnerAdminPanel({
         <div className="border-t border-surface-container-high px-3 py-3">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-secondary">Kısayollar</p>
           <div className="space-y-2">
+            <a
+              href="/admin/siparisler"
+              className="block rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm font-semibold text-on-background hover:bg-primary/10"
+            >
+              Sipariş operasyonu
+            </a>
             <a
               href="/dashboard"
               className="block rounded-xl border border-surface-container-highest bg-white px-3 py-2.5 text-sm font-semibold text-on-background hover:bg-surface-container-low"
@@ -955,293 +838,6 @@ export default function OwnerAdminPanel({
               </div>
             ) : null}
 
-            {activeNav === "orders" ? (
-              <div className="space-y-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <h1 className="font-headline text-2xl font-extrabold tracking-tight text-on-background sm:text-3xl">
-                      Siparişler
-                    </h1>
-                    <p className="mt-2 max-w-2xl text-sm text-secondary">
-                      Açık siparişler anlık; kapananlar seçili iş gününe göre. Canlı yenilenir (bildirim yok). Gün
-                      bölümü: {dayModeHint}.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {dayStrip.map((day) => {
-                    const active = day.offsetDays === ordersDayOffset;
-                    return (
-                      <button
-                        key={day.dayKey}
-                        type="button"
-                        onClick={() => setOrdersDayOffset(day.offsetDays)}
-                        className={[
-                          "shrink-0 rounded-xl border px-3 py-2 text-left transition",
-                          active
-                            ? "border-on-background bg-on-background text-white"
-                            : "border-surface-container-highest bg-surface-container-lowest text-secondary hover:border-primary/40",
-                        ].join(" ")}
-                      >
-                        <span className="block text-xs font-bold">{day.shortLabel}</span>
-                        <span className={["mt-0.5 block text-[10px]", active ? "text-white/70" : ""].join(" ")}>
-                          {day.label.replace(/^Bugün · |^Dün · /, "")}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Açık</p>
-                    <p className="mt-1 font-headline text-2xl font-extrabold text-on-background">
-                      {ordersDaySummary.openCount}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Kapanan (gün)</p>
-                    <p className="mt-1 font-headline text-2xl font-extrabold text-on-background">
-                      {ordersDaySummary.closedCount}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Gel-al</p>
-                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
-                      {formatTry(ordersDaySummary.channel.pickup.revenue)}
-                    </p>
-                    <p className="text-xs text-secondary">{ordersDaySummary.channel.pickup.count} sipariş</p>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Masa</p>
-                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
-                      {formatTry(ordersDaySummary.channel.dine_in.revenue)}
-                    </p>
-                    <p className="text-xs text-secondary">{ordersDaySummary.channel.dine_in.count} sipariş</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Paket</p>
-                    <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
-                      {formatTry(ordersDaySummary.channel.delivery.revenue)}
-                    </p>
-                    <p className="text-xs text-secondary">{ordersDaySummary.channel.delivery.count} sipariş</p>
-                  </div>
-                  {ordersDaySummary.payment.map((row) => (
-                    <div
-                      key={row.method}
-                      className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-4 shadow-sm"
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-secondary">
-                        {paymentMethodLabel(row.method)}
-                      </p>
-                      <p className="mt-1 font-headline text-xl font-extrabold text-on-background">
-                        {formatTry(row.revenue)}
-                      </p>
-                      <p className="text-xs text-secondary">{row.orderCount} sipariş</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                  <div
-                    className="inline-flex flex-wrap rounded-xl border border-surface-container-highest bg-surface-container-low p-1"
-                    role="group"
-                    aria-label="Kanal filtresi"
-                  >
-                    {CHANNEL_FILTERS.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setChannelFilter(item.id)}
-                        className={[
-                          "rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:text-sm",
-                          channelFilter === item.id
-                            ? "bg-primary text-white shadow-sm"
-                            : "text-secondary hover:bg-white hover:text-on-background",
-                        ].join(" ")}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div
-                    className="inline-flex flex-wrap rounded-xl border border-surface-container-highest bg-surface-container-low p-1"
-                    role="group"
-                    aria-label="Durum filtresi"
-                  >
-                    {STATUS_FILTERS.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setStatusFilter(item.id)}
-                        className={[
-                          "rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:text-sm",
-                          statusFilter === item.id
-                            ? "bg-on-background text-white shadow-sm"
-                            : "text-secondary hover:bg-white hover:text-on-background",
-                        ].join(" ")}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <section className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-6 shadow-sm">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="font-headline text-xl font-bold text-on-background">Sipariş listesi</h2>
-                      <p className="mt-1 text-sm text-secondary">
-                        Filtreye uyan {filteredOrders.length} kayıt · açıklar her zaman + seçili günün kapananları
-                      </p>
-                    </div>
-                    {pending ? <p className="text-xs font-semibold text-primary">İşlem yapılıyor…</p> : null}
-                  </div>
-                  {statusError ? (
-                    <p className="mt-4 rounded-lg border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{statusError}</p>
-                  ) : null}
-                  {filteredOrders.length === 0 ? (
-                    <p className="mt-6 rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/50 px-6 py-16 text-center text-sm text-secondary">
-                      Seçilen filtrelerde sipariş bulunamadı.
-                    </p>
-                  ) : (
-                    <ul className="mt-6 space-y-3">
-                      {filteredOrders.map((order) => {
-                        const expanded = openId === order.id;
-                        const payMethod = effectivePaymentMethod(order);
-                        const isOpen = ["new", "confirmed", "preparing"].includes(order.status);
-                        return (
-                          <li
-                            key={order.id}
-                            className={[
-                              "overflow-hidden rounded-2xl border bg-surface-container-lowest",
-                              isOpen
-                                ? "border-primary/25"
-                                : order.fulfillmentType === "pickup"
-                                  ? "border-sky-500/30"
-                                  : order.fulfillmentType === "delivery"
-                                    ? "border-amber-500/30"
-                                    : "border-emerald-500/30",
-                            ].join(" ")}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setOpenId(expanded ? null : order.id)}
-                              className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 text-left hover:bg-surface-container-low/80"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-headline text-sm font-bold text-on-background">
-                                  {order.orderCode} · {order.firstName} {order.lastName}
-                                </p>
-                                <p className="mt-1 text-xs text-secondary">
-                                  {fulfillmentTypeLabel(order.fulfillmentType)}
-                                  {order.fulfillmentType === "dine_in" && order.tableNumber != null
-                                    ? ` ${order.tableNumber}`
-                                    : ""}{" "}
-                                  ·{" "}
-                                  {new Date(order.createdAt).toLocaleString("tr-TR", {
-                                    dateStyle: "short",
-                                    timeStyle: "short",
-                                  })}{" "}
-                                  · {paymentMethodLabel(payMethod, order.mealCardBrandId)}
-                                  {order.paymentMethodAtClose && order.status === "completed" ? " (tahsilat)" : ""}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                                  {STATUS_LABELS[order.status]}
-                                </span>
-                                <span className="text-sm font-black text-on-background">{formatTry(order.total)}</span>
-                              </div>
-                            </button>
-                            {expanded ? (
-                              <div className="border-t border-surface-container-high bg-surface-container-low/40 px-4 py-4">
-                                {order.status !== "cancelled" && order.status !== "completed" ? (
-                                  <div className="mb-4">
-                                    <button
-                                      type="button"
-                                      disabled={pending}
-                                      onClick={() => cancelOrder(order.id)}
-                                      className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
-                                    >
-                                      Siparişi iptal et
-                                    </button>
-                                  </div>
-                                ) : null}
-                                <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Ürünler</p>
-                                <ul className="mt-2 space-y-2 text-sm text-secondary">
-                                  {order.lines.map((line) => (
-                                    <li key={line.id} className="rounded-xl border border-surface-container-high bg-white px-3 py-3">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <span className="font-medium text-on-background">
-                                          {line.name} × {line.qty}
-                                        </span>
-                                        <span className="font-semibold text-primary">
-                                          {formatTry(line.qty * line.unitPrice)}
-                                        </span>
-                                      </div>
-                                      {line.selectedOptions.length > 0 ? (
-                                        <p className="mt-1 text-xs text-secondary">
-                                          {formatSelectedVariationLabels(line.selectedOptions).join(" · ")}
-                                        </p>
-                                      ) : null}
-                                      {line.removedIngredients.length > 0 ? (
-                                        <p className="mt-1 text-xs text-secondary">
-                                          Çıkarılacak: {line.removedIngredients.join(", ")}
-                                        </p>
-                                      ) : null}
-                                    </li>
-                                  ))}
-                                </ul>
-                                <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-                                  <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Telefon</p>
-                                    <p className="mt-1 text-on-background">{order.phone || "—"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">E-posta</p>
-                                    <p className="mt-1 break-all text-on-background">{order.email || "—"}</p>
-                                  </div>
-                                  <div className="sm:col-span-2">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Adres</p>
-                                    <p className="mt-1 text-secondary">{formatAddressOneLine(order.address)}</p>
-                                  </div>
-                                  {order.orderNote.trim() ? (
-                                    <div className="sm:col-span-2">
-                                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
-                                        Sipariş notu (mutfak)
-                                      </p>
-                                      <div className="mt-1">
-                                        <NoteWithMapLinks text={order.orderNote} />
-                                      </div>
-                                    </div>
-                                  ) : null}
-                                  {order.courierNote.trim() ? (
-                                    <div className="sm:col-span-2">
-                                      <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
-                                        Kurye notu
-                                      </p>
-                                      <div className="mt-1">
-                                        <NoteWithMapLinks text={order.courierNote} />
-                                      </div>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </div>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </section>
-              </div>
-            ) : null}
-
             {activeNav === "logs" ? <LogsSection logs={initialLogs} /> : null}
 
             {activeNav === "settings" ? (
@@ -1294,12 +890,6 @@ export default function OwnerAdminPanel({
           </div>
         </main>
       </div>
-      <CancelOrderDialog
-        open={cancelOrderId != null}
-        pending={pending}
-        onClose={() => setCancelOrderId(null)}
-        onConfirm={confirmCancelOrder}
-      />
     </div>
   );
 }

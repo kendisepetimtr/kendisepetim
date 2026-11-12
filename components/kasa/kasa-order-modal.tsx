@@ -70,6 +70,8 @@ export type KasaOrderModalProps = {
   onOrderPlaced?: () => void;
   /** Varsayılan: /api/kasa/orders — garson için /api/garson/orders */
   ordersEndpoint?: string;
+  /** Müşteri arama API tabanı — varsayılan /api/kasa */
+  customersSearchBase?: string;
   /** Garson paneli fiş basmaz */
   skipPrint?: boolean;
 };
@@ -86,6 +88,7 @@ export default function KasaOrderModal({
   paymentFlags,
   onOrderPlaced,
   ordersEndpoint = "/api/kasa/orders",
+  customersSearchBase = "/api/kasa",
   skipPrint = false,
 }: KasaOrderModalProps) {
   const categories = useMemo(
@@ -173,7 +176,7 @@ export default function KasaOrderModal({
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const res = await fetch(`/api/kasa/customers/search?q=${encodeURIComponent(phone)}`, {
+          const res = await fetch(`${customersSearchBase}/customers/search?q=${encodeURIComponent(phone)}`, {
             cache: "no-store",
             credentials: "include",
           });

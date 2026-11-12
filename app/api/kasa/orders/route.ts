@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { CustomerAddress } from "@/lib/customer-address";
 import type { FulfillmentType } from "@/lib/fulfillment";
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 import { placeCashierOrder } from "@/lib/kasa/orders-service";
 import type { PublicOrderLineInput } from "@/lib/orders";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
@@ -37,9 +37,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Geçersiz sipariş tipi." }, { status: 400 });
   }
 
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
+    const status =
+      auth.error === "Oturum gerekli." || auth.error === "Admin PIN oturumu gerekli." ? 401 : 400;
     return NextResponse.json(auth, { status });
   }
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
     customerLongitude: body.customerLongitude,
     paymentMethod: body.paymentMethod,
     mealCardBrandId: body.mealCardBrandId,
+    actor: auth.actor,
   });
 
   if (!result.ok) {

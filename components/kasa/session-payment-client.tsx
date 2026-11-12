@@ -13,6 +13,7 @@ import {
   type TenantPaymentFlags,
 } from "@/lib/tenant-payment";
 import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
+import { KASA_OPS_SURFACE, opsSiparislerPath, type OpsSurface } from "@/lib/ops/surface";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -26,6 +27,7 @@ type SessionPaymentClientProps = {
   paymentFlags: TenantPaymentFlags;
   /** Ürün ekleme modalını açmak için (parent tahtadan da gelebilir) */
   onAddItems?: () => void;
+  surface?: OpsSurface;
 };
 
 export default function SessionPaymentClient({
@@ -35,6 +37,7 @@ export default function SessionPaymentClient({
   initialSession,
   paymentFlags,
   onAddItems,
+  surface = KASA_OPS_SURFACE,
 }: SessionPaymentClientProps) {
   const [session, setSession] = useState(initialSession);
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
@@ -51,7 +54,7 @@ export default function SessionPaymentClient({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/kasa/sessions?tableNumber=${tableNumber}`, { cache: "no-store" });
+      const res = await fetch(`${surface.apiBase}/sessions?tableNumber=${tableNumber}`, { cache: "no-store" });
       const data = (await res.json()) as {
         ok?: boolean;
         session?: KasaSessionDetail;
@@ -59,7 +62,7 @@ export default function SessionPaymentClient({
         error?: string;
       };
       if (data.empty) {
-        window.location.href = "/kasa";
+        window.location.href = opsSiparislerPath(surface);
         return;
       }
       if (!res.ok || !data.ok || !data.session) {
@@ -72,7 +75,7 @@ export default function SessionPaymentClient({
     } finally {
       setLoading(false);
     }
-  }, [tableNumber]);
+  }, [tableNumber, surface.apiBase, surface]);
 
   useEffect(() => {
     const id = window.setInterval(() => void refresh(), 20_000);
@@ -98,7 +101,7 @@ export default function SessionPaymentClient({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/kasa/sessions", {
+      const res = await fetch(`${surface.apiBase}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -130,7 +133,7 @@ export default function SessionPaymentClient({
         paymentClose,
       );
       window.alert(`Ödeme alındı (${label})\n${when}\nMasa ${tableNumber} kapatıldı.`);
-      window.location.href = "/kasa";
+      window.location.href = opsSiparislerPath(surface);
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -145,7 +148,7 @@ export default function SessionPaymentClient({
       <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
-            href="/kasa"
+            href={opsSiparislerPath(surface)}
             className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white text-on-background active:scale-95"
             aria-label="Geri"
           >
@@ -166,7 +169,7 @@ export default function SessionPaymentClient({
             </button>
           ) : (
             <Link
-              href={`/kasa?addTable=${tableNumber}`}
+              href={`${opsSiparislerPath(surface)}?addTable=${tableNumber}`}
               className="inline-flex h-12 items-center gap-1 rounded-2xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary active:scale-95"
             >
               <span className="material-symbols-outlined text-[20px]">add</span>

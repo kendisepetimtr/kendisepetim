@@ -16,6 +16,7 @@ import {
 import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
 import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
 import type { OrderCancelReason } from "@/lib/order-cancel";
+import { KASA_OPS_SURFACE, opsSiparislerPath, type OpsSurface } from "@/lib/ops/surface";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -27,6 +28,7 @@ type PickupOrderPaymentClientProps = {
   subdomain: string;
   paymentFlags: TenantPaymentFlags;
   readOnly?: boolean;
+  surface?: OpsSurface;
 };
 
 export default function PickupOrderPaymentClient({
@@ -35,6 +37,7 @@ export default function PickupOrderPaymentClient({
   subdomain,
   paymentFlags,
   readOnly = false,
+  surface = KASA_OPS_SURFACE,
 }: PickupOrderPaymentClientProps) {
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
     pickDefaultPaymentMethod(paymentFlags, order.paymentMethodAtClose ?? order.paymentMethod),
@@ -64,7 +67,7 @@ export default function PickupOrderPaymentClient({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/kasa/pickup", {
+      const res = await fetch(`${surface.apiBase}/pickup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -91,7 +94,7 @@ export default function PickupOrderPaymentClient({
         method: payMethod,
         mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
       });
-      window.location.href = "/kasa";
+      window.location.href = opsSiparislerPath(surface);
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -102,7 +105,7 @@ export default function PickupOrderPaymentClient({
   async function handleCancel(reason: OrderCancelReason, note: string) {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/kasa/pickup", {
+      const res = await fetch(`${surface.apiBase}/pickup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -117,7 +120,7 @@ export default function PickupOrderPaymentClient({
         window.alert(data.error ?? "İptal edilemedi.");
         return;
       }
-      window.location.href = "/kasa/gel-al";
+      window.location.href = opsSiparislerPath(surface);
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -132,7 +135,7 @@ export default function PickupOrderPaymentClient({
         <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
             <Link
-              href="/kasa"
+              href={opsSiparislerPath(surface)}
               className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
               aria-label="Geri"
             >
@@ -202,7 +205,7 @@ export default function PickupOrderPaymentClient({
       <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
-            href="/kasa"
+            href={opsSiparislerPath(surface)}
             className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
             aria-label="Geri"
           >

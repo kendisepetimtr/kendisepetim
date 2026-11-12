@@ -3,6 +3,7 @@ import { cancelKitchenOrder, markOrderSeenIfNeeded } from "@/lib/kitchen-orders"
 import { compareKitchenUrgency } from "@/lib/order-sla";
 import { buildAdminOrders } from "@/lib/order-map";
 import type { AdminOrder } from "@/lib/orders";
+import { CASHIER_OPS_ACTOR, type OpsActor } from "@/lib/ops/actor";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { OrderLineRow, OrderRow } from "@/lib/supabase/order-types";
 import type { CheckoutPaymentMethod, MealCardBrandId, TenantPaymentFlags } from "@/lib/tenant-payment";
@@ -184,7 +185,9 @@ export async function closePickupOrderWithPayment(input: {
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
+  actor?: OpsActor;
 }): Promise<{ ok: true; orderCode: string; total: number; paidAt: string } | { ok: false; error: string }> {
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
   const detail = await loadKasaPickupOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -224,8 +227,8 @@ export async function closePickupOrderWithPayment(input: {
 
     await writeActivityLog({
       tenant_id: input.tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "payment_closed",
       entity_type: "order",
       entity_id: input.orderId,
@@ -255,15 +258,17 @@ export async function cancelKasaPickupOrder(input: {
   orderId: string;
   reason: unknown;
   note?: unknown;
+  actor?: OpsActor;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
   const svc = createServiceSupabaseClient();
   return cancelKitchenOrder(svc, {
     tenantId: input.tenantId,
     orderId: input.orderId,
     reason: input.reason,
     note: input.note,
-    actorType: "cashier",
-    actorLabel: "Kasa",
-    panel: "kasa-pickup",
+    actorType: actor.type,
+    actorLabel: actor.label,
+    panel: actor.type === "owner" ? "admin-pickup" : "kasa-pickup",
   });
 }

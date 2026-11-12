@@ -4,6 +4,7 @@ import { compareKitchenUrgency } from "@/lib/order-sla";
 import { buildAdminOrders } from "@/lib/order-map";
 import type { DeliveryStatus } from "@/lib/fulfillment";
 import type { AdminOrder } from "@/lib/orders";
+import { CASHIER_OPS_ACTOR, type OpsActor } from "@/lib/ops/actor";
 import { createServiceSupabaseClient } from "@/lib/supabase/admin";
 import type { CourierRow } from "@/lib/supabase/courier-types";
 import { courierDisplayName } from "@/lib/supabase/courier-types";
@@ -281,7 +282,9 @@ export async function assignCourierToDeliveryOrder(input: {
   tenantId: string;
   orderId: string;
   courierId: string;
+  actor?: OpsActor;
 }): Promise<{ ok: true; courierName: string } | { ok: false; error: string }> {
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
   const detail = await loadKasaDeliveryOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -315,8 +318,8 @@ export async function assignCourierToDeliveryOrder(input: {
 
     await writeActivityLog({
       tenant_id: input.tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "courier_assigned",
       entity_type: "order",
       entity_id: input.orderId,
@@ -340,7 +343,9 @@ export async function updateDeliveryOrderStatus(input: {
   deliveryStatus: DeliveryStatus;
   cancelReason?: unknown;
   cancelNote?: unknown;
+  actor?: OpsActor;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
   const allowed: DeliveryStatus[] = [
     "pending",
     "preparing",
@@ -359,9 +364,9 @@ export async function updateDeliveryOrderStatus(input: {
       orderId: input.orderId,
       reason: input.cancelReason,
       note: input.cancelNote,
-      actorType: "cashier",
-      actorLabel: "Kasa",
-      panel: "kasa-delivery",
+      actorType: actor.type,
+      actorLabel: actor.label,
+      panel: actor.type === "owner" ? "admin-delivery" : "kasa-delivery",
     });
   }
 
@@ -392,8 +397,8 @@ export async function updateDeliveryOrderStatus(input: {
 
     await writeActivityLog({
       tenant_id: input.tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "delivery_status_updated",
       entity_type: "order",
       entity_id: input.orderId,
@@ -450,9 +455,11 @@ export async function closeDeliveryOrderWithPayment(input: {
   paymentMethod: CheckoutPaymentMethod;
   mealCardBrandId?: MealCardBrandId;
   paymentFlags: TenantPaymentFlags;
+  actor?: OpsActor;
 }): Promise<
   { ok: true; orderCode: string; total: number; paidAt: string; courierId: string } | { ok: false; error: string }
 > {
+  const actor = input.actor ?? CASHIER_OPS_ACTOR;
   const detail = await loadKasaDeliveryOrderDetail(input.tenantId, input.orderId);
   if (!detail.ok) {
     return detail;
@@ -510,8 +517,8 @@ export async function closeDeliveryOrderWithPayment(input: {
 
     await writeActivityLog({
       tenant_id: input.tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "delivery_completed",
       entity_type: "order",
       entity_id: input.orderId,
@@ -527,8 +534,8 @@ export async function closeDeliveryOrderWithPayment(input: {
 
     await writeActivityLog({
       tenant_id: input.tenantId,
-      actor_type: "cashier",
-      actor_label: "Kasa",
+      actor_type: actor.type,
+      actor_label: actor.label,
       action: "payment_closed",
       entity_type: "order",
       entity_id: input.orderId,

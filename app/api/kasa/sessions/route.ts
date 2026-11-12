@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { closeSessionWithPayment, loadKasaSessionDetail } from "@/lib/kasa/sessions-service";
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 import { isCheckoutPaymentMethod, tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
+
+function opsAuthStatus(error: string): number {
+  return error === "Oturum gerekli." || error === "Admin PIN oturumu gerekli." ? 401 : 400;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,10 +19,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Geçersiz masa numarası." }, { status: 400 });
   }
 
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
-    return NextResponse.json(auth, { status });
+    return NextResponse.json(auth, { status: opsAuthStatus(auth.error) });
   }
 
   if (tableNumber > (auth.tenant.table_count ?? 0)) {
@@ -73,10 +76,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Ödeme yöntemi seçilmelidir." }, { status: 400 });
   }
 
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
-    return NextResponse.json(auth, { status });
+    return NextResponse.json(auth, { status: opsAuthStatus(auth.error) });
   }
 
   if (tableNumber > (auth.tenant.table_count ?? 0)) {
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
     paymentMethod,
     mealCardBrandId: body.mealCardBrandId,
     paymentFlags: tenantPaymentFlagsFromRow(auth.tenant),
+    actor: auth.actor,
   });
 
   if (!result.ok) {

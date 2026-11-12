@@ -9,17 +9,20 @@ import {
   updateDeliveryOrderStatus,
 } from "@/lib/kasa/delivery-orders-service";
 import { getKasaFeatures } from "@/lib/kasa/kasa-access";
-import { getAuthenticatedCashierTenantByCookie } from "@/lib/kasa/cashier-tenant";
+import { getAuthenticatedOpsTenantByCookie } from "@/lib/ops/auth";
 import type { CheckoutPaymentMethod, MealCardBrandId } from "@/lib/tenant-payment";
 import { isCheckoutPaymentMethod, tenantPaymentFlagsFromRow } from "@/lib/tenant-payment";
 
 export const dynamic = "force-dynamic";
 
+function opsAuthStatus(error: string): number {
+  return error === "Oturum gerekli." || error === "Admin PIN oturumu gerekli." ? 401 : 400;
+}
+
 export async function GET(request: Request) {
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
-    return NextResponse.json(auth, { status });
+    return NextResponse.json(auth, { status: opsAuthStatus(auth.error) });
   }
 
   const features = getKasaFeatures(auth.tenant);
@@ -82,10 +85,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Sipariş gerekli." }, { status: 400 });
   }
 
-  const auth = await getAuthenticatedCashierTenantByCookie();
+  const auth = await getAuthenticatedOpsTenantByCookie();
   if (!auth.ok) {
-    const status = auth.error === "Kasa oturumu gerekli." ? 401 : 400;
-    return NextResponse.json(auth, { status });
+    return NextResponse.json(auth, { status: opsAuthStatus(auth.error) });
   }
 
   const features = getKasaFeatures(auth.tenant);
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
       tenantId: auth.tenant.id,
       orderId: body.orderId,
       courierId: body.courierId,
+      actor: auth.actor,
     });
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 });
@@ -120,6 +123,7 @@ export async function POST(request: Request) {
       deliveryStatus: body.deliveryStatus,
       cancelReason: body.cancelReason,
       cancelNote: body.cancelNote,
+      actor: auth.actor,
     });
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 });
@@ -142,6 +146,7 @@ export async function POST(request: Request) {
       paymentMethod,
       mealCardBrandId: body.mealCardBrandId,
       paymentFlags,
+      actor: auth.actor,
     });
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 });

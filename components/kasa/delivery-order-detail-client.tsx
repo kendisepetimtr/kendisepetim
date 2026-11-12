@@ -24,6 +24,7 @@ import {
 import { useKasaReceiptPrint } from "@/lib/hooks/use-receipt-print";
 import CancelOrderDialog from "@/components/orders/cancel-order-dialog";
 import type { OrderCancelReason } from "@/lib/order-cancel";
+import { KASA_OPS_SURFACE, opsPaketPath, type OpsSurface } from "@/lib/ops/surface";
 
 function formatTry(n: number): string {
   return `${Math.round(n)} ₺`;
@@ -37,6 +38,7 @@ type DeliveryOrderDetailClientProps = {
   paymentFlags: TenantPaymentFlags;
   readOnly?: boolean;
   courierName?: string | null;
+  surface?: OpsSurface;
 };
 
 export default function DeliveryOrderDetailClient({
@@ -47,6 +49,7 @@ export default function DeliveryOrderDetailClient({
   paymentFlags,
   readOnly = false,
   courierName = null,
+  surface = KASA_OPS_SURFACE,
 }: DeliveryOrderDetailClientProps) {
   const [order, setOrder] = useState(initialOrder);
   const [selectedCourierId, setSelectedCourierId] = useState(order.courierId ?? "");
@@ -78,7 +81,7 @@ export default function DeliveryOrderDetailClient({
         <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
             <Link
-              href="/kasa/paket?tab=history"
+              href={opsPaketPath(surface, "history")}
               className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
               aria-label="Geri"
             >
@@ -185,7 +188,7 @@ export default function DeliveryOrderDetailClient({
   }
 
   async function reloadOrder() {
-    const res = await fetch(`/api/kasa/delivery?orderId=${order.id}`, { cache: "no-store" });
+    const res = await fetch(`${surface.apiBase}/delivery?orderId=${order.id}`, { cache: "no-store" });
     const data = (await res.json()) as { ok?: boolean; order?: AdminOrder };
     if (res.ok && data.ok && data.order) {
       setOrder(data.order);
@@ -200,7 +203,7 @@ export default function DeliveryOrderDetailClient({
     }
     setBusy("courier");
     try {
-      const res = await fetch("/api/kasa/delivery", {
+      const res = await fetch(`${surface.apiBase}/delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -228,7 +231,7 @@ export default function DeliveryOrderDetailClient({
   ) {
     setBusy(`status-${status}`);
     try {
-      const res = await fetch("/api/kasa/delivery", {
+      const res = await fetch(`${surface.apiBase}/delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -245,7 +248,7 @@ export default function DeliveryOrderDetailClient({
         return;
       }
       if (status === "cancelled") {
-        window.location.href = "/kasa/paket";
+        window.location.href = opsPaketPath(surface);
         return;
       }
       await reloadOrder();
@@ -279,7 +282,7 @@ export default function DeliveryOrderDetailClient({
 
     setBusy("close");
     try {
-      const res = await fetch("/api/kasa/delivery", {
+      const res = await fetch(`${surface.apiBase}/delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,7 +313,7 @@ export default function DeliveryOrderDetailClient({
         method: payMethod,
         mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
       });
-      window.location.href = "/kasa/paket";
+      window.location.href = opsPaketPath(surface);
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -323,7 +326,7 @@ export default function DeliveryOrderDetailClient({
       <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
           <Link
-            href="/kasa/paket"
+            href={opsPaketPath(surface)}
             className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
             aria-label="Geri"
           >

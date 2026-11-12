@@ -15,6 +15,13 @@ import { fulfillmentTypeLabel } from "@/lib/fulfillment";
 import type { TenantPaymentFlags } from "@/lib/tenant-payment";
 import { paymentMethodLabel } from "@/lib/tenant-payment";
 import type { ReportDayStripItem } from "@/lib/orders-report";
+import {
+  closedOrderHref as opsClosedOrderHref,
+  KASA_OPS_SURFACE,
+  opsGelAlPath,
+  opsMasaPath,
+  type OpsSurface,
+} from "@/lib/ops/surface";
 
 const REFRESH_ON_ACTIONS = ["order_created", "bill_requested", "payment_closed"];
 
@@ -86,13 +93,8 @@ type KasaPanelClientProps = {
   initialDayModeLabel: string;
   menu: LocalMenuState;
   paymentFlags: TenantPaymentFlags;
+  surface?: OpsSurface;
 };
-
-function closedOrderHref(card: KasaClosedOrderCard): string | null {
-  if (card.fulfillmentType === "pickup") return `/kasa/gel-al/${card.orderId}?view=history`;
-  if (card.fulfillmentType === "delivery") return `/kasa/paket/${card.orderId}?view=history`;
-  return null;
-}
 
 export default function KasaPanelClient({
   businessName,
@@ -106,6 +108,7 @@ export default function KasaPanelClient({
   initialDayModeLabel,
   menu,
   paymentFlags,
+  surface = KASA_OPS_SURFACE,
 }: KasaPanelClientProps) {
   const [tables, setTables] = useState(initialTables);
   const [pickupSlots, setPickupSlots] = useState(initialPickupSlots);
@@ -120,7 +123,7 @@ export default function KasaPanelClient({
   const refresh = useCallback(async (offset = dayOffset) => {
     setError(null);
     try {
-      const res = await fetch(`/api/kasa/tables?dayOffset=${offset}`, {
+      const res = await fetch(`${surface.apiBase}/tables?dayOffset=${offset}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -147,13 +150,13 @@ export default function KasaPanelClient({
     } catch {
       setError("Bağlantı hatası.");
     }
-  }, [dayOffset]);
+  }, [dayOffset, surface.apiBase]);
 
   const { toasts, dismissToast, formatToastTitle, formatActivityLogSummary } = useNotificationStream({
-    streamUrl: "/api/kasa/notifications/stream",
+    streamUrl: surface.streamUrl,
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: () => void refresh(),
-    crossClientPresence: { role: "kasa", scope: subdomain },
+    crossClientPresence: { role: surface.shell === "admin" ? "panel" : "kasa", scope: subdomain },
   });
 
   useTenantOpsRealtime({
@@ -196,6 +199,7 @@ export default function KasaPanelClient({
         features={features}
         active="masalar"
         onBasketClick={openBasket}
+        surface={surface}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -221,7 +225,7 @@ export default function KasaPanelClient({
                     type="button"
                     onClick={() => {
                       if (occupied) {
-                        window.location.href = `/kasa/masa/${table.tableNumber}`;
+                        window.location.href = opsMasaPath(surface, table.tableNumber);
                       } else {
                         setOrderTarget({ channel: "dine_in", tableNumber: table.tableNumber });
                       }
@@ -282,7 +286,8 @@ export default function KasaPanelClient({
                       <button
                         type="button"
                         onClick={() => {
-                          window.location.href = `/kasa/gel-al/${slot.orderId}`;
+                          if (!slot.orderId) return;
+                          window.location.href = opsGelAlPath(surface, slot.orderId);
                         }}
                         className="flex min-h-0 flex-1 flex-col text-left active:scale-[0.98]"
                       >
@@ -371,7 +376,7 @@ export default function KasaPanelClient({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {closedOrders.map((card) => {
                 const style = CLOSED_CHANNEL_STYLE[card.fulfillmentType];
-                const href = closedOrderHref(card);
+                const href = opsClosedOrderHref(surface, card.fulfillmentType, card.orderId);
                 return (
                   <button
                     key={`closed-${card.orderId}`}
@@ -480,6 +485,8 @@ export default function KasaPanelClient({
           paymentFlags={paymentFlags}
           onClose={() => setOrderTarget(null)}
           onOrderPlaced={() => void refresh()}
+          ordersEndpoint={`${surface.apiBase}/orders`}
+          customersSearchBase={surface.apiBase}
         />
       ) : null}
 
