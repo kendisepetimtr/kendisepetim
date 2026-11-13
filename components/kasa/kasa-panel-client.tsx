@@ -156,7 +156,10 @@ export default function KasaPanelClient({
     streamUrl: surface.streamUrl,
     refreshOnActions: REFRESH_ON_ACTIONS,
     onRefresh: () => void refresh(),
-    crossClientPresence: { role: surface.shell === "admin" ? "panel" : "kasa", scope: subdomain },
+    crossClientPresence: {
+      role: surface.shell === "admin" || surface.shell === "dashboard" ? "panel" : "kasa",
+      scope: subdomain,
+    },
   });
 
   useTenantOpsRealtime({

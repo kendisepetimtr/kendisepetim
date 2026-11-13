@@ -2,7 +2,6 @@
 
 import { signOutDashboardAction } from "@/app/dashboard/actions";
 import CustomersManager from "@/components/dashboard/customers-manager";
-import DashboardOrdersList from "@/components/dashboard/dashboard-orders-list";
 import DashboardNotificationsBell from "@/components/dashboard/dashboard-notifications-bell";
 import DashboardReports from "@/components/dashboard/dashboard-reports";
 import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain";
@@ -669,6 +668,10 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 railMode={sidebarCollapsed}
                 alertActive={item.id === "orders" && pendingOrderAlert}
                 onSelect={() => {
+                  if (item.id === "orders") {
+                    window.location.href = "/dashboard/siparisler";
+                    return;
+                  }
                   setActiveNav(item.id);
                   setSidebarOpen(false);
                 }}
@@ -811,12 +814,18 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
             {activeNav === "menu" ? (
               <MenuManager subdomain={tenant.subdomain} businessName={tenant.businessName} />
             ) : activeNav === "orders" ? (
-              <DashboardOrdersList
-                remoteAuthEnabled={remoteAuthEnabled}
-                businessName={tenant.businessName}
-                subdomain={tenant.subdomain}
-                refreshKey={ordersRefreshKey}
-              />
+              <div className="rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/40 px-6 py-16 text-center">
+                <p className="font-headline text-lg font-bold text-on-background">Sipariş operasyonu</p>
+                <p className="mt-2 text-sm text-secondary">
+                  Siparişler artık Kasa ile aynı tahtada yönetilir.
+                </p>
+                <a
+                  href="/dashboard/siparisler"
+                  className="mt-5 inline-flex rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Sipariş tahtasına git
+                </a>
+              </div>
             ) : activeNav === "customers" ? (
               <CustomersManager subdomain={tenant.subdomain} remoteEnabled={remoteAuthEnabled} />
             ) : activeNav === "qr" ? (
@@ -1053,7 +1062,9 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 <h2 className="font-headline text-lg font-bold text-on-background">Son siparişler</h2>
                 <button
                   type="button"
-                  onClick={() => setActiveNav("orders")}
+                  onClick={() => {
+                    window.location.href = "/dashboard/siparisler";
+                  }}
                   className="text-sm font-semibold text-primary hover:text-primary-container"
                 >
                   Tümünü gör

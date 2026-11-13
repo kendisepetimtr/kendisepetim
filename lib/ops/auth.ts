@@ -56,9 +56,24 @@ export async function getAuthenticatedOwnerAdminTenantByCookie(): Promise<Authen
   return { ok: true, tenant, actor: ownerOpsActor(tenant.owner_name) };
 }
 
+/** Sahip Supabase oturumu (Dashboard). Admin PIN gerekmez. */
+export async function getAuthenticatedOwnerTenantByCookie(): Promise<AuthenticatedOpsTenant> {
+  const tenant = await getCurrentOwnerTenant();
+  if (!tenant?.owner_user_id) {
+    return { ok: false, error: "Oturum gerekli." };
+  }
+
+  const accessErr = ownerOpsAccessError(tenant);
+  if (accessErr) {
+    return { ok: false, error: accessErr };
+  }
+
+  return { ok: true, tenant, actor: ownerOpsActor(tenant.owner_name) };
+}
+
 /**
- * Kasa PIN veya Admin PIN oturumu.
- * Aynı /api/kasa uçları her iki yüzeyden kullanılır; aktör loga yazılır.
+ * Kasa PIN, Admin PIN veya Dashboard sahip oturumu.
+ * Aynı /api/kasa uçları kullanılır; aktör loga yazılır.
  */
 export async function getAuthenticatedOpsTenantByCookie(): Promise<AuthenticatedOpsTenant> {
   const cashier = await getAuthenticatedCashierTenantByCookie();
@@ -66,7 +81,12 @@ export async function getAuthenticatedOpsTenantByCookie(): Promise<Authenticated
     return { ok: true, tenant: cashier.tenant, actor: CASHIER_OPS_ACTOR };
   }
 
-  const owner = await getAuthenticatedOwnerAdminTenantByCookie();
+  const ownerAdmin = await getAuthenticatedOwnerAdminTenantByCookie();
+  if (ownerAdmin.ok) {
+    return ownerAdmin;
+  }
+
+  const owner = await getAuthenticatedOwnerTenantByCookie();
   if (owner.ok) {
     return owner;
   }

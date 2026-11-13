@@ -10,7 +10,7 @@ export type OpsSurface = {
   /** Üst etiket: Kasa / Admin */
   brandLabel: string;
   /** Kabuk menü davranışı */
-  shell: "kasa" | "admin";
+  shell: "kasa" | "admin" | "dashboard";
 };
 
 export const KASA_OPS_SURFACE: OpsSurface = {
@@ -27,6 +27,14 @@ export const ADMIN_OPS_SURFACE: OpsSurface = {
   streamUrl: "/api/kasa/notifications/stream",
   brandLabel: "Admin",
   shell: "admin",
+};
+
+export const DASHBOARD_OPS_SURFACE: OpsSurface = {
+  basePath: "/dashboard",
+  apiBase: "/api/kasa",
+  streamUrl: "/api/kasa/notifications/stream",
+  brandLabel: "Dashboard",
+  shell: "dashboard",
 };
 
 export function opsBoardPath(surface: OpsSurface): string {
@@ -54,7 +62,10 @@ export function opsMasaPath(surface: OpsSurface, tableNumber: number): string {
 }
 
 export function opsSiparislerPath(surface: OpsSurface): string {
-  return surface.shell === "admin" ? `${surface.basePath}/siparisler` : surface.basePath;
+  if (surface.shell === "admin" || surface.shell === "dashboard") {
+    return `${surface.basePath}/siparisler`;
+  }
+  return surface.basePath;
 }
 
 export function getDefaultOpsPath(features: KasaFeatures, surface: OpsSurface): string {

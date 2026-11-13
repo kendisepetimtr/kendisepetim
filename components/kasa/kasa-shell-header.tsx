@@ -131,6 +131,15 @@ export default function KasaShellHeader({
                     <span className="material-symbols-outlined text-[18px]">dashboard</span>
                     Yönetim paneline dön
                   </Link>
+                ) : surface.shell === "dashboard" ? (
+                  <Link
+                    href="/dashboard"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-on-background hover:bg-surface-container-low"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">space_dashboard</span>
+                    Dashboard’a dön
+                  </Link>
                 ) : (
                   <form action={signOutCashierAction}>
                     <button

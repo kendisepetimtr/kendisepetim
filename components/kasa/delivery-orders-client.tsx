@@ -109,7 +109,10 @@ export default function DeliveryOrdersClient({
       void refreshActive();
       if (tab === "history") void refreshHistory();
     },
-    crossClientPresence: { role: surface.shell === "admin" ? "panel" : "kasa", scope: subdomain },
+    crossClientPresence: {
+      role: surface.shell === "admin" || surface.shell === "dashboard" ? "panel" : "kasa",
+      scope: subdomain,
+    },
   });
 
   useTenantOpsRealtime({
