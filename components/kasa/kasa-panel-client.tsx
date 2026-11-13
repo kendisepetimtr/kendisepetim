@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import KasaOrderModal from "@/components/kasa/kasa-order-modal";
 import KasaShellHeader from "@/components/kasa/kasa-shell-header";
 import NotificationToastStack from "@/components/notifications/notification-toast-stack";
@@ -81,6 +81,12 @@ type OrderTarget =
   | { channel: "pickup" }
   | { channel: "delivery" };
 
+export type KasaPanelNavigateTarget =
+  | { kind: "masa"; tableNumber: number }
+  | { kind: "gel-al"; orderId: string; history?: boolean }
+  | { kind: "paket-order"; orderId: string; history?: boolean }
+  | { kind: "paket"; tab?: "active" | "history" };
+
 type KasaPanelClientProps = {
   businessName: string;
   subdomain: string;
@@ -94,6 +100,12 @@ type KasaPanelClientProps = {
   menu: LocalMenuState;
   paymentFlags: TenantPaymentFlags;
   surface?: OpsSurface;
+  /** Dashboard kabuğu içinde: KasaShellHeader gizlenir */
+  embedded?: boolean;
+  /** Sepet / kanal seçiciyi dışarıdan açmak için */
+  basketOpenSignal?: number;
+  onNavigate?: (target: KasaPanelNavigateTarget) => void;
+  onBasketHandlersReady?: (handlers: { openBasket: () => void }) => void;
 };
 
 export default function KasaPanelClient({
@@ -109,6 +121,10 @@ export default function KasaPanelClient({
   menu,
   paymentFlags,
   surface = KASA_OPS_SURFACE,
+  embedded = false,
+  basketOpenSignal = 0,
+  onNavigate,
+  onBasketHandlersReady,
 }: KasaPanelClientProps) {
   const [tables, setTables] = useState(initialTables);
   const [pickupSlots, setPickupSlots] = useState(initialPickupSlots);
@@ -173,7 +189,7 @@ export default function KasaPanelClient({
     void refresh(offset);
   }
 
-  function openBasket() {
+  const openBasket = useCallback(() => {
     const options: FulfillmentType[] = [];
     if (features.dineIn) options.push("dine_in");
     if (features.pickup) options.push("pickup");
@@ -193,19 +209,60 @@ export default function KasaPanelClient({
       return;
     }
     setChannelPickerOpen(true);
+  }, [features.dineIn, features.pickup, features.delivery]);
+
+  useEffect(() => {
+    onBasketHandlersReady?.({ openBasket });
+  }, [onBasketHandlersReady, openBasket]);
+
+  useEffect(() => {
+    if (basketOpenSignal > 0) openBasket();
+  }, [basketOpenSignal, openBasket]);
+
+  function goMasa(tableNumber: number) {
+    if (onNavigate) {
+      onNavigate({ kind: "masa", tableNumber });
+      return;
+    }
+    window.location.href = opsMasaPath(surface, tableNumber);
+  }
+
+  function goGelAl(orderId: string, history = false) {
+    if (onNavigate) {
+      onNavigate({ kind: "gel-al", orderId, history });
+      return;
+    }
+    window.location.href = opsGelAlPath(surface, orderId, history);
+  }
+
+  function goClosed(card: KasaClosedOrderCard) {
+    if (card.fulfillmentType === "pickup") {
+      goGelAl(card.orderId, true);
+      return;
+    }
+    if (card.fulfillmentType === "delivery") {
+      if (onNavigate) {
+        onNavigate({ kind: "paket-order", orderId: card.orderId, history: true });
+        return;
+      }
+      const href = opsClosedOrderHref(surface, card.fulfillmentType, card.orderId);
+      if (href) window.location.href = href;
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <KasaShellHeader
-        businessName={businessName}
-        features={features}
-        active="masalar"
-        onBasketClick={openBasket}
-        surface={surface}
-      />
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      {!embedded ? (
+        <KasaShellHeader
+          businessName={businessName}
+          features={features}
+          active="masalar"
+          onBasketClick={openBasket}
+          surface={surface}
+        />
+      ) : null}
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <main className={embedded ? "py-2" : "mx-auto max-w-6xl px-4 py-6 sm:px-6"}>
         {error ? (
           <p className="mb-4 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{error}</p>
         ) : null}
@@ -228,7 +285,7 @@ export default function KasaPanelClient({
                     type="button"
                     onClick={() => {
                       if (occupied) {
-                        window.location.href = opsMasaPath(surface, table.tableNumber);
+                        goMasa(table.tableNumber);
                       } else {
                         setOrderTarget({ channel: "dine_in", tableNumber: table.tableNumber });
                       }
@@ -290,7 +347,7 @@ export default function KasaPanelClient({
                         type="button"
                         onClick={() => {
                           if (!slot.orderId) return;
-                          window.location.href = opsGelAlPath(surface, slot.orderId);
+                          goGelAl(slot.orderId);
                         }}
                         className="flex min-h-0 flex-1 flex-col text-left active:scale-[0.98]"
                       >
@@ -379,20 +436,21 @@ export default function KasaPanelClient({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {closedOrders.map((card) => {
                 const style = CLOSED_CHANNEL_STYLE[card.fulfillmentType];
-                const href = opsClosedOrderHref(surface, card.fulfillmentType, card.orderId);
+                const canOpen =
+                  card.fulfillmentType === "pickup" || card.fulfillmentType === "delivery";
                 return (
                   <button
                     key={`closed-${card.orderId}`}
                     type="button"
-                    disabled={!href}
+                    disabled={!canOpen}
                     onClick={() => {
-                      if (!href) return;
-                      window.location.href = href;
+                      if (!canOpen) return;
+                      goClosed(card);
                     }}
                     className={[
                       "relative flex min-h-[132px] flex-col rounded-2xl border p-4 text-left shadow-sm transition",
                       style.card,
-                      href ? "active:scale-[0.98]" : "cursor-default",
+                      canOpen ? "active:scale-[0.98]" : "cursor-default",
                     ].join(" ")}
                   >
                     <div className="flex items-start justify-between gap-2">

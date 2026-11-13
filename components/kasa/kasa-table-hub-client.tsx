@@ -16,6 +16,8 @@ type KasaTableHubClientProps = {
   paymentFlags: TenantPaymentFlags;
   menu: LocalMenuState;
   surface?: OpsSurface;
+  embedded?: boolean;
+  onBack?: () => void;
 };
 
 /** Dolu masa: ödeme ekranı + ürün ekleme modalı. */
@@ -27,6 +29,8 @@ export default function KasaTableHubClient({
   paymentFlags,
   menu,
   surface = KASA_OPS_SURFACE,
+  embedded = false,
+  onBack,
 }: KasaTableHubClientProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
@@ -42,6 +46,8 @@ export default function KasaTableHubClient({
         paymentFlags={paymentFlags}
         onAddItems={() => setAddOpen(true)}
         surface={surface}
+        embedded={embedded}
+        onBack={onBack}
       />
       {addOpen ? (
         <KasaOrderModal

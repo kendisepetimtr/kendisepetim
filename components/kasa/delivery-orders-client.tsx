@@ -43,6 +43,9 @@ type DeliveryOrdersClientProps = {
   paymentFlags: TenantPaymentFlags;
   initialTab?: ListTab;
   surface?: OpsSurface;
+  embedded?: boolean;
+  onBack?: () => void;
+  onOpenOrder?: (orderId: string, history: boolean) => void;
 };
 
 export default function DeliveryOrdersClient({
@@ -56,6 +59,9 @@ export default function DeliveryOrdersClient({
   paymentFlags,
   initialTab = "active",
   surface = KASA_OPS_SURFACE,
+  embedded = false,
+  onBack,
+  onOpenOrder,
 }: DeliveryOrdersClientProps) {
   const [tab, setTab] = useState<ListTab>(initialTab);
   const [orders, setOrders] = useState(initialOrders);
@@ -127,16 +133,45 @@ export default function DeliveryOrdersClient({
   const list = tab === "active" ? orders : historyOrders;
 
   return (
-    <div className="min-h-screen bg-background">
-      <KasaShellHeader
-        businessName={businessName}
-        features={features}
-        active="paket"
-        onBasketClick={tab === "active" ? () => setOrderOpen(true) : undefined}
-        surface={surface}
-      />
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      {!embedded ? (
+        <KasaShellHeader
+          businessName={businessName}
+          features={features}
+          active="paket"
+          onBasketClick={tab === "active" ? () => setOrderOpen(true) : undefined}
+          surface={surface}
+        />
+      ) : (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm font-semibold text-on-background"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              Masalar
+            </button>
+          ) : (
+            <span />
+          )}
+          {tab === "active" ? (
+            <button
+              type="button"
+              onClick={() => setOrderOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] text-white shadow-md"
+              aria-label="Yeni paket siparişi"
+            >
+              <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                shopping_basket
+              </span>
+            </button>
+          ) : null}
+        </div>
+      )}
 
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <main className={embedded ? "py-1" : "mx-auto max-w-3xl px-4 py-6 sm:px-6"}>
         {error ? (
           <p className="mb-4 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm text-error">{error}</p>
         ) : null}
@@ -213,6 +248,11 @@ export default function DeliveryOrdersClient({
                 <li key={order.id}>
                   <Link
                     href={opsPaketOrderPath(surface, order.id, tab === "history")}
+                    onClick={(e) => {
+                      if (!onOpenOrder) return;
+                      e.preventDefault();
+                      onOpenOrder(order.id, tab === "history");
+                    }}
                     className={[
                       "flex flex-col gap-3 rounded-2xl border bg-surface-container-lowest p-4 shadow-sm transition hover:border-primary/30 sm:flex-row sm:items-center sm:justify-between",
                       overdue ? "border-error/50" : "border-surface-container-highest",

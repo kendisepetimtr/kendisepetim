@@ -3,6 +3,7 @@
 import { signOutDashboardAction } from "@/app/dashboard/actions";
 import CustomersManager from "@/components/dashboard/customers-manager";
 import DashboardNotificationsBell from "@/components/dashboard/dashboard-notifications-bell";
+import DashboardOrdersOps from "@/components/dashboard/dashboard-orders-ops";
 import DashboardReports from "@/components/dashboard/dashboard-reports";
 import DashboardQrSubdomain from "@/components/dashboard/dashboard-qr-subdomain";
 import DashboardSettings from "@/components/dashboard/dashboard-settings";
@@ -324,6 +325,13 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
   });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("nav") !== "orders") return;
+    setActiveNav("orders");
+    window.history.replaceState({}, "", "/dashboard");
+  }, []);
+
+  useEffect(() => {
     if (!tenant) return;
     if (hasFullTenantAccess(tenant)) return;
     if (activeNav === "orders" || activeNav === "marketplace") {
@@ -583,7 +591,7 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
         : activeNav === "customers"
           ? "Kayıtlı müşteriler ve sipariş bilgileri"
           : activeNav === "orders"
-            ? "Canlı siparişler — gel-al, paket ve masa"
+            ? "Kasa ile aynı operasyon — sol paneli daraltarak genişletebilirsin"
             : activeNav === "settings"
               ? "İşletme, hesap ve veri"
               : activeNav === "qr"
@@ -668,10 +676,6 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 railMode={sidebarCollapsed}
                 alertActive={item.id === "orders" && pendingOrderAlert}
                 onSelect={() => {
-                  if (item.id === "orders") {
-                    window.location.href = "/dashboard/siparisler";
-                    return;
-                  }
                   setActiveNav(item.id);
                   setSidebarOpen(false);
                 }}
@@ -810,22 +814,17 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
           </div>
         </header>
         <main className="px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
+          <div className={activeNav === "orders" ? "mx-auto max-w-7xl" : "mx-auto max-w-6xl"}>
             {activeNav === "menu" ? (
               <MenuManager subdomain={tenant.subdomain} businessName={tenant.businessName} />
             ) : activeNav === "orders" ? (
-              <div className="rounded-2xl border border-dashed border-outline/40 bg-surface-container-low/40 px-6 py-16 text-center">
-                <p className="font-headline text-lg font-bold text-on-background">Sipariş operasyonu</p>
-                <p className="mt-2 text-sm text-secondary">
-                  Siparişler artık Kasa ile aynı tahtada yönetilir.
-                </p>
-                <a
-                  href="/dashboard/siparisler"
-                  className="mt-5 inline-flex rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white"
-                >
-                  Sipariş tahtasına git
-                </a>
-              </div>
+              <DashboardOrdersOps
+                tenant={tenant}
+                wideMode={sidebarCollapsed}
+                onWideModeChange={(wide) => {
+                  setCollapsedPersist(wide);
+                }}
+              />
             ) : activeNav === "customers" ? (
               <CustomersManager subdomain={tenant.subdomain} remoteEnabled={remoteAuthEnabled} />
             ) : activeNav === "qr" ? (
@@ -1063,7 +1062,8 @@ export default function DashboardClient({ remoteAuthEnabled = false }: Dashboard
                 <button
                   type="button"
                   onClick={() => {
-                    window.location.href = "/dashboard/siparisler";
+                    setActiveNav("orders");
+                    setSidebarOpen(false);
                   }}
                   className="text-sm font-semibold text-primary hover:text-primary-container"
                 >

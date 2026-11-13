@@ -29,6 +29,8 @@ type PickupOrderPaymentClientProps = {
   paymentFlags: TenantPaymentFlags;
   readOnly?: boolean;
   surface?: OpsSurface;
+  embedded?: boolean;
+  onBack?: () => void;
 };
 
 export default function PickupOrderPaymentClient({
@@ -38,7 +40,13 @@ export default function PickupOrderPaymentClient({
   paymentFlags,
   readOnly = false,
   surface = KASA_OPS_SURFACE,
+  embedded = false,
+  onBack,
 }: PickupOrderPaymentClientProps) {
+  function goBack() {
+    if (onBack) onBack();
+    else window.location.href = opsSiparislerPath(surface);
+  }
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
     pickDefaultPaymentMethod(paymentFlags, order.paymentMethodAtClose ?? order.paymentMethod),
   );
@@ -94,7 +102,7 @@ export default function PickupOrderPaymentClient({
         method: payMethod,
         mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
       });
-      window.location.href = opsSiparislerPath(surface);
+      goBack();
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -120,7 +128,7 @@ export default function PickupOrderPaymentClient({
         window.alert(data.error ?? "İptal edilemedi.");
         return;
       }
-      window.location.href = opsSiparislerPath(surface);
+      goBack();
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -131,16 +139,22 @@ export default function PickupOrderPaymentClient({
   if (readOnly) {
     const closedPay = order.paymentMethodAtClose ?? order.paymentMethod;
     return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
-          <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-            <Link
-              href={opsSiparislerPath(surface)}
+      <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+        <header
+          className={[
+            "border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur",
+            embedded ? "rounded-2xl border" : "sticky top-0 z-20",
+          ].join(" ")}
+        >
+          <div className={["flex items-center gap-3 px-4 py-3", embedded ? "" : "mx-auto max-w-2xl"].join(" ")}>
+            <button
+              type="button"
+              onClick={goBack}
               className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
               aria-label="Geri"
             >
               <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-            </Link>
+            </button>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Gel-Al · Kapalı</p>
               <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
@@ -201,16 +215,22 @@ export default function PickupOrderPaymentClient({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link
-            href={opsSiparislerPath(surface)}
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
+      <header
+        className={[
+          "border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur",
+          embedded ? "rounded-2xl border" : "sticky top-0 z-20",
+        ].join(" ")}
+      >
+        <div className={["flex items-center gap-3 px-4 py-3", embedded ? "" : "mx-auto max-w-2xl"].join(" ")}>
+          <button
+            type="button"
+            onClick={goBack}
             className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
             aria-label="Geri"
           >
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-          </Link>
+          </button>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wide text-primary">Gel-Al · Ödeme</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>

@@ -39,6 +39,8 @@ type DeliveryOrderDetailClientProps = {
   readOnly?: boolean;
   courierName?: string | null;
   surface?: OpsSurface;
+  embedded?: boolean;
+  onBack?: () => void;
 };
 
 export default function DeliveryOrderDetailClient({
@@ -50,7 +52,13 @@ export default function DeliveryOrderDetailClient({
   readOnly = false,
   courierName = null,
   surface = KASA_OPS_SURFACE,
+  embedded = false,
+  onBack,
 }: DeliveryOrderDetailClientProps) {
+  function goBack() {
+    if (onBack) onBack();
+    else window.location.href = opsPaketPath(surface);
+  }
   const [order, setOrder] = useState(initialOrder);
   const [selectedCourierId, setSelectedCourierId] = useState(order.courierId ?? "");
   const [payMethod, setPayMethod] = useState<CheckoutPaymentMethod | "">(() =>
@@ -77,16 +85,17 @@ export default function DeliveryOrderDetailClient({
   if (readOnly) {
     const closedPay = order.paymentMethodAtClose ?? order.paymentMethod;
     return (
-      <div className="min-h-screen bg-background">
+      <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
         <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
           <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-            <Link
-              href={opsPaketPath(surface, "history")}
+            <button
+              type="button"
+              onClick={goBack}
               className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
               aria-label="Geri"
             >
               <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-            </Link>
+            </button>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-wide text-primary">Paket · Geçmiş</p>
               <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
@@ -248,7 +257,7 @@ export default function DeliveryOrderDetailClient({
         return;
       }
       if (status === "cancelled") {
-        window.location.href = opsPaketPath(surface);
+        goBack();
         return;
       }
       await reloadOrder();
@@ -313,7 +322,7 @@ export default function DeliveryOrderDetailClient({
         method: payMethod,
         mealCardBrandId: payMethod === "meal_card" ? mealBrand || undefined : undefined,
       });
-      window.location.href = opsPaketPath(surface);
+      goBack();
     } catch {
       window.alert("Bağlantı hatası.");
     } finally {
@@ -322,16 +331,17 @@ export default function DeliveryOrderDetailClient({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? "bg-background" : "min-h-screen bg-background"}>
       <header className="sticky top-0 z-20 border-b border-surface-container-highest bg-surface-container-lowest/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link
-            href={opsPaketPath(surface)}
+          <button
+            type="button"
+            onClick={goBack}
             className="inline-flex h-12 min-w-12 items-center justify-center rounded-2xl border border-surface-container-highest bg-white active:scale-95"
             aria-label="Geri"
           >
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-          </Link>
+          </button>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wide text-primary">Paket · Ödeme</p>
             <p className="truncate text-sm font-semibold text-on-background">{businessName}</p>
