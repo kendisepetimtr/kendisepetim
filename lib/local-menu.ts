@@ -9,6 +9,8 @@ export type LocalMenuCategory = {
   hidden: boolean;
   sortOrder: number;
   description: string;
+  /** Kasa/ops ürün notu kestirmeleri (fiyatsız) */
+  notePresets: string[];
 };
 
 export type LocalMenuProduct = {

@@ -14,6 +14,8 @@ export type MenuCategoryRow = {
   description: string;
   hidden: boolean;
   sort_order: number;
+  /** Kasa/ops kestirme ürün notları (migration sonrası her zaman dizi) */
+  note_presets?: string[];
 };
 
 export type MenuCategoryInsert = Omit<MenuCategoryRow, 'id' | 'created_at' | 'updated_at'> & {

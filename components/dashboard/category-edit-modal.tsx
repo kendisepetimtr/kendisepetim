@@ -1,6 +1,11 @@
 "use client";
 
 import type { LocalMenuCategory } from "@/lib/local-menu";
+import {
+  MAX_NOTE_PRESET_LENGTH,
+  MAX_NOTE_PRESETS_PER_CATEGORY,
+  sanitizeNotePresets,
+} from "@/lib/menu-note-presets";
 import LanguageAddStub from "@/components/dashboard/language-add-stub";
 import { type FormEvent, useEffect, useId, useState } from "react";
 
@@ -8,6 +13,7 @@ export type CategoryEditFields = {
   name: string;
   description: string;
   sortOrder: number;
+  notePresets: string[];
 };
 
 type CategoryEditModalProps = {
@@ -22,12 +28,16 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
+  const [notePresets, setNotePresets] = useState<string[]>([]);
+  const [presetDraft, setPresetDraft] = useState("");
 
   useEffect(() => {
     if (!open || !category) return;
     setName(category.name);
     setDescription(category.description);
     setSortOrder(String(category.sortOrder));
+    setNotePresets(sanitizeNotePresets(category.notePresets));
+    setPresetDraft("");
   }, [open, category]);
 
   useEffect(() => {
@@ -48,6 +58,17 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  function addPreset() {
+    const next = sanitizeNotePresets([...notePresets, presetDraft]);
+    setNotePresets(next);
+    setPresetDraft("");
+  }
+
+  function removePreset(label: string) {
+    const key = label.toLocaleLowerCase("tr");
+    setNotePresets((prev) => prev.filter((p) => p.toLocaleLowerCase("tr") !== key));
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!category) return;
@@ -56,15 +77,21 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
     const raw = sortOrder.trim().replace(",", ".");
     const ord = Number.parseInt(raw, 10);
     const sort = Number.isFinite(ord) ? ord : 0;
+    const withDraft = presetDraft.trim()
+      ? sanitizeNotePresets([...notePresets, presetDraft])
+      : sanitizeNotePresets(notePresets);
     onSave(category.id, {
       name: n,
       description: description.trim(),
       sortOrder: sort,
+      notePresets: withDraft,
     });
     onClose();
   }
 
   if (!open || !category) return null;
+
+  const atLimit = notePresets.length >= MAX_NOTE_PRESETS_PER_CATEGORY;
 
   return (
     <div className="fixed inset-0 z-[185] flex items-end justify-center p-4 sm:items-center sm:p-6" role="presentation">
@@ -85,7 +112,8 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
             Kategoriyi düzenle
           </h2>
           <p className="mt-1 text-xs text-secondary">
-            Ad, QR menüdeki sıra ve isteğe bağlı açıklama. Gizleme ve silme kart üzerindeki düğmelerdedir.
+            Ad, QR menüdeki sıra, kestirme ürün notları ve isteğe bağlı açıklama. Gizleme ve silme kart
+            üzerindeki düğmelerdedir.
           </p>
         </div>
 
@@ -136,6 +164,67 @@ export default function CategoryEditModal({ open, onClose, category, onSave }: C
                   className="mt-1 w-full resize-y rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background placeholder:text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <LanguageAddStub />
+              </div>
+
+              <div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <label className="block text-xs font-medium text-secondary" htmlFor={`${baseId}-preset`}>
+                    Kestirme ürün notları
+                  </label>
+                  <span className="text-[11px] text-secondary">
+                    {notePresets.length}/{MAX_NOTE_PRESETS_PER_CATEGORY}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-secondary">
+                  Kasa ve sipariş ekranında fare ile seçilir (örn. Az soğanlı, Bol soğanlı). Fiyat
+                  değiştirmez; mutfak notuna yazılır.
+                </p>
+
+                {notePresets.length > 0 ? (
+                  <ul className="mt-2 flex flex-wrap gap-2">
+                    {notePresets.map((label) => (
+                      <li key={label}>
+                        <button
+                          type="button"
+                          onClick={() => removePreset(label)}
+                          className="inline-flex items-center gap-1 rounded-full border border-surface-container-highest bg-white px-3 py-1.5 text-xs font-semibold text-on-background hover:border-primary/40 hover:bg-primary/5"
+                          title="Kaldır"
+                        >
+                          {label}
+                          <span className="text-secondary" aria-hidden>
+                            ×
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="mt-2 flex gap-2">
+                  <input
+                    id={`${baseId}-preset`}
+                    value={presetDraft}
+                    onChange={(e) => setPresetDraft(e.target.value.slice(0, MAX_NOTE_PRESET_LENGTH))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!atLimit && presetDraft.trim()) addPreset();
+                      }
+                    }}
+                    disabled={atLimit}
+                    maxLength={MAX_NOTE_PRESET_LENGTH}
+                    placeholder={atLimit ? "Limit doldu" : "Örn. Az soğanlı"}
+                    className="min-w-0 flex-1 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm text-on-background placeholder:text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={addPreset}
+                    disabled={atLimit || !presetDraft.trim()}
+                    className="shrink-0 rounded-xl border border-surface-container-highest bg-white px-3 py-2 text-sm font-semibold text-on-background hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Ekle
+                  </button>
+                </div>
               </div>
             </div>
           </div>

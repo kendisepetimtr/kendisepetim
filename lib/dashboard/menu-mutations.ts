@@ -5,6 +5,7 @@ import { loadDashboardMenuState } from "@/lib/dashboard/menu-load";
 import type { LocalMenuState } from "@/lib/local-menu";
 import { buildLocalMenuState } from "@/lib/menu-map";
 import { slimMenuStateForClient } from "@/lib/menu-client-sync";
+import { sanitizeNotePresets } from "@/lib/menu-note-presets";
 import { sanitizeCustomMenuWarnings, sanitizeMenuWarningPresetKeys } from "@/lib/menu-product-warnings";
 import { sanitizeVariationGroups } from "@/lib/menu-variations";
 import type { MenuCategoryRow, MenuProductRow } from "@/lib/supabase/menu-types";
@@ -163,9 +164,15 @@ async function updateMenuCategory(id: string, fields: CategoryEditFields): Promi
   if (!supabase || !tenantId) return { ok: false, error: error ?? "İşlem yapılamadı." };
   const name = fields.name.trim();
   if (!name) return { ok: false, error: "Kategori adı zorunludur." };
+  const notePresets = sanitizeNotePresets(fields.notePresets);
   const { error: updateError } = await supabase
     .from("menu_categories")
-    .update({ name, description: fields.description.trim(), sort_order: fields.sortOrder })
+    .update({
+      name,
+      description: fields.description.trim(),
+      sort_order: fields.sortOrder,
+      note_presets: notePresets,
+    })
     .eq("id", id)
     .eq("tenant_id", tenantId);
   if (updateError) return { ok: false, error: updateError.message };

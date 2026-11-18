@@ -21,6 +21,11 @@ import {
   type LocalMenuState,
 } from "@/lib/local-menu";
 import {
+  INLINE_NOTE_PRESET_CHIP_LIMIT,
+  composeLineNote,
+  toggleNotePreset,
+} from "@/lib/menu-note-presets";
+import {
   formatSelectedVariationLabels,
   hasVariations,
   sumVariationDeltas,
@@ -117,6 +122,8 @@ export default function KasaOrderModal({
   const [removedIngredients, setRemovedIngredients] = useState<string[]>([]);
   const [selectedOptions, setSelectedOptions] = useState<SelectedVariation[]>([]);
   const [lineNoteDraft, setLineNoteDraft] = useState("");
+  const [selectedNotePresets, setSelectedNotePresets] = useState<string[]>([]);
+  const [notePresetsSheetOpen, setNotePresetsSheetOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerFormValues>(() => emptyCustomerFormValues());
   const [phoneSuggestions, setPhoneSuggestions] = useState<CashierCustomerMatch[]>([]);
   const [phoneSuggestOpen, setPhoneSuggestOpen] = useState(false);
@@ -143,6 +150,8 @@ export default function KasaOrderModal({
     setCategoryId("all");
     setCustomize(null);
     setLineNoteDraft("");
+    setSelectedNotePresets([]);
+    setNotePresetsSheetOpen(false);
     setCustomer(emptyCustomerFormValues());
     setPhoneSuggestions([]);
     setPhoneSuggestOpen(false);
@@ -244,9 +253,16 @@ export default function KasaOrderModal({
   );
   const cartCount = cartLines.reduce((s, l) => s + l.qty, 0);
 
+  function categoryNotePresetsFor(product: LocalMenuProduct): string[] {
+    return menu.categories.find((c) => c.id === product.categoryId)?.notePresets ?? [];
+  }
+
   function openProduct(product: LocalMenuProduct) {
+    const presets = categoryNotePresetsFor(product);
     const needsDetail =
-      hasVariations(product.variationGroups) || parseIngredientLines(product.ingredients).length > 0;
+      hasVariations(product.variationGroups) ||
+      parseIngredientLines(product.ingredients).length > 0 ||
+      presets.length > 0;
     if (!needsDetail) {
       addToCart(product, [], [], "");
       return;
@@ -270,6 +286,8 @@ export default function KasaOrderModal({
     setSelectedOptions(defaults);
     setRemovedIngredients([]);
     setLineNoteDraft("");
+    setSelectedNotePresets([]);
+    setNotePresetsSheetOpen(false);
   }
 
   function addToCart(
@@ -298,7 +316,14 @@ export default function KasaOrderModal({
         return n.trim() ? `${n.trim()}\n${line}` : line;
       });
     }
+    closeCustomize();
+  }
+
+  function closeCustomize() {
     setCustomize(null);
+    setLineNoteDraft("");
+    setSelectedNotePresets([]);
+    setNotePresetsSheetOpen(false);
   }
 
   function adjustQty(key: string, delta: number) {
@@ -501,8 +526,11 @@ export default function KasaOrderModal({
 
       setCart({});
       setOrderNote("");
-      onOrderPlaced?.();
       onClose();
+      // Fiş önizleme host'u event'i işlesin; parent refresh/remount hemen kesmesin.
+      window.setTimeout(() => {
+        onOrderPlaced?.();
+      }, 0);
     } catch {
       window.alert("Sipariş kaydedilemedi. Bağlantıyı kontrol edin.");
     } finally {
@@ -513,6 +541,9 @@ export default function KasaOrderModal({
   if (!open) return null;
 
   const customizeIngredients = customize ? parseIngredientLines(customize.ingredients) : [];
+  const customizeNotePresets = customize ? categoryNotePresetsFor(customize) : [];
+  const inlineNotePresets = customizeNotePresets.slice(0, INLINE_NOTE_PRESET_CHIP_LIMIT);
+  const hasMoreNotePresets = customizeNotePresets.length > INLINE_NOTE_PRESET_CHIP_LIMIT;
   const customizeBase = customize
     ? getProductPriceForFulfillmentWithVariations(customize, channel, [])
     : 0;
@@ -838,7 +869,7 @@ export default function KasaOrderModal({
 
       {customize ? (
         <div className="absolute inset-0 z-10 flex items-end justify-center bg-on-background/45 p-0 sm:items-center sm:p-6">
-          <button type="button" className="absolute inset-0" aria-label="Kapat" onClick={() => setCustomize(null)} />
+          <button type="button" className="absolute inset-0" aria-label="Kapat" onClick={closeCustomize} />
           <div className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-surface-container-highest bg-surface-container-lowest shadow-2xl sm:rounded-3xl">
             <div className="border-b border-surface-container-high px-5 py-4">
               <h3 className="font-headline text-xl font-bold text-on-background">{customize.name}</h3>
@@ -917,6 +948,47 @@ export default function KasaOrderModal({
                 </div>
               ) : null}
 
+              {customizeNotePresets.length > 0 ? (
+                <div className="mt-5">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-secondary">
+                    Kestirme notlar
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {inlineNotePresets.map((label) => {
+                      const on = selectedNotePresets.some(
+                        (s) => s.toLocaleLowerCase("tr") === label.toLocaleLowerCase("tr"),
+                      );
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() =>
+                            setSelectedNotePresets((prev) => toggleNotePreset(prev, label))
+                          }
+                          className={[
+                            "rounded-full border px-3 py-2 text-xs font-semibold active:scale-[0.98]",
+                            on
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-surface-container-highest bg-white text-on-background",
+                          ].join(" ")}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                    {hasMoreNotePresets ? (
+                      <button
+                        type="button"
+                        onClick={() => setNotePresetsSheetOpen(true)}
+                        className="rounded-full border border-dashed border-surface-container-highest bg-surface-container-low/60 px-3 py-2 text-xs font-bold text-secondary active:scale-[0.98]"
+                      >
+                        Tümü
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               <label className="mt-5 block">
                 <span className="text-[11px] font-bold uppercase tracking-wide text-secondary">
                   Ürün notu (opsiyonel)
@@ -932,17 +1004,85 @@ export default function KasaOrderModal({
             <div className="border-t border-surface-container-high p-4">
               <button
                 type="button"
-                onClick={() => addToCart(customize, removedIngredients, selectedOptions, lineNoteDraft)}
+                onClick={() =>
+                  addToCart(
+                    customize,
+                    removedIngredients,
+                    selectedOptions,
+                    composeLineNote(selectedNotePresets, lineNoteDraft),
+                  )
+                }
                 className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-b from-[#bc000c] to-[#e71418] py-4 text-base font-bold text-white active:scale-[0.98]"
               >
                 Sepete ekle · {formatTry(customizeLive)}
               </button>
               <button
                 type="button"
-                onClick={() => setCustomize(null)}
+                onClick={closeCustomize}
                 className="mt-2 w-full rounded-xl border border-surface-container-highest py-3 text-sm font-semibold text-secondary"
               >
                 Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {customize && notePresetsSheetOpen && customizeNotePresets.length > 0 ? (
+        <div className="fixed inset-0 z-[140] flex items-end justify-center sm:items-center sm:p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-on-background/50 backdrop-blur-[2px]"
+            aria-label="Kapat"
+            onClick={() => setNotePresetsSheetOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Kestirme notlar"
+            className="relative z-10 flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-surface-container-highest bg-surface-container-lowest shadow-2xl sm:rounded-2xl"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-surface-container-high px-5 py-4">
+              <h3 className="font-headline text-lg font-bold text-on-background">Kestirme notlar</h3>
+              <button
+                type="button"
+                onClick={() => setNotePresetsSheetOpen(false)}
+                className="rounded-xl border border-surface-container-highest px-3 py-2 text-sm font-semibold text-secondary"
+              >
+                Kapat
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <div className="flex flex-wrap gap-2">
+                {customizeNotePresets.map((label) => {
+                  const on = selectedNotePresets.some(
+                    (s) => s.toLocaleLowerCase("tr") === label.toLocaleLowerCase("tr"),
+                  );
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setSelectedNotePresets((prev) => toggleNotePreset(prev, label))}
+                      className={[
+                        "rounded-full border px-3 py-2.5 text-sm font-semibold active:scale-[0.98]",
+                        on
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-surface-container-highest bg-white text-on-background",
+                      ].join(" ")}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="border-t border-surface-container-high p-4">
+              <button
+                type="button"
+                onClick={() => setNotePresetsSheetOpen(false)}
+                className="w-full rounded-2xl bg-primary py-3.5 text-sm font-bold text-white"
+              >
+                Uygula
               </button>
             </div>
           </div>

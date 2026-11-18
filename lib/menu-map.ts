@@ -1,4 +1,5 @@
 ﻿import type { LocalMenuCategory, LocalMenuProduct, LocalMenuState } from '@/lib/local-menu';
+import { sanitizeNotePresets } from '@/lib/menu-note-presets';
 import {
   buildMenuProductWarningBadges,
   sanitizeCustomMenuWarnings,
@@ -14,6 +15,7 @@ export function menuCategoryRowToLocal(row: MenuCategoryRow): LocalMenuCategory 
     hidden: row.hidden,
     sortOrder: row.sort_order,
     description: row.description,
+    notePresets: sanitizeNotePresets(row.note_presets),
   };
 }
 
