@@ -262,7 +262,11 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
                 ].join(" ")}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryEditTarget(cat)}
+                    className="min-w-0 flex-1 rounded-xl text-left hover:bg-surface-container-low"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-headline text-xl font-bold text-on-background">«{cat.name}»</h2>
                       {cat.hidden ? (
@@ -278,7 +282,8 @@ export default function MenuManager({ subdomain, businessName }: MenuManagerProp
                     {cat.description ? (
                       <p className="mt-2 line-clamp-2 text-xs text-secondary">{cat.description}</p>
                     ) : null}
-                  </div>
+                    <p className="mt-2 text-xs font-semibold text-primary">Düzenlemek için tıkla</p>
+                  </button>
 
                   <div className="flex flex-wrap gap-2">
                     <button
